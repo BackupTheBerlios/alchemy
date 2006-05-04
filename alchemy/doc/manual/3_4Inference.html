@@ -1,0 +1,154 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2 Final//EN">
+
+<!--Converted with LaTeX2HTML 2002-2-1 (1.70)
+original version by:  Nikos Drakos, CBLU, University of Leeds
+* revised and updated by:  Marcus Hennecke, Ross Moore, Herb Swan
+* with significant contributions from:
+  Jens Lippmann, Marek Rouchal, Martin Wilck and others -->
+<HTML>
+<HEAD>
+<TITLE>3.4 Inference</TITLE>
+<META NAME="description" CONTENT="3.4 Inference">
+<META NAME="keywords" CONTENT="manual">
+<META NAME="resource-type" CONTENT="document">
+<META NAME="distribution" CONTENT="global">
+
+<META NAME="Generator" CONTENT="LaTeX2HTML v2002-2-1">
+<META HTTP-EQUIV="Content-Style-Type" CONTENT="text/css">
+
+<LINK REL="STYLESHEET" HREF="manual.css">
+
+<LINK REL="previous" HREF="3_3Structure_Learning.html">
+<LINK REL="up" HREF="3Quick_Start.html">
+<LINK REL="next" HREF="3_4_1Memory_efficient_MAP_i.html">
+</HEAD>
+
+<BODY >
+<!--Navigation Panel-->
+<A NAME="tex2html98"
+  HREF="3_4_1Memory_efficient_MAP_i.html">
+<IMG WIDTH="37" HEIGHT="24" ALIGN="BOTTOM" BORDER="0" ALT="next" SRC="next.png"></A> 
+<A NAME="tex2html96"
+  HREF="3Quick_Start.html">
+<IMG WIDTH="26" HEIGHT="24" ALIGN="BOTTOM" BORDER="0" ALT="up" SRC="up.png"></A> 
+<A NAME="tex2html92"
+  HREF="3_3Structure_Learning.html">
+<IMG WIDTH="63" HEIGHT="24" ALIGN="BOTTOM" BORDER="0" ALT="previous" SRC="prev.png"></A>   
+<BR>
+<B> Next:</B> <A NAME="tex2html99"
+  HREF="3_4_1Memory_efficient_MAP_i.html">3.4.1 Memory-efficient MAP inference</A>
+<B> Up:</B> <A NAME="tex2html97"
+  HREF="3Quick_Start.html">3 Quick Start</A>
+<B> Previous:</B> <A NAME="tex2html93"
+  HREF="3_3Structure_Learning.html">3.3 Structure Learning</A>
+<BR>
+<BR>
+<!--End of Navigation Panel-->
+
+<H2><A NAME="SECTION00034000000000000000">
+3.4 Inference</A>
+</H2>
+To perform inference, run the <TT>infer</TT> executable, 
+e.g., <TT>ALCHDIR/bin/infer -i univ-out.mln -e univ-test.db
+-r univ.results -q advisedBy,student,professor -c -p -mcmcMaxSteps 20000
+-functions univ-test.func</TT>. 
+
+<P>
+<TT>-i</TT> specifies the input <TT>.mln</TT> file. In that file all formulas 
+must be preceded by a weight or terminated by a period (but not both).
+An exception is a unit formula with variables followed by the <TT>!</TT> 
+operator. Such a unit formula can be preceded by a weight, or terminated 
+by a period, or neither. (For such a unit formula,  the code automatically 
+creates formulas stating that the variables have mutually exclusive and 
+exhaustive values. See Section&nbsp;<A HREF="4Syntax.html#syntax">4</A>.)
+Each formula in the input <TT>.mln</TT> file is converted to CNF. 
+If a weight precedes the formula, it is divided equally among 
+its CNF clauses.  
+If the formula is terminated by a period (i.e., the formula is hard), 
+each of its CNF clauses is given a default weight that is twice the maximum 
+soft clause weight.
+If neither weight nor period is specified for a unit formula with  
+variables followed by <TT>!</TT>, each of its CNF clauses is given 
+a default weight that is 1.5 times the maximum soft clause weight.
+(See Section&nbsp;<A HREF="6_2Parser.html#parserdir">6.2</A> on how to change the default weights.)
+
+<P>
+<TT>-e</TT> specifies the evidence <TT>.db</TT> file; a comma-separated list 
+can be used to specify more than one <TT>.db</TT> file. 
+<TT>-functions</TT> specifies the function mappings used for inference.
+<TT>-r</TT> specifies the output file which contains the inference results. 
+
+<P>
+<TT>-q</TT> specifies the query predicates. 
+You can specify more than one query predicate, and restrict the query to 
+particular groundings, e.g., <TT>-q advisedBy(x,Ida),advisedBy(Ida,Geri)</TT>. 
+(Depending on the shell you are using, you may have to enclose the query 
+predicates in quotes because of the presence of parentheses.) You can 
+also use the <TT>-f</TT> option to specify a file 
+(same format as a <TT>.db</TT> file without false and unknown atoms) 
+containing the query ground atoms you are interested in. 
+(You may use both <TT>-q</TT> and <TT>-f</TT> together.) 
+<TT>-p</TT> indicates that inference using Gibbs sampling is to be used, 
+and the probabilities that the query atoms are true are to be returned.
+<TT>-mcmcMaxSteps</TT> is used to specify the maximum number of Gibbs 
+sampling steps. 
+
+<P>
+To use MAP inference instead, specify either the 
+<TT>-m</TT> or <TT>-a</TT> option. The former only returns the true ground atoms, 
+while the latter returns both true and false ones. For MAP inference, 
+the output file also contains the weight assigned to a hard ground 
+clause, fraction of hard ground clauses that are satisfied, the sum 
+of their weights, and the sum of the weights of satisfied soft ground 
+clauses. During MAP inference, each hard clause (derived from a hard 
+formula with a terminating period) is given a weight that is the sum 
+of the soft clause weights plus 10. The current version of Alchemy flips
+clauses with negative weights and distributes the weight among the
+resulting unit clauses. These are treated as separate clauses, although
+from a satisfiability standpoint, this is not quite correct; if one unit
+clause is satisfied, then the entire original clause is satisfied and the
+complete weight should be used, not just the new weight of the unit clause.
+Future versions of Alchemy will handle negative weights in this manner.
+
+<P>
+By default, all first-order predicates are open world. 
+You can control the open/closed-world assumptions with the 
+<TT>-c</TT> and <TT>-o</TT> options. Type <TT>ALCHDIR/bin/infer</TT>
+without any parameters to see all available options, including those 
+pertaining to Gibbs sampling and MAP inference. 
+
+<P>
+<BR><HR>
+<!--Table of Child-Links-->
+<A NAME="CHILD_LINKS"><STRONG>Subsections</STRONG></A>
+
+<UL>
+<LI><A NAME="tex2html100"
+  HREF="3_4_1Memory_efficient_MAP_i.html">3.4.1 Memory-efficient MAP inference</A>
+</UL>
+<!--End of Table of Child-Links-->
+<HR>
+<!--Navigation Panel-->
+<A NAME="tex2html98"
+  HREF="3_4_1Memory_efficient_MAP_i.html">
+<IMG WIDTH="37" HEIGHT="24" ALIGN="BOTTOM" BORDER="0" ALT="next" SRC="next.png"></A> 
+<A NAME="tex2html96"
+  HREF="3Quick_Start.html">
+<IMG WIDTH="26" HEIGHT="24" ALIGN="BOTTOM" BORDER="0" ALT="up" SRC="up.png"></A> 
+<A NAME="tex2html92"
+  HREF="3_3Structure_Learning.html">
+<IMG WIDTH="63" HEIGHT="24" ALIGN="BOTTOM" BORDER="0" ALT="previous" SRC="prev.png"></A>   
+<BR>
+<B> Next:</B> <A NAME="tex2html99"
+  HREF="3_4_1Memory_efficient_MAP_i.html">3.4.1 Memory-efficient MAP inference</A>
+<B> Up:</B> <A NAME="tex2html97"
+  HREF="3Quick_Start.html">3 Quick Start</A>
+<B> Previous:</B> <A NAME="tex2html93"
+  HREF="3_3Structure_Learning.html">3.3 Structure Learning</A>
+<!--End of Navigation Panel-->
+<ADDRESS>
+Marc Sumner
+2006-05-03
+</ADDRESS>
+</BODY>
+</HTML>
