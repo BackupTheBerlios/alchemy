@@ -749,16 +749,21 @@ ZZ_FUNCTION
 
   char constName[100];
   char* constString;
-  if (zztmpReturnNum) {
+  if (zztmpReturnNum)
+  {
   	zzcreateAndCheckIntConstant(zztmpReturnConstant, zzfunc, zzpred, zzdomain, constName);
-    if (constName == NULL) {
+    if (constName == NULL)
+    {
       constString = (char *)malloc((strlen(zztmpReturnConstant) + 1)*sizeof(char));
       strcpy(constString, zztmpReturnConstant);
-    } else {
+    } else
+    {
 	  constString = (char *)malloc((strlen(constName) + 1)*sizeof(char));
       strcpy(constString, constName);
     }
-  } else {
+  }
+  else
+  {
     constString = (char *)malloc((strlen(zztmpReturnConstant) + 1)*sizeof(char));  
   	strcpy(constString, zztmpReturnConstant);
   }
@@ -1090,6 +1095,7 @@ atomic_sentence:
 
 	if (PredicateTemplate::isInternalPredicateTemplateName(predName))
 	{
+	  //zzinfixPredName is misused here to store internal pred. name
 	  zzinfixPredName = (char *)malloc((strlen(predName)
     								  	+ 1)*sizeof(char));
 	  strcpy(zzinfixPredName, predName);
@@ -1124,6 +1130,7 @@ atomic_sentence:
     if (folDbg >= 1) printf(") "); 
 
 	  //If an internal pred., then need to determine type
+	  //zzinfixPredName is misused here to store internal pred. name
 	if (zzinfixPredName)
 	{
 	  ListObj* predlo = zzpredFuncListObjs.top();
@@ -1286,10 +1293,28 @@ atomic_sentence:
   }
   term         
   internal_predicate_sign
+  {
+  	ListObj* predlo = zzpredFuncListObjs.top();
+    predlo->replace(PredicateTemplate::EMPTY_NAME, zzinfixPredName);
+    
+  	  // If type known from LHS, then set the pred types accordingly
+    int lTypeId = zzgetTypeId(zzpred->getTerm(0), (*predlo)[1]->getStr());
+    if (lTypeId>0)
+    {
+      if (strcmp(zzinfixPredName, PredicateTemplate::EQUAL_NAME)==0)
+      {
+        zzsetEqPredTypeName(lTypeId);
+      }
+      else
+ 	  {
+ 	    zzsetInternalPredTypeName(zzinfixPredName, lTypeId);
+ 	  }
+    }
+  }
   term
   {  
     ListObj* predlo = zzpredFuncListObjs.top();
-    predlo->replace(PredicateTemplate::EMPTY_NAME, zzinfixPredName);
+    //predlo->replace(PredicateTemplate::EMPTY_NAME, zzinfixPredName);
 
 	// types are possibly unknown
 	// If '=' predicate then types are possibly unknown
@@ -1533,6 +1558,29 @@ terms:
 | 
   //{ if (folDbg >= 2) printf("terms: term\n"); }
   term
+  {
+  	// After the first term in an internal pred., check if we can determine type
+  	if (zzpred && zzpred->isEmptyPred() &&
+  		zzpred->getNumTerms() == 1 && zzinfixPredName)
+  	{
+      ListObj* predlo = zzpredFuncListObjs.top();
+      predlo->replace(PredicateTemplate::EMPTY_NAME, zzinfixPredName);
+    
+  	  	// If type known from term, then set the pred types accordingly
+	  int lTypeId = zzgetTypeId(zzpred->getTerm(0), (*predlo)[1]->getStr());
+      if (lTypeId>0)
+      {
+      	if (strcmp(zzinfixPredName, PredicateTemplate::EQUAL_NAME)==0)
+      	{
+          zzsetEqPredTypeName(lTypeId);
+      	}
+      	else
+ 	  	{
+ 	      zzsetInternalPredTypeName(zzinfixPredName, lTypeId);
+ 	  	}
+      }
+  	}
+  }
 ;
 
 
@@ -1843,8 +1891,10 @@ function_term: // ZZ_FUNCTION '(' terms ')' | term internal_function_sign term
 	  const FunctionTemplate* t = zzgetGenericInternalFunctionTemplate(zzinfixFuncName);
 		// If in a pred. (not LHS of infix pred.), then we know the return type
 	  if (zzpred)
+	  {
 	  	((FunctionTemplate*)t)->setRetTypeId(
 	  		zzpred->getTermTypeAsInt(zzpred->getNumTerms()), zzdomain);
+	  }
 	  zzfunc->setTemplate((FunctionTemplate*)t);
 
 		// types are possibly unknown

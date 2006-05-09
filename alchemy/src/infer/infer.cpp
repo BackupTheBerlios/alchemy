@@ -25,9 +25,6 @@ bool  amapAll = false;
 bool  agibbsInfer = false;
 int   asmooth = 1;
 
-bool averifyResults = false;
-bool aisQueryEvidence = false;
-
 bool mwsLazy = false;
 
 int  mwsMaxSteps = 1000000;
@@ -40,8 +37,6 @@ int mwsLimit = -1;
 
 bool lazywsGnded = false;
 bool lazyNoApprox = false;
-bool mwsOriginal = false;
-
 
 int    mcmcNumChains    = 10;
 int    mcmcBurnMinSteps = 100;
@@ -100,14 +95,6 @@ ARGS ARGS::Args[] =
        "Run inference using MCMC (Gibbs sampling) and return probabilities "
        "for all query atoms."),
   
-  ARGS("v", ARGS::Tog, averifyResults, 
-       "If this flag is set, the query preds are taken to be closed world, for the purpose "
-	   " of verification. At the time of the inference, all the query preds are set to unknown."),
-  
-  ARGS("queryEvidence", ARGS::Tog, aisQueryEvidence, 
-       "If this flag is set along with the verify flag, then all the groundings of query preds"
-	   " not in db are assumed false evudence. This flag is ignored if verify flag is not set"),
- 
   ARGS("lazy", ARGS::Tog, mwsLazy, 
        "run lazy maxwalksat if this flag is set."),
   
@@ -184,7 +171,6 @@ ARGS ARGS::Args[] =
   ARGS()
 };
 
-/************************ Functions Added by Parag ***************************/
 	
 /* run the lazy walksat */
 void runLazyWalksat(MLN *mln, Domain *domain,
@@ -228,8 +214,10 @@ void runLazyWalksat(MLN *mln, Domain *domain,
   {  	
   	  //compute the fraction of hard clauses satisfied & the sum of their wts
     int numSatHard = 0, totalHard = 0;
-    double satSoftWt = 0, totalWt = 0;
+    double satSoftWt = 0, satHardWt = 0, totalWt = 0;
     const ClauseHashArray* clauses = mln->getClauses();
+    double hardClauseWt = LWInfo::HARD_WT;
+    
     for (int i = 0; i < clauses->size(); i++)
     {
       Clause* clause = (*clauses)[i];
@@ -238,13 +226,14 @@ void runLazyWalksat(MLN *mln, Domain *domain,
       if (clause->isHardClause())
       {
         int h = (int) clause->getNumGroundings(domain);
-        //totalWt += h * hardClauseWt;
+        totalWt += h * hardClauseWt;
         totalHard += h;
         double numSat = clause->getNumTrueGroundings(domain,domain->getDB(),
                                                      false);
         if (numSat > 0) 
         {
           numSatHard += int(numSat); 
+          satHardWt += numSat*hardClauseWt;
         }
       }
       else
@@ -260,7 +249,9 @@ void runLazyWalksat(MLN *mln, Domain *domain,
     {
       out 
         << "//Number of hard clauses satisfied = " 
-        << numSatHard << " out of " << totalHard << endl;
+        << numSatHard << " out of " << totalHard << endl
+        << "//Each hard clause is given a wt of " << hardClauseWt << endl
+        << "//Weight of satisfied hard clauses  = " << satHardWt << endl;
     }
     else
       out << "//No hard clause." << endl;
@@ -268,8 +259,7 @@ void runLazyWalksat(MLN *mln, Domain *domain,
                << endl;
     if (totalHard > 0)
       out << "//Weight of all satisfied clauses   = " 
-                 << satSoftWt << endl;
-
+                 << satHardWt+satSoftWt << endl;
 
 	if (queryFile.length() > 0)
   	{
@@ -297,8 +287,6 @@ void runLazyWalksat(MLN *mln, Domain *domain,
   }  
 }
 
-/************************ END Functions Added by Parag ***************************/
-
 int main(int argc, char* argv[])
 {
   ///////////////////////////  read & prepare parameters ///////////////////////
@@ -319,7 +307,6 @@ int main(int argc, char* argv[])
   Array<string> evidenceFilesArr;
   Array<string> funcFilesArr;
 
-  //Parag
   Array<Predicate *> queryPreds;
   Array<TruthValue> queryPredValues;
   
@@ -350,6 +337,9 @@ int main(int argc, char* argv[])
 
   if (!amapPos && !amapAll && !agibbsInfer)
   { cout << "ERROR: must specify one of -m/-a/-p options." << endl; return-1; }
+
+  if (mwsLazy && !(amapPos || amapAll))
+  { cout << "ERROR: -lazy can only be used with MAP inference (-m or -a option)." << endl; return-1; }
 
   if (aclosedWorld && aopenWorldPredsStr)
   { cout << "ERROR: cannot specify both -c & -o together." << endl; return -1; }
@@ -398,7 +388,6 @@ int main(int argc, char* argv[])
   wsparams->lazyGnded = lazywsGnded;
   wsparams->lazyNoApprox = lazyNoApprox;
   
-  //Parag:
   if(mwsSeed == -1)
   {
     struct timeval tv;
@@ -527,76 +516,28 @@ int main(int argc, char* argv[])
 
   if (agibbsInfer)
   {
-	//Deletion of DB and MLN moved down because of verify results
+      // not needed by gibbs sampling and deleted to save space
+    cout << "deleting DB and MLN to save space since they are not needed by "
+         << "Gibbs sampling..." << endl;
+    domain->deleteDB();
+    delete mln;
+
     bool saveSpace = true;
     int numSamples = mrf.runGibbsSampling(gibbsParams, wsparams, saveSpace, domain);
 
-	if(!averifyResults)
-	{
-      for (int i = 0; i < knownQueries.size(); i++)
-      {
-	      // Parag : print the real value as well probability
-	    if(averifyResults)
-	    {
-          Predicate* p = knownQueries[i]->createEquivalentPredicate(domain);
-          TruthValue tv = domain->getDB()->getValue(p);
-       	  delete p;
-          int val;
-	      if(tv == TRUE)
-		    val = 1;
-	      else 
-		    val = 0;
-	  
-	      resultsOut << " " << knownQueries[i]->getProbTrue() << " "<<val<<" ";
-	      knownQueries[i]->print(resultsOut, domain); 
-          resultsOut<<endl;
-	  	}
-	  	else
-	  	{ 
-	   	    //original version when results are not verified
-       	  knownQueries[i]->print(resultsOut, domain); 
-       	  resultsOut << " " << knownQueries[i]->getProbTrue() << endl;
-	   	}
-	   }
+    for (int i = 0; i < knownQueries.size(); i++)
+    {
+	  knownQueries[i]->print(resultsOut, domain); 
+      resultsOut << " " << knownQueries[i]->getProbTrue() << endl;
 	}
 	
     for (int i = 0; i < queries.size(); i++)
     {
-	  // Parag : print the real value as well probability
-	  if(averifyResults)
-	  {
-        Predicate* p = queries[i]->createEquivalentPredicate(domain);
-        TruthValue tv = domain->getDB()->getValue(p);
-        delete p;
-	  
-	    int val;
-	    if(tv == TRUE)
-		  val = 1;
-	    else 
-		  val = 0;
-	  
-	    double prob = queries[i]->getProbTrue();
-        if (asmooth>0) prob = (prob*numSamples+asmooth/2.0)/(numSamples+asmooth);
-	   
-	    resultsOut << " " << prob << " "<<val<<" ";
-        queries[i]->print(resultsOut, domain); 
-        resultsOut<<endl;
-	  }
-	  else
-	  {
-	  	//original version when results are not verified
-	  	double prob = queries[i]->getProbTrue();
-      	if (asmooth>0) prob = (prob*numSamples+asmooth/2.0)/(numSamples+asmooth);
-      	queries[i]->print(resultsOut, domain); resultsOut << " " << prob << endl;
-	  }
-    } 
-	//Parag:
-	cout << "deleting DB and MLN to save space since they are not needed by "
-         << "Gibbs sampling..." << endl;
-    domain->deleteDB();
-    delete mln;
- 
-  }
+	  double prob = queries[i]->getProbTrue();
+      if (asmooth>0) prob = (prob*numSamples+asmooth/2.0)/(numSamples+asmooth);
+      queries[i]->print(resultsOut, domain); resultsOut << " " << prob << endl;
+	}
+  } 
   else
   {   //MAP inference
     assert(amapPos || amapAll);

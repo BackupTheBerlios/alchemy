@@ -78,8 +78,7 @@ class Database
     {
         // if this is a '=' pred, leave termMultByPred_[i] & gndPredValues_[i]
         // as NULL
-      const PredicateTemplate* t = domain_->getPredicateTemplate(i);    
-      	//Parag: shifted this condition down into the loop
+      const PredicateTemplate* t = domain_->getPredicateTemplate(i);
 	  if (t->isEqualPredWithType()) continue;
 		// Internal predicates are included!
 		
@@ -142,7 +141,7 @@ class Database
     }
   }
   
-  //Parag: set the lazy flag, update the structures accordingly
+  // Set the lazy flag, update the structures accordingly
   void setLazyFlag()
   {
 	lazyFlag_ = true;
@@ -156,7 +155,6 @@ class Database
 	  for (int i = 0; i < numFOPreds; i++)
       {
       	const PredicateTemplate* t = domain_->getPredicateTemplate(i);    
-      	//Parag: shifted this condition down into the loop
 	  	if (t->isEqualPredWithType()) continue;
 		// Internal predicates are included!
 		  
@@ -205,7 +203,6 @@ class Database
       	if (gndPredValues_[i]) delete gndPredValues_[i];
       gndPredValues_.clearAndCompress();
   	
-	  //Parag:
 	  if(lazyFlag_)
 	  {
 	    for (int i = 0; i < gndPredActiveStatus_.size(); i++)  
@@ -240,7 +237,6 @@ class Database
         if (gndPredValues_[i]) gndPredValues_[i]->compress();
       gndPredValues_.compress();
     
-	  //Parag:
 	  if(lazyFlag_)
 	  {
 	    for (int i = 0; i < gndPredActiveStatus_.size(); i++) 
@@ -338,7 +334,7 @@ class Database
 	}
   }
  
-  //Parag : get the active status of the given ground predicate
+  // Get the active status of the given ground predicate
   bool getActiveStatus(const Predicate* const& pred) const
   {
   	if (dbdebug >= 1) cout << "Calling database::getActiveStatus" << endl;
@@ -395,7 +391,7 @@ class Database
 	return false;
   }
   
-  //Parag : get the evidence status of the given ground predicate
+  // Get the evidence status of the given ground predicate
   bool getEvidenceStatus(const Predicate* const& pred) const
   {	
   	if (dbdebug >= 1) cout << "Calling database::getEvidenceStatus" << endl;
@@ -426,19 +422,6 @@ class Database
 	  return false;
 	}
   }
-
-  // Marc: Not being used, so removed
-  /*
-  TruthValue* getValuePtr(const Predicate* const& pred) const
-  {
-    assert(((Predicate*)pred)->isGrounded());
-      //if this is a '=' predicate
-    if (pred->isEqualPredWithType()) return NULL;
-
-    int idx = getIdxOfGndPredValues(pred);
-    return &((*gndPredValues_[pred->getId()])[idx]);    
-  }
-*/
 
   string getValueAsString(const Predicate* const& pred) const
   {
@@ -655,7 +638,6 @@ class Database
     return oldtv;
   }
   
-  //Parag: 
   // Returns prev ActiveStatus of pred. Caller is responsible for deleting pred.
   bool setActiveStatus(const Predicate* const & pred, const bool& as)
   { 
@@ -742,7 +724,6 @@ class Database
   }
 
 
-  //Parag: 
   // Returns prev EvidenceStatus of pred. Caller is responsible for deleting pred.
   bool setEvidenceStatus(const Predicate* const & pred, const bool& es)
   {
@@ -1202,17 +1183,17 @@ class Database
     // gndPredValues_[p] contains the truth values of the groundings of pred p
   Array<Array<TruthValue>*> gndPredValues_;
    
-  //added by Parag: Dec 2005
+  	// Flag is set when performing lazy inference
   bool lazyFlag_;
   
-  // Flag set when performing inference. If set, hash table of false ground atoms
-  // is not used (all atoms are true or false).
+    // Flag set when performing inference. If set, hash table of false ground atoms
+    // is not used (all atoms are true or false).
   bool performingInference_;
   
-  // gndPredActiveStatus_[p] contains the active status of the groundings of pred p
+    // gndPredActiveStatus_[p] contains the active status of the groundings of pred p
   Array<Array<bool>*> gndPredActiveStatus_;
   
-  // gndPredEvidenceStatus_[p] contains whether p is evdience predicate or not
+    // gndPredEvidenceStatus_[p] contains whether p is evdience predicate or not
   Array<Array<bool>*> gndPredEvidenceStatus_;
 
     //firstConstId_[c] is the id of the first constant of class c

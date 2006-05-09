@@ -647,10 +647,12 @@ bool zzisLinkedPredicate(const char* predname, void* handle)
 }	
 
 void zzsetEqPredTypeName(const int& typeId)
-{
+{  
   const char * typeName = zzdomain->getTypeName(typeId);
   string eqPredName = PredicateTemplate::createEqualPredTypeName(typeName);
-  zzassert(zzdomain->getPredicateTemplate(eqPredName.c_str()) != NULL,
+  const PredicateTemplate* t = zzdomain->getPredicateTemplate(eqPredName.c_str());
+  zzpred->setTemplate((PredicateTemplate*)t);
+  zzassert(t != NULL,
            "expect equal pred template != NULL");
   ListObj* predlo = zzpredFuncListObjs.top(); 
   predlo->replace(PredicateTemplate::EQUAL_NAME, eqPredName.c_str());
@@ -1030,7 +1032,8 @@ void zzpredAppendConstant(Predicate* const& pred, const int& constId,
   }
 
     // if this is not '=' predicate with unknown types
-  if (!(strcmp(pred->getName(),PredicateTemplate::EQUAL_NAME)==0))
+  if (!(strcmp(pred->getName(),PredicateTemplate::EQUAL_NAME)==0) &&
+  	  !(strcmp(pred->getTermTypeAsStr(pred->getNumTerms()),PredicateTemplate::ANY_TYPE_NAME)==0))
   {
       // Check that constant has same type as that of predicate term
     int typeId = pred->getTermTypeAsInt(pred->getNumTerms());
@@ -1210,18 +1213,20 @@ void zzfuncAppendConstant(Function* const& func, const int& constId,
     return;
   }
 
-    // Check that constant has same type as that of predicate term
-  int typeId = func->getTermTypeAsInt(func->getNumTerms());
-  int unexpId; 
-  if (typeId != (unexpId=zzdomain->getConstantTypeId(constId)))
+  if (!(strcmp(func->getTermTypeAsStr(func->getNumTerms()),PredicateTemplate::ANY_TYPE_NAME)==0))
   {
-    const char* expName = zzdomain->getTypeName(typeId);
-    const char* unexpName = zzdomain->getTypeName(unexpId);
-    zzerr("Constant %s is of the wrong type. Expected %s but given %s", 
-          constName, expName, unexpName);
-    return;
+	  // Check that constant has same type as that of predicate term
+  	int typeId = func->getTermTypeAsInt(func->getNumTerms());
+  	int unexpId; 
+  	if (typeId != (unexpId=zzdomain->getConstantTypeId(constId)))
+  	{
+      const char* expName = zzdomain->getTypeName(typeId);
+      const char* unexpName = zzdomain->getTypeName(unexpId);
+      zzerr("Constant %s is of the wrong type. Expected %s but given %s", 
+            constName, expName, unexpName);
+      return;
+  	}
   }
-
     // at this point, we have the right num of term and right constant type
   if (func != NULL) func->appendTerm(new Term(constId, (void*)func, false));
 }
@@ -1719,6 +1724,34 @@ void zzcreateIntConstant(char* const & buf, const char* const & typeName,
                        const int& i)
 { sprintf(buf, "C@%s@%d", typeName, i); }
 
+  // Checks all types of domain if C@type@intStr is in domain
+bool isIntConstant(const int& i, const Domain* const & domain)
+{
+  const Array<const char*>* typeNames = domain->getTypeNames();
+  for (int j = 0; j < typeNames->size(); j++)
+  {
+  	char constName[100];
+  	zzcreateIntConstant(constName, (*typeNames)[j], i);
+  	if (domain->isConstant(constName)) 
+  	{
+  	  return true;
+  	}
+  }
+  return false;
+}
+
+  // Returns the first type found to have C@type@intStr as a constant
+const char* getIntConstantTypeName(const int& i, const Domain* const & domain)
+{ 
+  const Array<const char*>* typeNames = domain->getTypeNames();
+  for (int j = 0; j < typeNames->size(); j++)
+  {
+  	char constName[100];
+  	zzcreateIntConstant(constName, (*typeNames)[j], i);
+  	if (domain->getConstantId(constName) >= 0) return (*typeNames)[j];
+  }
+  return NULL;
+}
 
 void zzcreateAndCheckIntConstant(const char* const & intStr,
                                  const Function* const & func,
@@ -1735,6 +1768,14 @@ void zzcreateAndCheckIntConstant(const char* const & intStr,
 
   if (typeName == NULL) 
   { zzerr("Too many terms for predicate/function"); constName = NULL; return;}
+
+	// If type name is still open, then try to determine it
+  if (strcmp(typeName, PredicateTemplate::ANY_TYPE_NAME)==0)
+  {
+  	  // Constant may have been previously declared
+  	if (isIntConstant(i, domain))
+	  typeName = getIntConstantTypeName(i, domain);
+  }
 
   zzcreateIntConstant(constName, typeName, i);
 
@@ -2828,6 +2869,10 @@ void zzinsertPermutationOfLinkedFunction(const Domain* const & domain, void* fun
   	hash_map<int,PredicateHashArray*>::iterator it;
   	if ((it=zzpredIdToGndPredMap.find(predId)) == zzpredIdToGndPredMap.end())
     	zzpredIdToGndPredMap[predId] = new PredicateHashArray;
+
+//cout << "Mapping " << endl;
+//zzpred->printWithStrVar(cout, zzdomain);
+//cout << " " << zzpred->getTruthValue() << endl;
   
   	PredicateHashArray* pha = zzpredIdToGndPredMap[predId];
   	if (pha->append(zzpred) < 0)
@@ -3071,8 +3116,8 @@ void zzinsertPermutationOfLinkedPredicate(const Domain* const & domain, void* fu
   // Insert the predicate definition just created  
   const char* predName;
   	predName = ptemplate->getName();
-  for (int i = 0; i < currentConstants->size(); i++)
-    printf("%d ", (*currentConstants)[i]);
+  //for (int i = 0; i < currentConstants->size(); i++)
+    //printf("%d ", (*currentConstants)[i]);
   zzcreatePred(zzpred, predName);
   if (retBool) zzpred->setTruthValue(TRUE);
   else zzpred->setTruthValue(FALSE);
@@ -3093,6 +3138,10 @@ void zzinsertPermutationOfLinkedPredicate(const Domain* const & domain, void* fu
   if ((it=zzpredIdToGndPredMap.find(predId)) == zzpredIdToGndPredMap.end())
    	zzpredIdToGndPredMap[predId] = new PredicateHashArray;
   
+//cout << "Mapping " << endl;
+//zzpred->printWithStrVar(cout, zzdomain);
+//cout << " " << zzpred->getTruthValue() << endl;
+
   PredicateHashArray* pha = zzpredIdToGndPredMap[predId];
   if (pha->append(zzpred) < 0)
   {
@@ -3476,6 +3525,10 @@ void zzinsertPermutationOfInternalPredicate(int index,
   if ((it=zzpredIdToGndPredMap.find(predId)) == zzpredIdToGndPredMap.end())
    	zzpredIdToGndPredMap[predId] = new PredicateHashArray;
   
+//cout << "Mapping " << endl;
+//zzpred->printWithStrVar(cout, zzdomain);
+//cout << " " << zzpred->getTruthValue() << endl;
+
   PredicateHashArray* pha = zzpredIdToGndPredMap[predId];
   if (pha->append(zzpred) < 0)
   {
@@ -3608,6 +3661,10 @@ void zzinsertPermutationOfInternalFunction(int index, const FunctionTemplate* ft
   	hash_map<int,PredicateHashArray*>::iterator it;
   	if ((it=zzpredIdToGndPredMap.find(predId)) == zzpredIdToGndPredMap.end())
     	zzpredIdToGndPredMap[predId] = new PredicateHashArray;
+
+//cout << "Mapping " << endl;
+//zzpred->printWithStrVar(cout, zzdomain);
+//cout << " " << zzpred->getTruthValue() << endl;
   
   	PredicateHashArray* pha = zzpredIdToGndPredMap[predId];
   	if (pha->append(zzpred) < 0)

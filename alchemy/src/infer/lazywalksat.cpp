@@ -603,8 +603,6 @@ void LazyWalksat::fix(int tofix)
   }
 }
 
-
-/* added by Parag - add clauses*/
 void LazyWalksat::addNewClauses(bool initial)
 {
 	 //cout<<"adding new clauses.."<<endl;
@@ -897,7 +895,6 @@ void LazyWalksat::initializeBreakCost(int startclause)
 }
 	 
 
-/* added by Parag - allocate memory for clauses */
 void LazyWalksat::allocateClauseMemory(int allocCount) {
 #ifdef Huge
 	cout<<"Allocating Memory to Store "<<allocCount<<" Clauses.."<<endl;
@@ -940,7 +937,6 @@ void LazyWalksat::allocateClauseMemory(int allocCount) {
 }
 
 
-/* added by Parag - allocate memory for clauses */
 void LazyWalksat::allocateAtomMemory(int allocCount) {    
 	
 #ifdef Huge
@@ -1009,7 +1005,6 @@ void LazyWalksat::allocateAtomMemory(int allocCount) {
 }
 
 
-/* added by Parag - delete memory allocated for clauses */
 void LazyWalksat::deleteClauseMemory() {
 if(clausemem == 0)
 	 return;
@@ -1026,7 +1021,6 @@ if(clausemem == 0)
 	
 }
 
-/* added by Parag - delete memory allocated for atoms */
 void LazyWalksat::deleteAtomMemory() {    
 if(atommem == 0)
 	 return;

@@ -57,8 +57,6 @@ bool Clause::createAndAddUnknownClause(
 	if (unknownGndClauses)
     {
       unknownGndClauses->append(new GroundClause(clause));
-      //Parag : bug. should do this only if it is a hard clause
-	  //also, clause should be deleted
 	  if (isHardClause_) unknownGndClauses->lastItem()->setWtToHardWt();
     }
     else
@@ -73,10 +71,6 @@ bool Clause::createAndAddUnknownClause(
   return false;
 }
 
-/*********************** Functions Added by Parag *****************************/
-
-
-//Parag:
 void addPredicateToHash(const Clause* const & c, PredicateHashArray* const & predHashArray)
 {
   int numPreds = c->getNumPredicates();

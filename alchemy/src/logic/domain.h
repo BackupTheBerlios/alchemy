@@ -433,8 +433,8 @@ class Domain
   { return constDualMap_->getInt(name); }
 
 
-  bool isConstant(const char* const & name) {return (getConstantId(name) >= 0);}
-  bool isConstant(const int& id) { return (getConstantName(id) != NULL); }
+  bool isConstant(const char* const & name) const {return (getConstantId(name) >= 0);}
+  bool isConstant(const int& id) const { return (getConstantName(id) != NULL); }
 
     // Caller should delete the constName argument if required
   int getConstantTypeId(const char* const & constName) const 
@@ -493,6 +493,8 @@ class Domain
     for (int i = 0; i < getNumPredicates(); i++)
     {
       if (getPredicateTemplate(i)->isEqualPredicateTemplate()) continue;
+      if (getPredicateTemplate(i)->isInternalPredicateTemplate()) continue;
+      if (getPredicateTemplate(i)->isPredicateTemplateFromFunction()) continue;
       predNames.append(getPredicateName(i));
     }
   }

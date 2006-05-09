@@ -25,7 +25,7 @@ using namespace std;
 const bool useInverseIndex = true;
 
 /*********************************************************************************/
-/** Parag : need to define this type in the beginning as it is used in this file */
+/** Need to define this type in the beginning as it is used in this file */
 class HashClause;
 class EqualClause;
 typedef HashArray<Clause*, HashClause, EqualClause> ClauseHashArray;
@@ -1888,9 +1888,6 @@ class Clause
     return count;
   }
 
-  
-/************ Functions added by Parag ******************************************/
-
 
 //returns true if the ground clause was active 
 bool createAndAddActiveClause(Array<IntClause *> * const & activeIntClauses,
@@ -1993,12 +1990,6 @@ void sortLiteralsByNegationAndArity(Array<Predicate*>& clauseLits)
   }
 }
 
-bool isIndexable(Predicate* const & pred)
-{
-	// At most one of the two terms is grounded
-  if (pred->isGrounded()) return false;
-  return (!pred->getSense() && pred->getNumTerms() == 2);	
-}
 
   //Assumes clauseLits is ordered so that indexable lits are in the front
 void groundIndexableLiterals(const Domain* const & domain,
@@ -2013,14 +2004,13 @@ void groundIndexableLiterals(const Domain* const & domain,
 {
   const Database* db = domain->getDB();
 
-  if (isIndexable(clauseLits[litIdx]))
+  if (clauseLits[litIdx]->isIndexable())
   {
 	  // Branch and bound on indexable literals
 	Array<Predicate *>* indexedGndings = new Array<Predicate *>;
 	  // Bound
 	((Database *)db)->getIndexedGndings(indexedGndings, clauseLits[litIdx],
 														ignoreActivePreds);
-
 	  // Branch
 	for (int i = 0; i < indexedGndings->size(); i++)
 	{
@@ -2158,7 +2148,6 @@ void getActiveClausesAndCnt(const Domain* const & domain,
   activeClauseCnt = 0;
   Array<Predicate*> clauseLits(*predicates_);
   const Database* db = domain->getDB();
-
   if (useInverseIndex)
   {
 	sortLiteralsByNegationAndArity(clauseLits);
@@ -2395,8 +2384,7 @@ int getActiveClauseCnt(Predicate*  const & gndPred,
        
 	   return cnt;
   }
-	  
-/********* End Functions added by Parag ***********************************/
+
 
 private:
   

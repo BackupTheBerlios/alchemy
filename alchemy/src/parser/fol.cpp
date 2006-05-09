@@ -81,7 +81,7 @@
 
 
 /* Copy the first part of user declarations.  */
-#line 1 "/homes/gws/marcs/workspace/alchemy-release/src/parser/fol.y"
+#line 1 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
 
 #define YYSTYPE int
 #define YYDEBUG 1
@@ -180,16 +180,16 @@ static YYSTYPE yyval_default;
 /* YYFINAL -- State number of the termination state. */
 #define YYFINAL  2
 /* YYLAST -- Last index in YYTABLE.  */
-#define YYLAST   206
+#define YYLAST   205
 
 /* YYNTOKENS -- Number of terminals. */
 #define YYNTOKENS  38
 /* YYNNTS -- Number of nonterminals. */
-#define YYNNTS  85
+#define YYNNTS  86
 /* YYNRULES -- Number of rules. */
-#define YYNRULES  153
+#define YYNRULES  154
 /* YYNRULES -- Number of states. */
-#define YYNSTATES  214
+#define YYNSTATES  215
 /* YYMAXRHS -- Maximum number of symbols on right-hand side of rule. */
 #define YYMAXRHS 10
 /* YYMAXLEFT -- Maximum number of symbols to the left of a handle
@@ -254,10 +254,10 @@ static const unsigned short int yyprhs[] =
      240,   242,   244,   245,   247,   248,   253,   254,   257,   258,
      264,   265,   271,   272,   278,   279,   285,   286,   287,   288,
      295,   296,   300,   302,   304,   305,   306,   312,   314,   316,
-     317,   318,   326,   327,   332,   334,   336,   339,   342,   344,
-     345,   347,   348,   353,   355,   357,   359,   361,   363,   366,
-     370,   371,   373,   374,   375,   382,   383,   384,   385,   394,
-     396,   398,   400,   402
+     317,   318,   326,   327,   328,   334,   336,   338,   341,   344,
+     346,   347,   349,   350,   355,   357,   359,   361,   363,   365,
+     368,   372,   373,   375,   376,   377,   384,   385,   386,   387,
+     396,   398,   400,   402,   404
 };
 
 /* YYRHS -- A `-1'-separated list of the rules' RHS. */
@@ -294,16 +294,16 @@ static const signed char yyrhs[] =
       20,    96,    46,    90,    -1,    -1,    -1,    -1,    97,   101,
       98,   102,    99,    90,    -1,    -1,    21,   100,    90,    -1,
       15,    -1,    16,    -1,    -1,    -1,   103,   105,    32,   104,
-     102,    -1,   105,    -1,    11,    -1,    -1,    -1,   111,     8,
-     107,    33,   108,   112,    34,    -1,    -1,   109,   114,   110,
-     114,    -1,    36,    -1,    37,    -1,    36,    29,    -1,    37,
-      29,    -1,    29,    -1,    -1,    22,    -1,    -1,   112,    32,
-     113,   114,    -1,   114,    -1,   116,    -1,    10,    -1,     5,
-      -1,     3,    -1,   115,    11,    -1,   115,    11,    21,    -1,
-      -1,    14,    -1,    -1,    -1,     9,   117,    33,   118,   112,
-      34,    -1,    -1,    -1,    -1,   119,    33,   120,   114,   122,
-     121,   114,    34,    -1,    14,    -1,    13,    -1,    22,    -1,
-      23,    -1,    24,    -1
+     102,    -1,   105,    -1,    11,    -1,    -1,    -1,   112,     8,
+     107,    33,   108,   113,    34,    -1,    -1,    -1,   109,   115,
+     111,   110,   115,    -1,    36,    -1,    37,    -1,    36,    29,
+      -1,    37,    29,    -1,    29,    -1,    -1,    22,    -1,    -1,
+     113,    32,   114,   115,    -1,   115,    -1,   117,    -1,    10,
+      -1,     5,    -1,     3,    -1,   116,    11,    -1,   116,    11,
+      21,    -1,    -1,    14,    -1,    -1,    -1,     9,   118,    33,
+     119,   113,    34,    -1,    -1,    -1,    -1,   120,    33,   121,
+     115,   123,   122,   115,    34,    -1,    14,    -1,    13,    -1,
+      22,    -1,    23,    -1,    24,    -1
 };
 
 /* YYRLINE[YYN] -- source line where rule number YYN was defined.  */
@@ -317,14 +317,14 @@ static const unsigned short int yyrline[] =
      446,   444,   453,   456,   493,   505,   506,   492,   526,   549,
      574,   525,   603,   603,   609,   608,   613,   612,   615,   616,
      620,   633,   652,   655,   661,   673,   686,   672,   730,   736,
-     776,   728,   821,   829,   839,   840,   846,   855,   863,   872,
-     884,   893,   908,   911,   926,   925,   940,   940,   944,   943,
-     956,   955,   968,   967,   979,   978,   990,   992,   998,   990,
-    1009,  1008,  1024,  1032,  1045,  1047,  1045,  1054,  1058,  1084,
-    1113,  1083,  1270,  1270,  1428,  1442,  1456,  1473,  1490,  1505,
-    1507,  1525,  1523,  1535,  1540,  1714,  1724,  1736,  1751,  1757,
-    1781,  1783,  1795,  1831,  1794,  1911,  1927,  1932,  1911,  2016,
-    2025,  2034,  2043,  2052
+     781,   728,   826,   834,   844,   845,   851,   860,   868,   877,
+     889,   898,   913,   916,   931,   930,   945,   945,   949,   948,
+     961,   960,   973,   972,   984,   983,   995,   997,  1003,   995,
+    1014,  1013,  1029,  1037,  1050,  1052,  1050,  1059,  1063,  1089,
+    1119,  1088,  1277,  1296,  1277,  1453,  1467,  1481,  1498,  1515,
+    1530,  1532,  1550,  1548,  1560,  1588,  1762,  1772,  1784,  1799,
+    1805,  1829,  1831,  1843,  1879,  1842,  1961,  1977,  1982,  1961,
+    2066,  2075,  2084,  2093,  2102
 };
 #endif
 
@@ -352,9 +352,9 @@ static const char *const yytname[] =
   "function_return_constant", "weight", "sentence", "@23", "@24", "@25",
   "@26", "@27", "@28", "@29", "@30", "@31", "@32", "quantifier",
   "variables", "@33", "@34", "quant_variable", "atomic_sentence", "@35",
-  "@36", "@37", "internal_predicate_sign", "asterisk", "terms", "@38",
-  "term", "plus", "function_term", "@39", "@40", "@41", "@42", "@43",
-  "internal_function_sign", 0
+  "@36", "@37", "@38", "internal_predicate_sign", "asterisk", "terms",
+  "@39", "term", "plus", "function_term", "@40", "@41", "@42", "@43",
+  "@44", "internal_function_sign", 0
 };
 #endif
 
@@ -373,10 +373,10 @@ static const unsigned char yyr1[] =
       88,    88,    89,    89,    91,    90,    92,    90,    93,    90,
       94,    90,    95,    90,    96,    90,    97,    98,    99,    90,
      100,    90,   101,   101,   103,   104,   102,   102,   105,   107,
-     108,   106,   109,   106,   110,   110,   110,   110,   110,   111,
-     111,   113,   112,   112,   114,   114,   114,   114,   114,   114,
-     115,   115,   117,   118,   116,   119,   120,   121,   116,   122,
-     122,   122,   122,   122
+     108,   106,   109,   110,   106,   111,   111,   111,   111,   111,
+     112,   112,   114,   113,   113,   115,   115,   115,   115,   115,
+     115,   116,   116,   118,   119,   117,   120,   121,   122,   117,
+     123,   123,   123,   123,   123
 };
 
 /* YYR2[YYN] -- Number of symbols composing right hand side of rule YYN.  */
@@ -394,10 +394,10 @@ static const unsigned char yyr2[] =
        1,     1,     0,     1,     0,     4,     0,     2,     0,     5,
        0,     5,     0,     5,     0,     5,     0,     0,     0,     6,
        0,     3,     1,     1,     0,     0,     5,     1,     1,     0,
-       0,     7,     0,     4,     1,     1,     2,     2,     1,     0,
-       1,     0,     4,     1,     1,     1,     1,     1,     2,     3,
-       0,     1,     0,     0,     6,     0,     0,     0,     8,     1,
-       1,     1,     1,     1
+       0,     7,     0,     0,     5,     1,     1,     2,     2,     1,
+       0,     1,     0,     4,     1,     1,     1,     1,     1,     2,
+       3,     0,     1,     0,     0,     6,     0,     0,     0,     8,
+       1,     1,     1,     1,     1
 };
 
 /* YYDPREC[RULE-NUM] -- Dynamic precedence of rule #RULE-NUM (0 if none). */
@@ -418,7 +418,7 @@ static const unsigned char yydprec[] =
        0,     0,     0,     0,     0,     0,     0,     0,     0,     0,
        0,     0,     0,     0,     0,     0,     0,     0,     0,     0,
        0,     0,     0,     0,     0,     0,     0,     0,     0,     0,
-       0,     0,     0,     0
+       0,     0,     0,     0,     0
 };
 
 /* YYMERGER[RULE-NUM] -- Index of merging function for rule #RULE-NUM. */
@@ -439,7 +439,7 @@ static const unsigned char yymerger[] =
        0,     0,     0,     0,     0,     0,     0,     0,     0,     0,
        0,     0,     0,     0,     0,     0,     0,     0,     0,     0,
        0,     0,     0,     0,     0,     0,     0,     0,     0,     0,
-       0,     0,     0,     0
+       0,     0,     0,     0,     0
 };
 
 /* YYDEFACT[S] -- default rule to reduce with in state S when YYTABLE
@@ -454,21 +454,21 @@ static const unsigned char yydefact[] =
        9,     0,    27,    28,    26,    55,    96,    75,    10,    78,
       29,    59,     0,   110,    94,    19,   122,     0,     0,     0,
       33,     0,     0,    71,    70,    56,    68,    69,    96,    96,
-     100,    98,   102,   104,    20,    15,   130,    97,   140,     0,
+     100,    98,   102,   104,    20,    15,   131,    97,   141,     0,
      112,   113,   107,    76,    79,    39,    45,    60,    64,     0,
-     111,     0,    23,    23,    23,    23,     0,   137,   136,   142,
-     135,   141,     0,     0,   134,     0,   119,     0,     0,     0,
+     111,     0,    23,    23,    23,    23,     0,   138,   137,   143,
+     136,   142,     0,     0,   135,     0,   119,     0,     0,     0,
        0,    30,    40,    34,     0,     0,     0,     0,    57,    95,
-      24,    25,    96,    96,    96,    96,    16,     0,   128,   124,
-     125,   140,   138,   146,     0,   118,   108,     0,   117,    86,
+      24,    25,    96,    96,    96,    96,    16,     0,   129,   125,
+     126,   123,   139,   147,     0,   118,   108,     0,   117,    86,
       85,    84,    87,    39,    82,    80,    42,    43,     0,    46,
-       0,    65,    67,   101,    99,   103,   105,   143,   126,   127,
-     123,   139,   140,   120,    96,     0,    77,     0,     0,    41,
-      37,    38,    36,    35,     0,    61,   140,     0,   140,   109,
-     115,    83,    39,    53,     0,     0,    49,    52,     0,   133,
-     150,   149,   151,   152,   153,   147,     0,     0,    81,     0,
-      47,    50,   131,   144,   140,   121,   116,    48,     0,   140,
-       0,    51,   132,   148
+       0,    65,    67,   101,    99,   103,   105,   144,   127,   128,
+     141,   140,   141,   120,    96,     0,    77,     0,     0,    41,
+      37,    38,    36,    35,     0,    61,   141,   124,     0,   141,
+     109,   115,    83,    39,    53,     0,     0,    49,    52,     0,
+     134,   151,   150,   152,   153,   154,   148,     0,     0,    81,
+       0,    47,    50,   132,   145,   141,   121,   116,    48,     0,
+     141,     0,    51,   133,   149
 };
 
 /* YYPDEFGOTO[NTERM-NUM]. */
@@ -476,13 +476,13 @@ static const short int yydefgoto[] =
 {
       -1,     1,    10,    46,    96,    11,    75,    12,   122,    13,
       44,    14,    60,    15,    85,   148,   173,   167,    16,    61,
-     114,   174,   185,   186,   208,   187,    17,    22,    52,    89,
+     114,   174,   186,   187,   209,   188,    17,    22,    52,    89,
       18,    41,    62,   115,    19,    65,   116,   117,    66,    67,
       33,    48,    58,   108,    34,    59,   109,   168,   143,   144,
       35,    24,    55,    69,    56,    93,    92,    94,    95,    57,
-     107,   164,    68,    82,   136,   137,   197,   138,    77,   134,
-     178,    78,   131,    79,   188,   209,   189,   103,   104,   127,
-     176,   105,   162,   204,   195
+     107,   164,    68,    82,   136,   137,   198,   138,    77,   134,
+     179,    78,   160,   131,    79,   189,   210,   190,   103,   104,
+     127,   176,   105,   162,   205,   196
 };
 
 /* YYPACT[STATE-NUM] -- Index in YYTABLE of the portion describing
@@ -490,72 +490,72 @@ static const short int yydefgoto[] =
 #define YYPACT_NINF -79
 static const short int yypact[] =
 {
-     -79,    11,   -79,    -1,    25,    -4,    27,   -79,   -79,   -79,
-      47,    38,   -79,   -79,    55,    31,    55,    55,    55,   -79,
-     -79,    57,    32,   -79,   -79,   -79,   -79,   -79,   -79,   -79,
-     -79,   -79,   -79,    70,   -79,    58,   -79,    88,   -79,   -79,
+     -79,    11,   -79,    -1,    33,    -4,    19,   -79,   -79,   -79,
+      57,    38,   -79,   -79,    25,    36,    25,    25,    25,   -79,
+     -79,    55,    45,   -79,   -79,   -79,   -79,   -79,   -79,   -79,
+     -79,   -79,   -79,    77,   -79,    58,   -79,    62,   -79,   -79,
      -79,    98,   -79,   -79,   -79,   -79,    46,   -79,   -79,   -79,
-     129,   -79,    -7,   -79,   -79,   121,     9,   146,    59,   133,
-     -79,   143,   135,   -79,   -79,   127,   -79,   -79,    53,    56,
-     -79,   -79,   -79,   -79,   -79,   -79,   -79,   -79,    37,   159,
+     123,   -79,    -7,   -79,   -79,   121,     9,   147,    85,   122,
+     -79,   139,   113,   -79,   -79,   128,   -79,   -79,    53,    56,
+     -79,   -79,   -79,   -79,   -79,   -79,   -79,   -79,    37,   160,
      -79,   -79,   -79,   -79,   -79,     3,   -79,   -79,   158,   136,
-     -79,   103,    89,    89,    89,    89,    55,   -79,   -79,   -79,
-     -79,   -79,   107,   160,   -79,   139,   -79,   163,   100,   142,
-     141,   -79,   151,   -79,   145,    -7,   166,   168,   -79,   -79,
-     -79,   -79,    60,    75,    79,    83,   -79,   147,   -79,   152,
-     153,    37,   164,   -79,   150,   -79,   -79,   173,   -79,   -79,
-     -79,   -79,   -79,    20,   -79,   -79,   161,   -79,   140,   -79,
-     -19,   -79,   -79,   134,   144,   167,   -79,   -79,   -79,   -79,
-     -79,   -79,    37,   -79,    86,   156,   -79,   100,   100,   -79,
-     -79,   -79,   -79,   -79,   162,   -79,    37,   111,    37,   110,
-     -79,   -79,    81,   -79,   157,   165,   -79,   169,   115,   -79,
-     -79,   -79,   -79,   -79,   -79,   -79,   126,   179,   -79,   188,
-     -79,   -79,   -79,   -79,    37,   -79,   -79,   -79,   189,    37,
-     170,   -79,   -79,   -79
+     -79,   103,    89,    89,    89,    89,    25,   -79,   -79,   -79,
+     -79,   -79,   107,   161,   -79,   138,   -79,   162,   100,   141,
+     143,   -79,   151,   -79,   146,    -7,   165,   168,   -79,   -79,
+     -79,   -79,    60,    75,    79,    83,   -79,   148,   -79,   153,
+     154,   -79,   159,   -79,   152,   -79,   -79,   173,   -79,   -79,
+     -79,   -79,   -79,    20,   -79,   -79,   164,   -79,   140,   -79,
+     -19,   -79,   -79,   110,   145,   166,   -79,   -79,   -79,   -79,
+      37,   -79,    37,   -79,    86,   155,   -79,   100,   100,   -79,
+     -79,   -79,   -79,   -79,   163,   -79,    37,   -79,   111,    37,
+     135,   -79,   -79,    81,   -79,   156,   167,   -79,   169,   115,
+     -79,   -79,   -79,   -79,   -79,   -79,   -79,   127,   179,   -79,
+     188,   -79,   -79,   -79,   -79,    37,   -79,   -79,   -79,   189,
+      37,   170,   -79,   -79,   -79
 };
 
 /* YYPGOTO[NTERM-NUM].  */
 static const signed char yypgoto[] =
 {
-     -79,   -79,   -79,   -79,   -79,   -79,   -79,    -8,    62,   -79,
+     -79,   -79,   -79,   -79,   -79,   -79,   -79,    -8,    63,   -79,
      -79,   -79,   -79,   -79,   -79,   -79,   -79,   108,   -79,   -79,
-     -79,   -79,   -79,   -14,   -79,   -79,   -79,   -79,   -79,   -79,
-     -79,   -79,   -79,   -79,   -79,    80,   -79,   -79,    82,    85,
-     -79,   -79,   -79,   -79,   -79,   -79,   -79,   -79,    29,    33,
+     -79,   -79,   -79,   -15,   -79,   -79,   -79,   -79,   -79,   -79,
+     -79,   -79,   -79,   -79,   -79,    80,   -79,   -79,    84,    82,
+     -79,   -79,   -79,   -79,   -79,   -79,   -79,   -79,    28,    30,
      -79,   -79,   -67,   -79,   -79,   -79,   -79,   -79,   -79,   -79,
-     -79,   -79,   -79,   -79,     2,   -79,   -79,    66,   -79,   -79,
-     -79,   -79,   -79,   -79,    28,   -79,   -78,   -79,   -79,   -79,
-     -79,   -79,   -79,   -79,   -79
+     -79,   -79,   -79,   -79,     4,   -79,   -79,    66,   -79,   -79,
+     -79,   -79,   -79,   -79,   -79,    26,   -79,   -78,   -79,   -79,
+     -79,   -79,   -79,   -79,   -79,   -79
 };
 
 /* YYTABLE[YYPACT[STATE-NUM]].  What to do in state STATE-NUM.  If
    positive, shift that token.  If negative, reduce the rule which
    number is the opposite.  If zero, do what YYDEFACT says.
    If YYTABLE_NINF, parse error.  */
-#define YYTABLE_NINF -146
+#define YYTABLE_NINF -147
 static const short int yytable[] =
 {
      102,    90,    91,    32,    63,    64,    36,   -63,    38,    39,
-      40,     2,     3,    88,   -13,   175,   -13,  -129,     4,   -13,
+      40,     2,     3,    88,   -13,   175,   -13,  -130,     4,   -13,
      -13,   -13,     5,     6,    20,   -13,   -13,   -13,   110,   -54,
-      21,    76,   -13,   -13,   111,   112,     7,     8,   -62,     9,
+     -62,    76,   -13,   -13,   111,   112,     7,     8,    21,     9,
       97,    25,    98,    26,   -13,   110,    99,   100,    27,    28,
-      23,   101,   112,   160,   166,   153,   154,   155,   156,    29,
-      37,  -106,  -106,     7,    30,    45,     9,    53,  -106,  -106,
-    -145,  -106,  -106,    31,    53,  -106,  -106,    53,    47,    54,
-       7,    53,    42,     9,   177,    43,    54,    49,   126,    54,
-    -106,  -106,    83,    54,  -106,  -106,    53,   179,  -106,  -106,
+       7,   101,   112,     9,   166,   153,   154,   155,   156,    29,
+      23,  -106,  -106,     7,    30,    37,     9,    53,  -106,  -106,
+    -146,  -106,  -106,    31,    53,  -106,  -106,    53,    45,    54,
+      42,    53,   177,    43,   178,    47,    54,    49,   126,    54,
+    -106,  -106,    50,    54,  -106,  -106,    53,   180,  -106,  -106,
       53,  -106,  -106,   139,    53,   140,   110,    53,    54,    51,
-     141,   142,    54,   112,   120,   198,    54,   121,    50,    54,
-      70,    71,    72,    73,   190,   191,   210,    70,    71,    72,
-      73,   212,   -44,   192,   193,   194,   128,   119,    70,    71,
-      72,    73,    84,   129,   130,   170,    86,   202,    74,   203,
-     171,   172,    71,    72,    73,   123,   124,   125,   202,    88,
-     205,    80,    81,    72,    73,   183,   184,   106,    87,   -66,
-     118,   132,   133,   146,   135,   145,   147,   149,    64,    63,
-     157,   158,   159,   163,   135,   161,   169,    73,   180,   199,
-     135,   207,   183,   113,   211,   150,   200,   182,   151,   206,
-     181,   201,   152,   165,   213,     0,   196
+     141,   142,    54,   112,   120,   199,    54,   121,    83,    54,
+      70,    71,    72,    73,   191,   192,   -44,   211,    71,    72,
+      73,    84,   213,   193,   194,   195,   128,   119,    70,    71,
+      72,    73,    86,   129,   130,   170,    87,   203,    74,   204,
+     171,   172,    70,    71,    72,    73,   123,   124,   125,   203,
+      88,   206,    80,    81,    72,    73,   184,   185,   106,   -66,
+     118,   133,   132,   135,   145,   146,   147,    64,   149,    63,
+     161,   157,   158,   159,   135,   163,    73,   181,   200,   169,
+     135,   208,   184,   113,   212,   150,   183,   182,   201,   152,
+     151,   202,   207,   165,   214,   197
 };
 
 /* YYCONFLP[YYPACT[STATE-NUM]] -- Pointer into YYCONFL of start of
@@ -569,22 +569,22 @@ static const unsigned char yyconflp[] =
        0,     0,     1,     0,     0,     0,     0,     0,     0,     0,
        0,     0,     0,     0,     0,     0,     0,     0,     0,     0,
        0,     0,     0,     0,     0,     0,     0,     0,     0,     0,
-       3,     0,     0,     0,     0,     0,     0,     0,     0,     0,
        0,     0,     0,     0,     0,     0,     0,     0,     0,     0,
+       3,     0,     0,     0,     0,     0,     0,     0,     0,     0,
        0,     0,     0,     0,     0,     0,     0,     0,     0,     5,
        0,     0,     0,     0,     0,     0,     7,     0,     0,     9,
        0,     0,     0,    13,     0,     0,     0,     0,     0,     0,
        0,     0,     0,     0,     0,     0,     0,     0,    15,     0,
        0,     0,    17,     0,     0,     0,    19,     0,     0,    21,
-       0,     0,     0,     0,     0,     0,     0,    23,    25,    27,
-      29,     0,     0,     0,     0,     0,     0,     0,     0,     0,
        0,     0,     0,     0,     0,     0,     0,     0,     0,     0,
        0,     0,     0,     0,     0,     0,     0,     0,     0,     0,
        0,     0,     0,     0,     0,     0,     0,     0,     0,     0,
-       0,     0,     0,     0,    11,     0,     0,     0,     0,     0,
+       0,     0,    23,    25,    27,    29,     0,     0,     0,     0,
+       0,     0,     0,     0,     0,     0,     0,     0,     0,     0,
+       0,     0,     0,    11,     0,     0,     0,     0,     0,     0,
        0,     0,     0,     0,     0,     0,     0,     0,     0,     0,
       31,     0,     0,     0,     0,     0,     0,     0,     0,     0,
-       0,     0,     0,     0,     0,     0,     0
+       0,     0,     0,     0,     0,     0
 };
 
 /* YYCONFL[I] -- lists of conflicting rule numbers, each terminated by
@@ -597,29 +597,29 @@ static const short int yyconfl[] =
        0,   114,     0
 };
 
-static const short int yycheck[] =
+static const unsigned char yycheck[] =
 {
       78,    68,    69,    11,    11,    12,    14,    11,    16,    17,
       18,     0,     1,    32,     3,    34,     5,     8,     7,     8,
        9,    10,    11,    12,    25,    14,    15,    16,    25,    33,
-       5,    22,    21,    22,    31,    32,    25,    26,    11,    28,
+      11,    22,    21,    22,    31,    32,    25,    26,     5,    28,
        3,     3,     5,     5,    33,    25,     9,    10,    10,    11,
-       3,    14,    32,   131,    34,   122,   123,   124,   125,    21,
-      29,    15,    16,    25,    26,    33,    28,    21,    15,    16,
-      33,    15,    16,    35,    21,    15,    16,    21,     8,    33,
-      25,    21,    25,    28,   162,    28,    33,    29,    96,    33,
-      15,    16,    33,    33,    15,    16,    21,   164,    15,    16,
+      25,    14,    32,    28,    34,   122,   123,   124,   125,    21,
+       3,    15,    16,    25,    26,    29,    28,    21,    15,    16,
+      33,    15,    16,    35,    21,    15,    16,    21,    33,    33,
+      25,    21,   160,    28,   162,     8,    33,    29,    96,    33,
+      15,    16,    30,    33,    15,    16,    21,   164,    15,    16,
       21,    15,    16,     3,    21,     5,    25,    21,    33,    11,
-      10,    11,    33,    32,    25,    34,    33,    28,    30,    33,
-      17,    18,    19,    20,    13,    14,   204,    17,    18,    19,
-      20,   209,     3,    22,    23,    24,    29,    34,    17,    18,
-      19,    20,     9,    36,    37,     5,     3,    32,    27,    34,
-      10,    11,    18,    19,    20,    93,    94,    95,    32,    32,
-      34,    15,    16,    19,    20,     3,     4,     8,    33,    11,
-      34,    11,    33,    32,    11,    33,    25,    32,    12,    11,
-      33,    29,    29,    33,    11,    21,    25,    20,    32,    32,
-      11,     3,     3,    85,   208,   115,    31,   168,   116,   197,
-     167,    32,   117,   137,    34,    -1,   178
+      10,    11,    33,    32,    25,    34,    33,    28,    33,    33,
+      17,    18,    19,    20,    13,    14,     3,   205,    18,    19,
+      20,     9,   210,    22,    23,    24,    29,    34,    17,    18,
+      19,    20,     3,    36,    37,     5,    33,    32,    27,    34,
+      10,    11,    17,    18,    19,    20,    93,    94,    95,    32,
+      32,    34,    15,    16,    19,    20,     3,     4,     8,    11,
+      34,    33,    11,    11,    33,    32,    25,    12,    32,    11,
+      21,    33,    29,    29,    11,    33,    20,    32,    32,    25,
+      11,     3,     3,    85,   209,   115,   168,   167,    31,   117,
+     116,    32,   198,   137,    34,   179
 };
 
 /* YYSTOS[STATE-NUM] -- The (internal number of the) accessing
@@ -633,21 +633,21 @@ static const unsigned char yystos[] =
       45,    69,    25,    28,    48,    33,    41,     8,    79,    29,
       30,    11,    66,    21,    33,    90,    92,    97,    80,    83,
       50,    57,    70,    11,    12,    73,    76,    77,   100,    91,
-      17,    18,    19,    20,    27,    44,    22,   106,   109,   111,
+      17,    18,    19,    20,    27,    44,    22,   106,   109,   112,
       15,    16,   101,    33,     9,    52,     3,    33,    32,    67,
       90,    90,    94,    93,    95,    96,    42,     3,     5,     9,
-      10,    14,   114,   115,   116,   119,     8,    98,    81,    84,
+      10,    14,   115,   116,   117,   120,     8,    98,    81,    84,
       25,    31,    32,    55,    58,    71,    74,    75,    34,    34,
-      25,    28,    46,    46,    46,    46,    45,   117,    29,    36,
-      37,   110,    11,    33,   107,    11,   102,   103,   105,     3,
+      25,    28,    46,    46,    46,    46,    45,   118,    29,    36,
+      37,   111,    11,    33,   107,    11,   102,   103,   105,     3,
        5,    10,    11,    86,    87,    33,    32,    25,    53,    32,
       73,    76,    77,    90,    90,    90,    90,    33,    29,    29,
-     114,    21,   120,    33,    99,   105,    34,    55,    85,    25,
-       5,    10,    11,    54,    59,    34,   118,   114,   108,    90,
-      32,    87,    86,     3,     4,    60,    61,    63,   112,   114,
-      13,    14,    22,    23,    24,   122,   112,   104,    34,    32,
-      31,    32,    32,    34,   121,    34,   102,     3,    62,   113,
-     114,    61,   114,    34
+     110,    21,   121,    33,    99,   105,    34,    55,    85,    25,
+       5,    10,    11,    54,    59,    34,   119,   115,   115,   108,
+      90,    32,    87,    86,     3,     4,    60,    61,    63,   113,
+     115,    13,    14,    22,    23,    24,   123,   113,   104,    34,
+      32,    31,    32,    32,    34,   122,    34,   102,     3,    62,
+     114,   115,    61,   115,    34
 };
 
 
@@ -961,12 +961,12 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
   switch (yyn)
     {
         case 2:
-#line 49 "/homes/gws/marcs/workspace/alchemy-release/src/parser/fol.y"
+#line 49 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
     { if (folDbg >= 2) printf("input: empty\n"); ;}
     break;
 
   case 3:
-#line 52 "/homes/gws/marcs/workspace/alchemy-release/src/parser/fol.y"
+#line 52 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
     { 
     yyerrok; // tell Bison not to suppress any errors
     const char* tok; 
@@ -980,7 +980,7 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 13:
-#line 76 "/homes/gws/marcs/workspace/alchemy-release/src/parser/fol.y"
+#line 76 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
     { 
     if (folDbg >= 2) printf("input: weight\n"); 
     zzreset();
@@ -988,7 +988,7 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 14:
-#line 81 "/homes/gws/marcs/workspace/alchemy-release/src/parser/fol.y"
+#line 81 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
     {  
     if (folDbg >= 2) printf("input: sentence\n");
       // the states should be reset because a parse error may have occurred
@@ -996,7 +996,7 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 15:
-#line 86 "/homes/gws/marcs/workspace/alchemy-release/src/parser/fol.y"
+#line 86 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
     {
 
     ListObj* formula;
@@ -1053,17 +1053,17 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 17:
-#line 144 "/homes/gws/marcs/workspace/alchemy-release/src/parser/fol.y"
+#line 144 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
     { zzconsumeToken(zztokenList,"@"); ;}
     break;
 
   case 18:
-#line 145 "/homes/gws/marcs/workspace/alchemy-release/src/parser/fol.y"
+#line 145 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
     { zzconsumeToken(zztokenList,"@"); ;}
     break;
 
   case 20:
-#line 152 "/homes/gws/marcs/workspace/alchemy-release/src/parser/fol.y"
+#line 152 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
     { 
   if (folDbg >= 1) printf(".\n"); zzconsumeToken(zztokenList,"."); 
   zzassert(!zzhasFullStop, "expecting no full stop");
@@ -1073,27 +1073,27 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 21:
-#line 161 "/homes/gws/marcs/workspace/alchemy-release/src/parser/fol.y"
+#line 161 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
     { if (folDbg >= 1) printf("\\n\n"); zzconsumeToken(zztokenList,"\n"); ;}
     break;
 
   case 22:
-#line 163 "/homes/gws/marcs/workspace/alchemy-release/src/parser/fol.y"
+#line 163 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
     { if (folDbg >= 1) printf("\\r\n"); zzconsumeToken(zztokenList,"\r"); ;}
     break;
 
   case 24:
-#line 169 "/homes/gws/marcs/workspace/alchemy-release/src/parser/fol.y"
+#line 169 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
     { if (folDbg >= 1) printf("\\n\n"); zzconsumeToken(zztokenList,"\n"); ;}
     break;
 
   case 25:
-#line 171 "/homes/gws/marcs/workspace/alchemy-release/src/parser/fol.y"
+#line 171 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
     { if (folDbg >= 1) printf("\\r\n"); zzconsumeToken(zztokenList,"\r"); ;}
     break;
 
   case 26:
-#line 178 "/homes/gws/marcs/workspace/alchemy-release/src/parser/fol.y"
+#line 178 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
     {
   const char* inc = zztokenList.removeLast();
   const char* str = zztokenList.removeLast();
@@ -1156,17 +1156,17 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 27:
-#line 240 "/homes/gws/marcs/workspace/alchemy-release/src/parser/fol.y"
+#line 240 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
     { if (folDbg >= 1) printf("\\n\n"); ;}
     break;
 
   case 28:
-#line 242 "/homes/gws/marcs/workspace/alchemy-release/src/parser/fol.y"
+#line 242 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
     { if (folDbg >= 1) printf("\\r\n"); ;}
     break;
 
   case 29:
-#line 253 "/homes/gws/marcs/workspace/alchemy-release/src/parser/fol.y"
+#line 253 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
     { 
   zzconsumeToken(zztokenList,"=");
   zzconsumeToken(zztokenList,"{");
@@ -1176,7 +1176,7 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 30:
-#line 261 "/homes/gws/marcs/workspace/alchemy-release/src/parser/fol.y"
+#line 261 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
     {
   if (folDbg >= 1) printf("} ");           
   zzconsumeToken(zztokenList, "}");
@@ -1186,7 +1186,7 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 31:
-#line 272 "/homes/gws/marcs/workspace/alchemy-release/src/parser/fol.y"
+#line 272 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
     {
   const char* idf = zztokenList.removeLast();
   if (folDbg >= 1) printf("type t_%s ", idf);
@@ -1201,7 +1201,7 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 32:
-#line 285 "/homes/gws/marcs/workspace/alchemy-release/src/parser/fol.y"
+#line 285 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
     {
   const char* idf = zztokenList.removeLast();
   if (folDbg >= 1) printf("type t_%s ", idf);
@@ -1215,12 +1215,12 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 34:
-#line 304 "/homes/gws/marcs/workspace/alchemy-release/src/parser/fol.y"
+#line 304 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
     { if (folDbg >= 2) printf("constant_declarations: ZZ_VARIABLE\n"); ;}
     break;
 
   case 35:
-#line 306 "/homes/gws/marcs/workspace/alchemy-release/src/parser/fol.y"
+#line 306 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
     {
     const char* vsc = zztokenList.removeLast();
     if (folDbg >= 1) printf("cd_%s ", vsc);
@@ -1239,12 +1239,12 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 40:
-#line 332 "/homes/gws/marcs/workspace/alchemy-release/src/parser/fol.y"
+#line 332 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
     { zzconsumeToken(zztokenList, ","); ;}
     break;
 
   case 41:
-#line 335 "/homes/gws/marcs/workspace/alchemy-release/src/parser/fol.y"
+#line 335 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
     { 
     zzconsumeToken(zztokenList,"\n");
     zzconsumeToken(zztokenList,",");
@@ -1253,7 +1253,7 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 42:
-#line 342 "/homes/gws/marcs/workspace/alchemy-release/src/parser/fol.y"
+#line 342 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
     { 
     zzconsumeToken(zztokenList,"\n");
     zzconsumeToken(zztokenList,",");
@@ -1261,7 +1261,7 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 43:
-#line 348 "/homes/gws/marcs/workspace/alchemy-release/src/parser/fol.y"
+#line 348 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
     { 
     zzconsumeToken(zztokenList,",");
     zzconsumeToken(zztokenList,"\n");
@@ -1269,7 +1269,7 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 44:
-#line 358 "/homes/gws/marcs/workspace/alchemy-release/src/parser/fol.y"
+#line 358 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
     {
   if (folDbg >= 2) printf("numeric_type_declarations: \n");
   zzconsumeToken(zztokenList,"=");
@@ -1278,7 +1278,7 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 45:
-#line 364 "/homes/gws/marcs/workspace/alchemy-release/src/parser/fol.y"
+#line 364 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
     {
   const char* numStr = zztokenList.removeLast();
   if (folDbg >= 1) printf(" %s ", numStr);
@@ -1308,21 +1308,21 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 46:
-#line 391 "/homes/gws/marcs/workspace/alchemy-release/src/parser/fol.y"
+#line 391 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
     {
   zzconsumeToken(zztokenList, ",");
 ;}
     break;
 
   case 47:
-#line 396 "/homes/gws/marcs/workspace/alchemy-release/src/parser/fol.y"
+#line 396 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
     {
   zzconsumeToken(zztokenList, "}");
 ;}
     break;
 
   case 48:
-#line 403 "/homes/gws/marcs/workspace/alchemy-release/src/parser/fol.y"
+#line 403 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
     {
   //const char* numStr1 = zztokenList.removeLast();
   zzconsumeToken(zztokenList, "...");
@@ -1361,7 +1361,7 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 50:
-#line 446 "/homes/gws/marcs/workspace/alchemy-release/src/parser/fol.y"
+#line 446 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
     {  
     zzconsumeToken(zztokenList, ",");
     if (folDbg >= 1) printf(", "); 
@@ -1370,7 +1370,7 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 53:
-#line 457 "/homes/gws/marcs/workspace/alchemy-release/src/parser/fol.y"
+#line 457 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
     {
   const char* numStr = zztokenList.removeLast();
   if (folDbg >= 1) printf(" %s ", numStr);
@@ -1400,7 +1400,7 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 54:
-#line 493 "/homes/gws/marcs/workspace/alchemy-release/src/parser/fol.y"
+#line 493 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
     {
   const char* predName= zztokenList.removeLast();
 
@@ -1416,17 +1416,17 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 55:
-#line 505 "/homes/gws/marcs/workspace/alchemy-release/src/parser/fol.y"
+#line 505 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
     { if (folDbg >= 1) printf("( "); zzconsumeToken(zztokenList,"("); ;}
     break;
 
   case 56:
-#line 506 "/homes/gws/marcs/workspace/alchemy-release/src/parser/fol.y"
+#line 506 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
     { if (folDbg >= 2) printf("predicate_declaration: types\n"); ;}
     break;
 
   case 57:
-#line 508 "/homes/gws/marcs/workspace/alchemy-release/src/parser/fol.y"
+#line 508 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
     {  
   if (folDbg >= 1) printf(") "); 
 
@@ -1441,7 +1441,7 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 58:
-#line 526 "/homes/gws/marcs/workspace/alchemy-release/src/parser/fol.y"
+#line 526 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
     { 
   const char* retTypeName = zztokenList.removeLast();
   if (folDbg >= 1) printf("ZZ_FUNCTION t_%s ", retTypeName); 
@@ -1467,7 +1467,7 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 59:
-#line 549 "/homes/gws/marcs/workspace/alchemy-release/src/parser/fol.y"
+#line 549 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
     {
   const char* funcName = zztokenList.removeLast();
 
@@ -1495,7 +1495,7 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 60:
-#line 574 "/homes/gws/marcs/workspace/alchemy-release/src/parser/fol.y"
+#line 574 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
     {
   zzconsumeToken(zztokenList,"(");
   if (folDbg >= 1) printf("( "); 
@@ -1504,7 +1504,7 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 61:
-#line 580 "/homes/gws/marcs/workspace/alchemy-release/src/parser/fol.y"
+#line 580 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
     {  
   zzconsumeToken(zztokenList,")");
   if (folDbg >= 1) printf(") "); 
@@ -1528,17 +1528,17 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 64:
-#line 609 "/homes/gws/marcs/workspace/alchemy-release/src/parser/fol.y"
+#line 609 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
     { if (folDbg >= 1) printf(", "); zzconsumeToken(zztokenList,","); ;}
     break;
 
   case 66:
-#line 613 "/homes/gws/marcs/workspace/alchemy-release/src/parser/fol.y"
+#line 613 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
     { if (folDbg >= 1) printf(", "); zzconsumeToken(zztokenList,","); ;}
     break;
 
   case 70:
-#line 621 "/homes/gws/marcs/workspace/alchemy-release/src/parser/fol.y"
+#line 621 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
     {  
   const char* ttype = zztokenList.removeLast();
   if (folDbg >= 1) printf("t_%s ", ttype);
@@ -1552,7 +1552,7 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 71:
-#line 634 "/homes/gws/marcs/workspace/alchemy-release/src/parser/fol.y"
+#line 634 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
     {
   const char* varName = zztokenList.removeLast();;
   if (folDbg >= 1) printf("t_%s ", varName);
@@ -1568,14 +1568,14 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 72:
-#line 652 "/homes/gws/marcs/workspace/alchemy-release/src/parser/fol.y"
+#line 652 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
     { 
     zztrueFalseUnknown = 't';
   ;}
     break;
 
   case 73:
-#line 656 "/homes/gws/marcs/workspace/alchemy-release/src/parser/fol.y"
+#line 656 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
     { 
     zzconsumeToken(zztokenList,"!"); 
     if (folDbg >= 1) printf("! "); 
@@ -1584,7 +1584,7 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 74:
-#line 662 "/homes/gws/marcs/workspace/alchemy-release/src/parser/fol.y"
+#line 662 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
     { 
     zzconsumeToken(zztokenList,"?"); 
     if (folDbg >= 1) printf("? "); 
@@ -1593,7 +1593,7 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 75:
-#line 673 "/homes/gws/marcs/workspace/alchemy-release/src/parser/fol.y"
+#line 673 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
     {
   const char* predName = zztokenList.removeLast();
   if (folDbg >= 1) printf("pd_%s ", predName); 
@@ -1609,7 +1609,7 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 76:
-#line 686 "/homes/gws/marcs/workspace/alchemy-release/src/parser/fol.y"
+#line 686 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
     { 
   zzconsumeToken(zztokenList,"("); 
   if (folDbg >= 1) printf("( "); 
@@ -1618,7 +1618,7 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 77:
-#line 692 "/homes/gws/marcs/workspace/alchemy-release/src/parser/fol.y"
+#line 692 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
     { 
   zzconsumeToken(zztokenList,")"); 
   if (folDbg >= 1) printf(")\n"); 
@@ -1655,7 +1655,7 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 78:
-#line 730 "/homes/gws/marcs/workspace/alchemy-release/src/parser/fol.y"
+#line 730 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
     { 
   zzconsumeToken(zztokenList,"="); 
   if (folDbg >= 1) printf("= "); 
@@ -1664,7 +1664,7 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 79:
-#line 736 "/homes/gws/marcs/workspace/alchemy-release/src/parser/fol.y"
+#line 736 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
     {
   // Predicate name is PredicateTemplate::ZZ_RETURN_PREFIX + function name
   const char* funcName = zztokenList.removeLast();
@@ -1681,16 +1681,21 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
 
   char constName[100];
   char* constString;
-  if (zztmpReturnNum) {
+  if (zztmpReturnNum)
+  {
   	zzcreateAndCheckIntConstant(zztmpReturnConstant, zzfunc, zzpred, zzdomain, constName);
-    if (constName == NULL) {
+    if (constName == NULL)
+    {
       constString = (char *)malloc((strlen(zztmpReturnConstant) + 1)*sizeof(char));
       strcpy(constString, zztmpReturnConstant);
-    } else {
+    } else
+    {
 	  constString = (char *)malloc((strlen(constName) + 1)*sizeof(char));
       strcpy(constString, constName);
     }
-  } else {
+  }
+  else
+  {
     constString = (char *)malloc((strlen(zztmpReturnConstant) + 1)*sizeof(char));  
   	strcpy(constString, zztmpReturnConstant);
   }
@@ -1707,7 +1712,7 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 80:
-#line 776 "/homes/gws/marcs/workspace/alchemy-release/src/parser/fol.y"
+#line 781 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
     { 
   zzconsumeToken(zztokenList,"("); 
   if (folDbg >= 1) printf("( "); 
@@ -1716,7 +1721,7 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 81:
-#line 782 "/homes/gws/marcs/workspace/alchemy-release/src/parser/fol.y"
+#line 787 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
     { 
   zzconsumeToken(zztokenList,")"); 
   if (folDbg >= 1) printf(")\n"); 
@@ -1756,7 +1761,7 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 82:
-#line 822 "/homes/gws/marcs/workspace/alchemy-release/src/parser/fol.y"
+#line 827 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
     {     
     const char* constName = zztokenList.removeLast();
     if (folDbg >= 1) printf("cg_%s ", constName);
@@ -1766,7 +1771,7 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 83:
-#line 830 "/homes/gws/marcs/workspace/alchemy-release/src/parser/fol.y"
+#line 835 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
     {     
     const char* constName = zztokenList.removeLast();
     if (folDbg >= 1) printf("cg_%s ", constName);
@@ -1776,7 +1781,7 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 85:
-#line 841 "/homes/gws/marcs/workspace/alchemy-release/src/parser/fol.y"
+#line 846 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
     {
     if (zzconstantMustBeDeclared)
       zzerr("Constant %s must be declared before it is used.",
@@ -1785,7 +1790,7 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 86:
-#line 847 "/homes/gws/marcs/workspace/alchemy-release/src/parser/fol.y"
+#line 852 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
     {
     const char* intStr = zztokenList.removeLast();
     char constName[100];
@@ -1797,7 +1802,7 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 87:
-#line 856 "/homes/gws/marcs/workspace/alchemy-release/src/parser/fol.y"
+#line 861 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
     {
     if (zzconstantMustBeDeclared)
       zzerr("Constant %s must be declared before it is used",
@@ -1806,7 +1811,7 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 88:
-#line 864 "/homes/gws/marcs/workspace/alchemy-release/src/parser/fol.y"
+#line 869 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
     {
     const char* tmp = zztokenList.removeLast();
 	zztmpReturnConstant = (char *)malloc((strlen(tmp) + 1)*sizeof(char));
@@ -1818,7 +1823,7 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 89:
-#line 873 "/homes/gws/marcs/workspace/alchemy-release/src/parser/fol.y"
+#line 878 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
     {
     if (zzconstantMustBeDeclared)
       zzerr("Constant %s must be declared before it is used.",
@@ -1833,7 +1838,7 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 90:
-#line 885 "/homes/gws/marcs/workspace/alchemy-release/src/parser/fol.y"
+#line 890 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
     {
   	const char* tmp = zztokenList.removeLast();
   	zztmpReturnConstant = (char *)malloc((strlen(tmp) + 1)*sizeof(char));
@@ -1845,7 +1850,7 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 91:
-#line 894 "/homes/gws/marcs/workspace/alchemy-release/src/parser/fol.y"
+#line 899 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
     {
     if (zzconstantMustBeDeclared)
       zzerr("Constant %s must be declared before it is used",
@@ -1860,7 +1865,7 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 93:
-#line 912 "/homes/gws/marcs/workspace/alchemy-release/src/parser/fol.y"
+#line 917 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
     {
     const char* wt = zztokenList.removeLast();
     if (folDbg >= 1) printf("n_%f ", atof(wt));
@@ -1871,7 +1876,7 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 94:
-#line 926 "/homes/gws/marcs/workspace/alchemy-release/src/parser/fol.y"
+#line 931 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
     { 
     zzconsumeToken(zztokenList,"("); 
     if (folDbg >= 1) printf("( "); 
@@ -1881,7 +1886,7 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 95:
-#line 934 "/homes/gws/marcs/workspace/alchemy-release/src/parser/fol.y"
+#line 939 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
     { 
     zzconsumeToken(zztokenList,")"); 
     if (folDbg >= 1) printf(") "); 
@@ -1890,12 +1895,12 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 96:
-#line 940 "/homes/gws/marcs/workspace/alchemy-release/src/parser/fol.y"
+#line 945 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
     { if (folDbg >= 2) printf("sentence: atomic_sentence\n"); ;}
     break;
 
   case 98:
-#line 944 "/homes/gws/marcs/workspace/alchemy-release/src/parser/fol.y"
+#line 949 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
     {
     const char* imp = zztokenList.removeLast(); 
     if (folDbg >= 1) printf("=> ");
@@ -1905,12 +1910,12 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 99:
-#line 952 "/homes/gws/marcs/workspace/alchemy-release/src/parser/fol.y"
+#line 957 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
     { zzcreateListObjFromTopTwo(zzformulaListObjs, "=>"); ;}
     break;
 
   case 100:
-#line 956 "/homes/gws/marcs/workspace/alchemy-release/src/parser/fol.y"
+#line 961 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
     { 
     const char* eq = zztokenList.removeLast(); 
     if (folDbg >= 1) printf("<=> ");
@@ -1920,12 +1925,12 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 101:
-#line 964 "/homes/gws/marcs/workspace/alchemy-release/src/parser/fol.y"
+#line 969 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
     { zzcreateListObjFromTopTwo(zzformulaListObjs, "<=>"); ;}
     break;
 
   case 102:
-#line 968 "/homes/gws/marcs/workspace/alchemy-release/src/parser/fol.y"
+#line 973 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
     { 
     zzconsumeToken(zztokenList,"v"); 
     if (folDbg >= 1) printf("v "); 
@@ -1934,12 +1939,12 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 103:
-#line 975 "/homes/gws/marcs/workspace/alchemy-release/src/parser/fol.y"
+#line 980 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
     { zzcreateListObjFromTopTwo(zzformulaListObjs, "v"); ;}
     break;
 
   case 104:
-#line 979 "/homes/gws/marcs/workspace/alchemy-release/src/parser/fol.y"
+#line 984 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
     { 
     zzconsumeToken(zztokenList,"^"); 
     if (folDbg >= 1) printf("^ "); 
@@ -1948,17 +1953,17 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 105:
-#line 986 "/homes/gws/marcs/workspace/alchemy-release/src/parser/fol.y"
+#line 991 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
     { zzcreateListObjFromTopTwo(zzformulaListObjs, "^"); ;}
     break;
 
   case 106:
-#line 990 "/homes/gws/marcs/workspace/alchemy-release/src/parser/fol.y"
+#line 995 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
     { if (folDbg >= 2) printf("sentence: quantifier\n"); ;}
     break;
 
   case 107:
-#line 992 "/homes/gws/marcs/workspace/alchemy-release/src/parser/fol.y"
+#line 997 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
     { 
     if (folDbg >= 2) printf("sentence: variables\n"); 
     zzformulaListObjs.push(new ListObj);
@@ -1968,12 +1973,12 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 108:
-#line 998 "/homes/gws/marcs/workspace/alchemy-release/src/parser/fol.y"
+#line 1003 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
     { if (folDbg >= 2) printf("sentence: sentence\n"); ;}
     break;
 
   case 109:
-#line 1000 "/homes/gws/marcs/workspace/alchemy-release/src/parser/fol.y"
+#line 1005 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
     { 
     zzcreateListObjFromTopThree(zzformulaListObjs);
     pair<StringToStringMap*, int> pr = zzoldNewVarList.front();
@@ -1983,7 +1988,7 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 110:
-#line 1009 "/homes/gws/marcs/workspace/alchemy-release/src/parser/fol.y"
+#line 1014 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
     { 
     zzassert(!zzisNegated,"expecting !zzisNegated");
     zzisNegated = true;
@@ -1996,12 +2001,12 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 111:
-#line 1019 "/homes/gws/marcs/workspace/alchemy-release/src/parser/fol.y"
+#line 1024 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
     { zzcreateListObjFromTop(zzformulaListObjs, "!"); ;}
     break;
 
   case 112:
-#line 1025 "/homes/gws/marcs/workspace/alchemy-release/src/parser/fol.y"
+#line 1030 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
     { 
     const char* fa = zztokenList.removeLast();
     if (folDbg >= 1) printf("FORALL ");
@@ -2012,7 +2017,7 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 113:
-#line 1033 "/homes/gws/marcs/workspace/alchemy-release/src/parser/fol.y"
+#line 1038 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
     { 
     const char* ex = zztokenList.removeLast();
     if (folDbg >= 1) printf("EXIST "); 
@@ -2023,12 +2028,12 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 114:
-#line 1045 "/homes/gws/marcs/workspace/alchemy-release/src/parser/fol.y"
+#line 1050 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
     { if (folDbg >= 2) printf("variables: variables\n"); ;}
     break;
 
   case 115:
-#line 1047 "/homes/gws/marcs/workspace/alchemy-release/src/parser/fol.y"
+#line 1052 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
     {  
     zzconsumeToken(zztokenList,",");
     if (folDbg >= 1) printf(", "); 
@@ -2037,12 +2042,12 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 117:
-#line 1054 "/homes/gws/marcs/workspace/alchemy-release/src/parser/fol.y"
+#line 1059 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
     { zzformulaStr.append(" "); ;}
     break;
 
   case 118:
-#line 1059 "/homes/gws/marcs/workspace/alchemy-release/src/parser/fol.y"
+#line 1064 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
     {
   const char* varName = zztokenList.removeLast();  
   if (folDbg >= 1) printf("v_%s ", varName); 
@@ -2066,7 +2071,7 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 119:
-#line 1084 "/homes/gws/marcs/workspace/alchemy-release/src/parser/fol.y"
+#line 1089 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
     {
     const char* predName = zztokenList.removeLast();
     if (folDbg >= 1) printf("p_%s ", predName); 
@@ -2076,6 +2081,7 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
 
 	if (PredicateTemplate::isInternalPredicateTemplateName(predName))
 	{
+	  //zzinfixPredName is misused here to store internal pred. name
 	  zzinfixPredName = (char *)malloc((strlen(predName)
     								  	+ 1)*sizeof(char));
 	  strcpy(zzinfixPredName, predName);
@@ -2098,7 +2104,7 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 120:
-#line 1113 "/homes/gws/marcs/workspace/alchemy-release/src/parser/fol.y"
+#line 1119 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
     {  
     zzconsumeToken(zztokenList, "(");
     if (folDbg >= 1) printf("( "); 
@@ -2109,12 +2115,13 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 121:
-#line 1122 "/homes/gws/marcs/workspace/alchemy-release/src/parser/fol.y"
+#line 1128 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
     {  
     zzconsumeToken(zztokenList, ")");
     if (folDbg >= 1) printf(") "); 
 
 	  //If an internal pred., then need to determine type
+	  //zzinfixPredName is misused here to store internal pred. name
 	if (zzinfixPredName)
 	{
 	  ListObj* predlo = zzpredFuncListObjs.top();
@@ -2259,7 +2266,7 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 122:
-#line 1270 "/homes/gws/marcs/workspace/alchemy-release/src/parser/fol.y"
+#line 1277 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
     {
     ++zzfdnumPreds;
     //zzfdisEqualPred = true;
@@ -2280,10 +2287,32 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 123:
-#line 1290 "/homes/gws/marcs/workspace/alchemy-release/src/parser/fol.y"
+#line 1296 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
+    {
+  	ListObj* predlo = zzpredFuncListObjs.top();
+    predlo->replace(PredicateTemplate::EMPTY_NAME, zzinfixPredName);
+    
+  	  // If type known from LHS, then set the pred types accordingly
+    int lTypeId = zzgetTypeId(zzpred->getTerm(0), (*predlo)[1]->getStr());
+    if (lTypeId>0)
+    {
+      if (strcmp(zzinfixPredName, PredicateTemplate::EQUAL_NAME)==0)
+      {
+        zzsetEqPredTypeName(lTypeId);
+      }
+      else
+ 	  {
+ 	    zzsetInternalPredTypeName(zzinfixPredName, lTypeId);
+ 	  }
+    }
+  ;}
+    break;
+
+  case 124:
+#line 1315 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
     {  
     ListObj* predlo = zzpredFuncListObjs.top();
-    predlo->replace(PredicateTemplate::EMPTY_NAME, zzinfixPredName);
+    //predlo->replace(PredicateTemplate::EMPTY_NAME, zzinfixPredName);
 
 	// types are possibly unknown
 	// If '=' predicate then types are possibly unknown
@@ -2418,8 +2447,8 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
   ;}
     break;
 
-  case 124:
-#line 1429 "/homes/gws/marcs/workspace/alchemy-release/src/parser/fol.y"
+  case 125:
+#line 1454 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
     {
   	zzconsumeToken(zztokenList, ">");
     if (folDbg >= 1) printf("> "); 
@@ -2434,8 +2463,8 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
   ;}
     break;
 
-  case 125:
-#line 1443 "/homes/gws/marcs/workspace/alchemy-release/src/parser/fol.y"
+  case 126:
+#line 1468 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
     {
    	zzconsumeToken(zztokenList, "<");
     if (folDbg >= 1) printf("< "); 
@@ -2450,8 +2479,8 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
   ;}
     break;
 
-  case 126:
-#line 1457 "/homes/gws/marcs/workspace/alchemy-release/src/parser/fol.y"
+  case 127:
+#line 1482 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
     {
   	zzconsumeToken(zztokenList, ">");
     if (folDbg >= 1) printf(">");
@@ -2469,8 +2498,8 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
   ;}
     break;
 
-  case 127:
-#line 1474 "/homes/gws/marcs/workspace/alchemy-release/src/parser/fol.y"
+  case 128:
+#line 1499 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
     {
 	zzconsumeToken(zztokenList, "<");
     if (folDbg >= 1) printf("<");
@@ -2488,8 +2517,8 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
   ;}
     break;
 
-  case 128:
-#line 1491 "/homes/gws/marcs/workspace/alchemy-release/src/parser/fol.y"
+  case 129:
+#line 1516 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
     {
   	zzconsumeToken(zztokenList, "=");
     if (folDbg >= 1) printf("= "); 
@@ -2503,8 +2532,8 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
   ;}
     break;
 
-  case 130:
-#line 1508 "/homes/gws/marcs/workspace/alchemy-release/src/parser/fol.y"
+  case 131:
+#line 1533 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
     { 
     zzconsumeToken(zztokenList, "*");
     if (folDbg >= 1) printf("* "); 
@@ -2516,8 +2545,8 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
   ;}
     break;
 
-  case 131:
-#line 1525 "/homes/gws/marcs/workspace/alchemy-release/src/parser/fol.y"
+  case 132:
+#line 1550 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
     {  
     zzconsumeToken(zztokenList, ",");
     if (folDbg >= 1) printf(", "); 
@@ -2528,7 +2557,34 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 134:
-#line 1541 "/homes/gws/marcs/workspace/alchemy-release/src/parser/fol.y"
+#line 1561 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
+    {
+  	// After the first term in an internal pred., check if we can determine type
+  	if (zzpred && zzpred->isEmptyPred() &&
+  		zzpred->getNumTerms() == 1 && zzinfixPredName)
+  	{
+      ListObj* predlo = zzpredFuncListObjs.top();
+      predlo->replace(PredicateTemplate::EMPTY_NAME, zzinfixPredName);
+    
+  	  	// If type known from term, then set the pred types accordingly
+	  int lTypeId = zzgetTypeId(zzpred->getTerm(0), (*predlo)[1]->getStr());
+      if (lTypeId>0)
+      {
+      	if (strcmp(zzinfixPredName, PredicateTemplate::EQUAL_NAME)==0)
+      	{
+          zzsetEqPredTypeName(lTypeId);
+      	}
+      	else
+ 	  	{
+ 	      zzsetInternalPredTypeName(zzinfixPredName, lTypeId);
+ 	  	}
+      }
+  	}
+  ;}
+    break;
+
+  case 135:
+#line 1589 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
     {  
     zzassert(zzfunc != NULL,"expecting zzfunc != NULL");
     zzcheckFuncNumTerm(zzfunc);
@@ -2703,8 +2759,8 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
   ;}
     break;
 
-  case 135:
-#line 1715 "/homes/gws/marcs/workspace/alchemy-release/src/parser/fol.y"
+  case 136:
+#line 1763 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
     {
     const char* constName = zztokenList.removeLast();
     if (folDbg >= 1) printf("c2_%s ", constName); 
@@ -2715,8 +2771,8 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
   ;}
     break;
 
-  case 136:
-#line 1725 "/homes/gws/marcs/workspace/alchemy-release/src/parser/fol.y"
+  case 137:
+#line 1773 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
     {
     const char* constName = zztokenList.removeLast();
     if (folDbg >= 1) printf("c2_%s ", constName); 
@@ -2729,8 +2785,8 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
   ;}
     break;
 
-  case 137:
-#line 1737 "/homes/gws/marcs/workspace/alchemy-release/src/parser/fol.y"
+  case 138:
+#line 1785 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
     {
     const char* intStr = zztokenList.removeLast();
     if (folDbg >= 1) printf("c3_%s ", intStr);
@@ -2746,16 +2802,16 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
   ;}
     break;
 
-  case 138:
-#line 1752 "/homes/gws/marcs/workspace/alchemy-release/src/parser/fol.y"
+  case 139:
+#line 1800 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
     {
     zztermIsVariable(folDbg);
     if (zzisPlus) zzisPlus = false;
   ;}
     break;
 
-  case 139:
-#line 1758 "/homes/gws/marcs/workspace/alchemy-release/src/parser/fol.y"
+  case 140:
+#line 1806 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
     {
     zztermIsVariable(folDbg);
 
@@ -2779,8 +2835,8 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
   ;}
     break;
 
-  case 141:
-#line 1784 "/homes/gws/marcs/workspace/alchemy-release/src/parser/fol.y"
+  case 142:
+#line 1832 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
     { 
     zzconsumeToken(zztokenList, "+");
     if (folDbg >= 1) printf("+ "); 
@@ -2790,8 +2846,8 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
   ;}
     break;
 
-  case 142:
-#line 1795 "/homes/gws/marcs/workspace/alchemy-release/src/parser/fol.y"
+  case 143:
+#line 1843 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
     {
     const char* funcName = zztokenList.removeLast();
     if (folDbg >= 1) printf("f_%s ", funcName);
@@ -2829,8 +2885,8 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
   ;}
     break;
 
-  case 143:
-#line 1831 "/homes/gws/marcs/workspace/alchemy-release/src/parser/fol.y"
+  case 144:
+#line 1879 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
     {
     zzconsumeToken(zztokenList, "(");
     if (folDbg >= 1) printf("( "); 
@@ -2838,8 +2894,8 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
   ;}
     break;
 
-  case 144:
-#line 1837 "/homes/gws/marcs/workspace/alchemy-release/src/parser/fol.y"
+  case 145:
+#line 1885 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
     {
   	  //If an internal func., then need to determine type
 	if (zzinfixFuncName)
@@ -2849,8 +2905,10 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
 	  const FunctionTemplate* t = zzgetGenericInternalFunctionTemplate(zzinfixFuncName);
 		// If in a pred. (not LHS of infix pred.), then we know the return type
 	  if (zzpred)
+	  {
 	  	((FunctionTemplate*)t)->setRetTypeId(
 	  		zzpred->getTermTypeAsInt(zzpred->getNumTerms()), zzdomain);
+	  }
 	  zzfunc->setTemplate((FunctionTemplate*)t);
 
 		// types are possibly unknown
@@ -2915,8 +2973,8 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
   ;}
     break;
 
-  case 145:
-#line 1911 "/homes/gws/marcs/workspace/alchemy-release/src/parser/fol.y"
+  case 146:
+#line 1961 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
     {
     // Make an "empty" function
     const char* funcName = FunctionTemplate::EMPTY_FTEMPLATE_NAME;
@@ -2934,16 +2992,16 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
   ;}
     break;
 
-  case 146:
-#line 1927 "/homes/gws/marcs/workspace/alchemy-release/src/parser/fol.y"
+  case 147:
+#line 1977 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
     {
     zzconsumeToken(zztokenList, "(");
     if (folDbg >= 1) printf("( ");
   ;}
     break;
 
-  case 147:
-#line 1932 "/homes/gws/marcs/workspace/alchemy-release/src/parser/fol.y"
+  case 148:
+#line 1982 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
     {
     //Replace empty function with function sign just parsed
     //zzcreateInternalFuncTemplate(zzinfixFuncName);
@@ -2957,8 +3015,8 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
   ;}
     break;
 
-  case 148:
-#line 1944 "/homes/gws/marcs/workspace/alchemy-release/src/parser/fol.y"
+  case 149:
+#line 1994 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
     {
 	ListObj* funclo = zzpredFuncListObjs.top();
     funclo->replace(FunctionTemplate::EMPTY_FTEMPLATE_NAME, zzinfixFuncName);
@@ -3029,8 +3087,8 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
   ;}
     break;
 
-  case 149:
-#line 2017 "/homes/gws/marcs/workspace/alchemy-release/src/parser/fol.y"
+  case 150:
+#line 2067 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
     {
   	zzconsumeToken(zztokenList, "+");
     if (folDbg >= 1) printf("+ "); 
@@ -3040,8 +3098,8 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
   ;}
     break;
 
-  case 150:
-#line 2026 "/homes/gws/marcs/workspace/alchemy-release/src/parser/fol.y"
+  case 151:
+#line 2076 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
     {
    	zzconsumeToken(zztokenList, "-");
     if (folDbg >= 1) printf("- "); 
@@ -3051,8 +3109,8 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
   ;}
     break;
 
-  case 151:
-#line 2035 "/homes/gws/marcs/workspace/alchemy-release/src/parser/fol.y"
+  case 152:
+#line 2085 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
     {
   	zzconsumeToken(zztokenList, "*");
     if (folDbg >= 1) printf("* ");
@@ -3062,8 +3120,8 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
   ;}
     break;
 
-  case 152:
-#line 2044 "/homes/gws/marcs/workspace/alchemy-release/src/parser/fol.y"
+  case 153:
+#line 2094 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
     {
 	zzconsumeToken(zztokenList, "/");
     if (folDbg >= 1) printf("/ ");
@@ -3073,8 +3131,8 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
   ;}
     break;
 
-  case 153:
-#line 2053 "/homes/gws/marcs/workspace/alchemy-release/src/parser/fol.y"
+  case 154:
+#line 2103 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
     {
   	zzconsumeToken(zztokenList, "%");
     if (folDbg >= 1) printf("%% ");
@@ -3096,7 +3154,7 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
 # undef yyclearin
 # undef YYRECOVERING
 /* Line 750 of glr.c.  */
-#line 3100 "fol.cpp"
+#line 3158 "fol.cpp"
 }
 
 
@@ -4382,7 +4440,7 @@ yypdumpstack (yyGLRStack* yystack)
 #endif
 
 
-#line 2063 "/homes/gws/marcs/workspace/alchemy-release/src/parser/fol.y"
+#line 2113 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
 
 
 /******************* function definitions ****************************/

@@ -70,9 +70,14 @@ class Predicate
   
   bool isEqualPredWithType() const  { return template_->isEqualPredWithType(); }
 
-    //returns true if this predicate is an internal predicate
+    //returns true if this predicate is empty predicate
+  bool isEmptyPred() const  { return template_->isEmptyPredicateTemplate(); }
+ 
+     //returns true if this predicate is an internal predicate
   bool isInternalPred() const  { return template_->isInternalPredicateTemplate(); }
   
+  bool isInternalPredWithoutType() const
+  { return template_->isInternalPredicateTemplateWithoutType(); }
 
   void canonicalize()
   {
@@ -307,6 +312,14 @@ class Predicate
   void setParent(Clause* const & parent) { parent_ = parent; setDirty(); }
   Clause* getParent() const { return parent_; }
 
+	// True, if the predicate can be used in the inverted index
+  bool isIndexable()
+  {
+	  // At most one of the two terms is grounded
+	  // and equality pred is never indexed
+	if (isGrounded() || isEqualPred()) return false;
+  	return (!getSense() && getNumTerms() == 2);	
+  }
 
   void createVarsTypeIdArr(Array<VarsTypeId*>*& varsTypeIdArr)
   {

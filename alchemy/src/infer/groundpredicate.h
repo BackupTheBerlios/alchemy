@@ -159,8 +159,10 @@ class GroundPredicate
     int size = intArrRep_->size();
     for (int i = 1; i < size; i++)
     {
-      const char* name = domain->getConstantName((*intArrRep_)[i]);
+      string name = domain->getConstantName((*intArrRep_)[i]);
       assert(name);
+      string::size_type at = name.rfind("@");
+      if (at != string::npos) name = name.substr(at+1, name.length()-at-1);
       out << name;
       if (i < size-1) out << ",";
       else            out << ")";

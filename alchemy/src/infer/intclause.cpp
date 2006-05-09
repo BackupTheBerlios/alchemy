@@ -1,5 +1,9 @@
 #include "intclause.h"
 #include "clause.h"
+#include "lwinfo.h"
+
+double LWInfo::HARD_WT = 10.0;
+double LWInfo::WSCALE = 1.0;
 
 IntClause::IntClause(const Clause* const & c, PredicateHashArray* const & predHashArray) 
   : wt_(c->getWt())
@@ -44,3 +48,12 @@ IntClause::IntClause(const Clause* const & c, PredicateHashArray* const & predHa
   intPreds_->compress();
 }
 
+void IntClause::addWt(const double& wt) 
+{ if (wt_ == LWInfo::HARD_WT) return; wt_ += wt; }
+
+void IntClause::setWt(const double& wt) 
+{ if (wt_ == LWInfo::HARD_WT) return; wt_ = wt; }
+
+void IntClause::setWtToHardWt() { wt_ = LWInfo::HARD_WT; }
+
+bool IntClause::isHardClause() const { return (wt_ == LWInfo::HARD_WT); }

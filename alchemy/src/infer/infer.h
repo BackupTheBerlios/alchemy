@@ -553,25 +553,26 @@ void readPredValuesAndSetToUnknown( const StringHashArray& predNames,
       ppreds.clear();
       int predid = domain->getPredicateId(predNames[predno].c_str());
       Predicate::createAllGroundings(predid, domain, ppreds);
-       //cout<<"size of gnd for pred " << predid << " = "<<ppreds.size()<<endl;
-		for(int gpredno=0;gpredno<ppreds.size();gpredno++) {
-		 Predicate *pred = ppreds[gpredno];
-		 TruthValue tv = domain->getDB()->getValue(pred);
-		 if(tv == UNKNOWN)
+       	//cout<<"size of gnd for pred " << predid << " = "<<ppreds.size()<<endl;
+	  for(int gpredno=0;gpredno<ppreds.size();gpredno++)
+	  {
+		Predicate *pred = ppreds[gpredno];
+		TruthValue tv = domain->getDB()->getValue(pred);
+		if(tv == UNKNOWN)
 		  domain->getDB()->setValue(pred,FALSE);
 		 
-		 // if first order query pred grounndings are allowed to be evidence
-		 // - we assume all the predicates not in db to be false
-		 // evidence - need a better way code this.
-		 if(isQueryEvidence && tv == UNKNOWN)
-			  delete pred;
-		 else
-			  queryPreds.append(pred);
-		}
+		// if first order query pred grounndings are allowed to be evidence
+		// - we assume all the predicates not in db to be false
+		// evidence - need a better way code this.
+		if(isQueryEvidence && tv == UNKNOWN)
+		  delete pred;
+		else
+		  queryPreds.append(pred);
 	  }
+	}
 	  //set all the query preds to unknown, reading in the TRUE/FALSE status 
 	  //for verification at a later time
-	  domain->getDB()->setValuesToUnknown(&queryPreds, &queryPredValues);
+	domain->getDB()->setValuesToUnknown(&queryPreds, &queryPredValues);
  }
 
 

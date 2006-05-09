@@ -10,7 +10,7 @@
 #include <sys/resource.h>
 #include <signal.h>
 
-#include "FreeStoreManager.h"
+#include "freestoremanager.h"
 
 #include "array.h"
 #include "lwinfo.h"

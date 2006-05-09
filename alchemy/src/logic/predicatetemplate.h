@@ -114,6 +114,9 @@ class PredicateTemplate
   bool isEqualPredicateTemplate() const 
   { return (equalPred_ == EQUAL_PRED || equalPred_ == EQUAL_PRED_WITH_TYPE); }
 
+  bool isEmptyPredicateTemplate() const 
+  { return (strcmp(name_, EMPTY_NAME) == 0); }
+
   bool isInternalPredicateTemplate() const 
   { 
   	return (strncmp(name_, GT_NAME, strlen(GT_NAME)) == 0 || 
@@ -121,6 +124,15 @@ class PredicateTemplate
   			strncmp(name_, GTEQ_NAME, strlen(GTEQ_NAME)) == 0 ||
   			strncmp(name_, LTEQ_NAME, strlen(LTEQ_NAME)) == 0 ||
   			strncmp(name_, SUBSTR_NAME, strlen(SUBSTR_NAME)) == 0);
+  }
+
+  bool isInternalPredicateTemplateWithoutType() const 
+  { 
+  	return (strcmp(name_, GT_NAME) == 0 || 
+  			strcmp(name_, LT_NAME) == 0 ||
+  			strcmp(name_, GTEQ_NAME) == 0 ||
+  			strcmp(name_, LTEQ_NAME) == 0 ||
+  			strcmp(name_, SUBSTR_NAME) == 0);
   }
 
   bool isPredicateTemplateFromInternalFunction() const

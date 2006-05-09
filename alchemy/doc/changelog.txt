@@ -1,20 +1,29 @@
+May 5, 2006
+------------
+* Hard clause weights handled correctly in LazySat
+* Bug fix involving equality predicate and inverted index
+* Bug fix involving use of constants in internal functions/predicates
+* Time limit check added while burning in during Gibbs sampling
+* Output of integer constants in MAP inference fixed
+* Removal of extraneous debugging code
+
 May 3, 2006
 ------------
+* LazySat algorithm (Memory-efficient MAP inference) implemented (/infer dir)
+* Inverted index of partially grounded atoms to true / active ground
+atoms implemented in database.h, clause.h to speed up LazySat
+* Hash table of true ground atoms implemented in database.h to
+save memory
+* VotedPerceptron algorithm: LazySat implemented as inference step
+* VotedPerceptron algorithm: True counts calculated from MRF
+* VotedPerceptron algorithm: Log-odds of clauses calculated from 
+aggregation of clauses across all databases
 * Bug causing loop out on 64-bit architecture fixed
 * Memory leak in groundclause.cpp fixed
 * Types of variables in internal functions and predicates determined
 during parsing
 * Bug fix in pseudologlikelihood.h (Different order of .mln files was
 producing different weights)
-* LazySat (Memory-efficient MAP inference) implemented (/infer dir)
-* Inverted index of partially ground clauses to true / active ground
-clauses implemented in database.h, clause.h to speed up LazySat
-* Hash table of true ground clauses implemented in database.h to
-save memory
-* VotedPerceptron algorithm: LazySat implemented as inference step
-* VotedPerceptron algorithm: True counts calculated from MRF
-* VotedPerceptron algorithm: Log-odds of clauses calculated from 
-aggregation of clauses across all databases
 
 Mar 15, 2006
 ------------

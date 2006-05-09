@@ -1,7 +1,7 @@
 #ifndef _LW_UTIL_H_
 #define _LW_UTIL_H_
 
-#define WSCALE 10
+//#define WSCALE 10
 #define WEIGHT_EPSILON .0001
 
 class LWUtil {

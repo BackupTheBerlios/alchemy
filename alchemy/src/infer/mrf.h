@@ -65,7 +65,6 @@ struct AddGroundClauseStruct
                         Array<GroundClause*>* const & ggndClauses,
                         const bool& mmarkHardGndClauses,
                         const double* const & pparentWtPtr,
-						//Parag:
 						const int & cclauseId)
     : seenPreds(sseenPreds), unseenPreds(uunseenPreds), gndPreds(ggndPreds),
       gndPredsMap(ggndPredsMap), 
@@ -156,7 +155,6 @@ class MRF
       for (int i = 0; clauses && i < clauses->size(); i++)
       {
         Clause* c = (*clauses)[i]->clause;
-        //Parag:
 		const int clauseId = mln->findClauseIdx(c);  
 		assert(clauseId >= 0);
 		
@@ -169,7 +167,6 @@ class MRF
                                   &gndPredsMap, allPredGndingsAreQueries,
                                   &gndClausesSet, gndClauses_,
                                   markHardGndClauses, parentWtPtr,
-								  //Parag:
 								  clauseId);
        /* 
 		cout<<"just before calling addunknown gnd clauses.."<<endl;
@@ -219,115 +216,8 @@ class MRF
   }
 
 
-/*
     //Do not delete the clause and truncClause argument.
     //This function is tightly bound to Clause::createAndAddUnknownClause().
-  static void addUnknownGndClause(const AddGroundClauseStruct* const & agcs, 
-                                  const Clause* const & clause,
-                                  const Clause* const & truncClause,
-                                  const bool& isHardClause)
-  {
-    const GroundPredicateSet* seenPreds     = agcs->seenPreds;
-    GroundPredicateSet*       unseenPreds   = agcs->unseenPreds;
-    Array<GroundPredicate*>*  gndPreds      = agcs->gndPreds;
-    GroundPredicateToIntMap*  gndPredsMap   = agcs->gndPredsMap; 
-    const Array<int>* allGndingsAreQueries  = agcs->allPredGndingsAreQueries;
-    GroundClauseSet*          gndClausesSet = agcs->gndClausesSet;
-    Array<GroundClause*>*     gndClauses    = agcs->gndClauses;
-    const bool markHardGndClauses           = agcs->markHardGndClauses;
-    const double* parentWtPtr               = agcs->parentWtPtr;
-	
-
-    //check none of the grounded clause's predicates have been seen before
-    //if any of them have been seen before, this clause has been created 
-    //before (for that seen predicate), and can be ignored
-
-      //check the untruncated ground clause whether any of its predicates
-      //have been seen before
-    GroundClause* gndClause = new GroundClause(clause);
-    bool seenBefore = false;
-    for (int j = 0; j < gndClause->getNumGroundPredicates(); j++)
-    {
-      GroundPredicate* gp = (GroundPredicate*) gndClause->getGroundPredicate(j);
-      if (seenPreds->find(gp) !=  seenPreds->end() ||
-          (allGndingsAreQueries && (*allGndingsAreQueries)[gp->getId()] > 1) )
-      { 
-        seenBefore = true;
-        break;
-      }
-    }
-
-    gndClause->deleteAllGndPreds();
-    delete gndClause;
-    if (seenBefore) return;
-
-    gndClause = new GroundClause(truncClause);
-    if (markHardGndClauses && isHardClause) gndClause->setWtToHardWt();
-    assert(gndClause->getWt() != 0);
-
-
-    GroundClauseSet::iterator iter = gndClausesSet->find(gndClause);
-      //if the unknown clause is not in gndClauses
-    if (iter == gndClausesSet->end())
-    {
-      gndClausesSet->insert(gndClause);
-      gndClauses->append(gndClause);
-      //gndClause's wt is set when it was constructed
-      if (parentWtPtr) 
-      { 
-        gndClause->appendParentWtPtr(parentWtPtr);
-        assert(gndClause->getWt() == *parentWtPtr);
-      }
-
-        // add the unknown predicates of the clause to unseenPreds if 
-        // the predicates are already not in it
-      for (int j = 0; j < gndClause->getNumGroundPredicates(); j++)
-      {
-        GroundPredicate* gp =(GroundPredicate*)gndClause->getGroundPredicate(j);
-        assert(seenPreds->find(gp) == seenPreds->end());
-          // if the ground predicate is not in unseenPreds
-        GroundPredicateSet::iterator it = unseenPreds->find(gp);
-        if (it == unseenPreds->end())
-        {
-          //cout << "\tinserting into unseen pred: ";  
-          //pred->print(cout, domain); cout << endl;
-          unseenPreds->insert(gp);
-          //commented out: done when gndClause is initialized
-          //gp->appendGndClause(gndClause,predSense);              
-          int gndPredIdx = gndPreds->append(gp);
-          assert(gndPredsMap->find(gp) == gndPredsMap->end());
-          (*gndPredsMap)[gp] = gndPredIdx;
-          gndClause->setGroundPredicateIndex(j, gndPredIdx);
-        }
-        else
-        {
-          GroundPredicate* origGndPred = *it;
-          gndClause->replaceGroundPredicate(j, origGndPred);
-          bool predSense = gndClause->getGroundPredicateSense(j);
-          bool ok = origGndPred->appendGndClause(gndClause, predSense);
-          assert(ok); ok = true; // avoid compilation warning
-          
-            // origGndPred must already be in gndPreds
-          int gndPredIdx = (*(gndPredsMap->find(origGndPred))).second;
-          assert(gndPredIdx >= 0);
-          gndClause->setGroundPredicateIndex(j, gndPredIdx);
-        }
-      }
-    }
-    else
-    {  // gndClause has appeared before, so just accumulate its weight
-      (*iter)->addWt(gndClause->getWt());
-      if (parentWtPtr) (*iter)->appendParentWtPtr(parentWtPtr);
-      gndClause->deleteAllGndPreds();
-      delete gndClause;
-    }
-  } //addUnknownGndClause()
-*/
-
-
-  //Parag: Change as suggested by Stanley - 4/24
-  //Do not delete the clause and truncClause argument.
-  //This function is tightly bound to Clause::createAndAddUnknownClause().
   static void addUnknownGndClause(const AddGroundClauseStruct* const & agcs, 
                                   const Clause* const & clause,
                                   const Clause* const & truncClause,
@@ -377,20 +267,12 @@ class MRF
       //if the unknown clause is not in gndClauses
     if (iter == gndClausesSet->end())
     {
-  
-  /*	 
-	  cout<<endl<<" first time stan parag => "<<endl;
-	  gndClause->print(cout);
-	  cout<<endl<<endl;
-	  */
-
 	  gndClausesSet->insert(gndClause);
       gndClauses->append(gndClause);
       //gndClause's wt is set when it was constructed
       if (parentWtPtr) 
       { 
         gndClause->appendParentWtPtr(parentWtPtr);
-        //Parag:
 		gndClause->incrementClauseFrequency(clauseId,1); 
 		
 		assert(gndClause->getWt() == *parentWtPtr);
@@ -434,17 +316,12 @@ class MRF
     else
     {  // gndClause has appeared before, so just accumulate its weight
       (*iter)->addWt(gndClause->getWt());
-	  /*
-	  cout<<endl<<" Duplicate addition stan parag => "<<endl;
-	  gndClause->print(cout);
-	  cout<<endl<<endl;
-	  */
 
 	  //Change as suggeted by STAN : Mar 8, 2006
       //if (parentWtPtr) gndClause->appendParentWtPtr(parentWtPtr);
-	  if (parentWtPtr) {
+	  if (parentWtPtr)
+	  {
 		   (*iter)->appendParentWtPtr(parentWtPtr);
-		   //Parag:
            (*iter)->incrementClauseFrequency(clauseId,1); 
 	  }
 
@@ -643,7 +520,8 @@ class MRF
                                                          gndPreds_->size(),
                                                          true);
         if (   (isamp >= burnMinSteps && burnConverged)
-            || (burnMaxSteps >= 0 && isamp >= burnMaxSteps) )
+            || (burnMaxSteps >= 0 && isamp >= burnMaxSteps) 
+            || (maxSeconds > 0 && secondsElapsed >= maxSeconds))
         {
           cout << "Done burning. " << isamp << " samples per pred per chain (" 
                << (burnConverged? "converged":"didn't converge") 
@@ -1106,7 +984,6 @@ class MRF
  public:
 
   
-//Parag: 
 // initialize the structure to store the number of satisfied literals in
 // each clause
 void initNumSatLiterals(const int& numChains)

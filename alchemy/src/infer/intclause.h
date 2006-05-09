@@ -12,35 +12,43 @@ using namespace __gnu_cxx;
 class Domain;
 class Clause;
 
-const double HARD_INTCLAUSE_WT = DBL_MAX;
+//const double HARD_INTCLAUSE_WT = DBL_MAX;
+//const double HARD_INTCLAUSE_WT = 10.0;
 
 class IntClause
 {
  public:
 
-IntClause(const Clause* const & c, PredicateHashArray* const & predHashArray);
+  IntClause(const Clause* const & c, PredicateHashArray* const & predHashArray);
   
-	 
-~IntClause() { 
-  //if(intArrRep_) delete intArrRep_;
- }
+  ~IntClause()
+  {
+  	//if(intArrRep_) delete intArrRep_;
+  }
  
-  void deleteIntPredicates(){
-	 if (intPreds_) delete intPreds_;
-  } 
+  void deleteIntPredicates()
+  {
+	if (intPreds_) delete intPreds_;
+  }
 
-  void addWt(const double& wt) 
-  { if (wt_ == HARD_INTCLAUSE_WT) return; wt_ += wt; }
+//  void addWt(const double& wt) 
+//  { if (wt_ == LWInfo::HARD_WT) return; wt_ += wt; }
 
-  void setWt(const double& wt) 
-  { if (wt_ == HARD_INTCLAUSE_WT) return; wt_ = wt; }
+//  void setWt(const double& wt) 
+//  { if (wt_ == LWInfo::HARD_WT) return; wt_ = wt; }
+
+  void addWt(const double& wt);
+  void setWt(const double& wt);
 
   double getWt() const { return wt_; }
 
-  void setWtToHardWt() { wt_ = HARD_INTCLAUSE_WT; }
+//  void setWtToHardWt() { wt_ = LWInfo::HARD_WT; }
 
-  bool isHardClause() const { return (wt_ == HARD_INTCLAUSE_WT); }
+//  bool isHardClause() const { return (wt_ == LWInfo::HARD_WT); }
 
+  void setWtToHardWt();
+  bool isHardClause() const;
+  
   int getNumIntPredicates() const { return intPreds_->size(); }
 
   const int getIntPredicate(const int& i) const 
@@ -66,19 +74,19 @@ IntClause(const Clause* const & c, PredicateHashArray* const & predHashArray);
     const int* cItems  = c->getIntPredicates()->getItems();
     
 	return (memcmp(myItems,cItems,(intPreds_->size())*sizeof(int)) == 0);
-} 	
+  } 	
 
-void printWithoutWt(ostream& out) const
-{
-  for (int i = 0; i < intPreds_->size(); i++)
+  void printWithoutWt(ostream& out) const
   {
-    out << (*intPreds_)[i];
-    if (i < intPreds_->size()-1) out << " v ";
+  	for (int i = 0; i < intPreds_->size(); i++)
+  	{
+      out << (*intPreds_)[i];
+      if (i < intPreds_->size()-1) out << " v ";
+  	}
   }
-}
 
-void print(ostream& out) const
-{ out << wt_ << " "; printWithoutWt(out); }
+  void print(ostream& out) const
+  { out << wt_ << " "; printWithoutWt(out); }
 
 
  private:
@@ -89,7 +97,7 @@ void print(ostream& out) const
   Array<int>* intPreds_;
   
   // overloaded to indicate whether this is a hard clause
-  // if this is a hard clause, wt_ is set to HARD_INTCLAUSE_WT
+  // if this is a hard clause, wt_ is set to LWInfo::HARD_WT
   double wt_;
 
 };

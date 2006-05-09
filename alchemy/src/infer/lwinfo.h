@@ -20,6 +20,7 @@ LWInfo(MLN *mln, Domain *domain)
   this->domain_ = domain;
   //LWUtil::initPredStatus(domain_);
   makePositiveWeights();
+  setHardClauseWeight();
 }
   
  //destructor
@@ -95,6 +96,58 @@ inline void makePositiveWeights()
     }
   }  
   mln_ = posmln;
+}
+
+/*
+ * Computes the hard clause weight from the first order clauses in the mln.
+ * 
+ */
+inline void setHardClauseWeight()
+{
+	// This is the weight used if no soft clauses are present
+  LWInfo::HARD_WT = 10.0;
+  
+  int clauseCnt = mln_->getNumClauses();
+  double sumSoftWts = 0.0;
+  double minWt = DBL_MAX;
+  double maxWt = DBL_MIN;
+  int maxAllowedWt = 4000;
+  
+	// Sum up the soft weights of all grounded clauses
+  for (int clauseno = 0; clauseno < clauseCnt; clauseno++)
+  {
+    Clause* fclause = (Clause *) mln_->getClause(clauseno);
+	
+	if (fclause->isHardClause()) continue;
+	
+	double wt = fclause->getWt();
+	double numGndings = fclause->getNumGroundings(domain_);
+
+	if (wt < minWt) minWt = wt;
+	if (wt > maxWt) maxWt = wt;
+	sumSoftWts += wt*numGndings;
+	assert(minWt >= 0);
+    assert(maxWt >= 0);
+  } //for(clauseno < clauseCnt)
+  assert(sumSoftWts >= 0);
+
+	// If at least one soft clause
+  if (sumSoftWts > 0)
+  {
+  	  //find out how much to scale weights by
+  	LWInfo::WSCALE = 1.0;
+    if (maxWt > maxAllowedWt) LWInfo::WSCALE = maxAllowedWt/maxWt;
+    else
+    {
+      if (minWt < 10)
+      {
+        LWInfo::WSCALE = 10/minWt;
+        if (LWInfo::WSCALE*maxWt > maxAllowedWt) LWInfo::WSCALE = maxAllowedWt/maxWt;
+      }
+    }
+
+	LWInfo::HARD_WT = (sumSoftWts + 10.0)*LWInfo::WSCALE;
+  }
 }
 
 inline void reset()
@@ -232,7 +285,7 @@ void getWalksatClauses(Predicate *inputPred,
 */
 	litClause = (Array<int> *)intClause->getIntPredicates();
 	walksatClauses.append(litClause);
-	walksatClauseWts.append((int)(weight*WSCALE+0.5));
+	walksatClauseWts.append((int)(weight*LWInfo::WSCALE+0.5));
 	
     delete intClause;
   }
@@ -282,7 +335,7 @@ int getUnSatCostWhenFlipped(int atom)
   for(int j = 0; j < indclauses->size(); j++)
   {      
 	clause = (Clause *) (*indclauses)[j]->clause;			
-    int wt = (int)(clause->getWt()*WSCALE+0.5);
+    int wt = (int)(clause->getWt()*LWInfo::WSCALE+0.5);
 	if(wt < WEIGHT_EPSILON)
 	  continue;
 	bool ignoreActivePreds = true;
@@ -360,6 +413,12 @@ void removeVars(Array<int> indices)
   cout << "reset " << endl;
 }
 
+public:
+	//Weight of hard clauses
+  static double HARD_WT;
+	//Scale to use on weights
+  static double WSCALE;
+
 private:
 
   MLN *mln_;
@@ -369,7 +428,7 @@ private:
   PredicateHashArray predHashArray_;
   
   Array<Array<int> *> predToClauseIds_;
-  
+
 };
 
 #endif

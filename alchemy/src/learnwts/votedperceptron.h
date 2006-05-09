@@ -17,12 +17,11 @@ class VotedPerceptron
                   const string& nonEvidPredsStr, const int& maxSteps,
                   const int& tries, const int& targetWt, const bool& hard,
                   IndexTranslator* const & idxTrans, const int& memLimit,
-                  const bool& lazyInference, const bool& isQueryEvidence)
+                  const bool& lazyInference)
     : domainCnt_(domains.size()), idxTrans_(idxTrans)
   { 
     cout << endl << "Constructing voted perceptron..." << endl << endl;
     //cout << "domain count = " << domainCnt_ << endl;
-	isQueryEvidence_ = isQueryEvidence;
 
     assert(mlns.size() == domains.size());
     domains_.append(domains);
@@ -133,7 +132,7 @@ class VotedPerceptron
 
         knownPreds.clear();
         readPredValuesAndSetToUnknown(nonEvidPredNames, domain, nonEvidPreds,
-        							  nonEvidPredValues, isQueryEvidence_);
+        							  nonEvidPredValues, false);
 	 
 		cout<<"size of non evid preds = "<<nonEvidPreds.size()<<endl;
       	allPredGndingsAreNonEvid.growToSize(domain->getNumPredicates(), false);
@@ -1014,7 +1013,6 @@ class VotedPerceptron
   Array<double*> trainTrueCnts_;
 
   bool usePrior_;
-  bool isQueryEvidence_;
   const double* priorMeans_, * priorStdDevs_; 
 
   MaxWalksatParams* wsparams_;

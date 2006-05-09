@@ -33,7 +33,6 @@ int  mwsMaxSteps = 1000000;
 int  mwsTries    = 1;
 int  mwsLimit    = -1;
 bool  mwsLazy    = false;
-bool isQueryEvidence = false;
 
 int maxIter = 10000;
 double convThresh = 1e-5;
@@ -90,10 +89,6 @@ ARGS ARGS::Args[] =
        "[0.001] (For discriminative learning only) "
        "Learning rate for the gradient descent in voted perceptron algorithm."),
        
-  ARGS("dQueryEvidence", ARGS::Tog, isQueryEvidence, " (For distriminative learning only) "
-	    " If this flag is set, all the groundings of "
-		"query Predicates not in db are assumed false evidence."),
-  
   ARGS("mwsMaxSteps", ARGS::Opt, mwsMaxSteps,
        "[1000000] (For discriminative learning only.) " 
        "The max number of steps taken by MaxWalksat."),
@@ -326,7 +321,7 @@ int main(int argc, char* argv[])
     int  mwsTargetWt = INT_MAX;
     bool mwsHard = false;
     VotedPerceptron vp(mlns, domains, nonEvidPredsStr, mwsMaxSteps, mwsTries, 
-                       mwsTargetWt, mwsHard, indexTrans, mwsLimit, mwsLazy, isQueryEvidence);
+                       mwsTargetWt, mwsHard, indexTrans, mwsLimit, mwsLazy);
     if (!noPrior) 
       vp.setMeansStdDevs(numClausesFormulas, priorMeans.getItems(),
                          priorStdDevs.getItems());
