@@ -107,3 +107,43 @@ void GroundClause::print(ostream& out, const Domain* const & domain) const
 
 void GroundClause::print(ostream& out) const
 { out << wt_ << " "; printWithoutWt(out); }
+
+
+/**
+ * Computes and returns the size of this ground clause.
+ */
+double GroundClause::sizeKB()
+{
+  double size = 0;
+    //intArrRep_
+  if (intArrRep_)
+    size += (intArrRep_->size()*sizeof(unsigned int) / 1024.0);
+    // gndPreds_
+  //if (gndPreds_)
+  //{
+  //  for (int i = 0; i < gndPreds_->size(); i++)
+  //    size += (((*gndPreds_)[i])->sizeKB());
+  //}
+    // gndPredSenses_
+  if (gndPredSenses_)
+    size += (gndPredSenses_->size()*sizeof(bool) / 1024.0);
+    // gndPredIndexes_
+  if (gndPredIndexes_)
+    size += (gndPredIndexes_->size()*sizeof(int) / 1024.0);
+    // numSatLiterals_
+  if (numSatLiterals_)
+    size += (numSatLiterals_->size()*sizeof(int) / 1024.0);
+    // wt_
+  size += (sizeof(double) / 1024.0);
+    // threshold_
+  size += (sizeof(double) / 1024.0);
+    // parentWtPtrs_
+  if (parentWtPtrs_)
+    size += (parentWtPtrs_->size()*sizeof(const double*) / 1024.0);
+    // foClauseFrequencies_
+  if (foClauseFrequencies_)
+    size += (foClauseFrequencies_->size()*2*sizeof(int) / 1024.0);
+  
+  return size;
+}
+

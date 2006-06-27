@@ -34,6 +34,16 @@ class MLN
 
   int getNumClauses() const { return clauses_->size(); }
 
+  int getNumHardClauses() const
+  {
+  	int numHardClauses = 0;
+  	for (int i = 0; i < clauses_->size(); i++)
+  	{
+  	  if ((*clauses_)[i]->isHardClause()) numHardClauses++;
+  	}
+  	return numHardClauses;
+  }
+
 
   bool containsClause(const Clause* const & c) const
   { return clauses_->contains((Clause*)c); }

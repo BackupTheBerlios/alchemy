@@ -64,6 +64,8 @@ class Database
 	  truePredIdxSet_ = new Array<hash_set<int> >(numFOPreds);
 	  falsePredIdxSet_ = new Array<hash_set<int> >(numFOPreds);
 	  numberOfGroundings_.growToSize(numFOPreds);
+	  truePredIdxSet_->growToSize(numFOPreds);
+	  falsePredIdxSet_->growToSize(numFOPreds);
 	}
 	if (gndAtoms == 2)
 	{
@@ -140,6 +142,125 @@ class Database
       predIdToNumTF_->growToSize(numFOPreds);
     }
   }
+
+    //Copy constructor
+  Database(const Database& db)
+  {
+    domain_ = db.domain_;
+  	closedWorld_.growToSize(db.closedWorld_.size());
+    memcpy((void*)closedWorld_.getItems(), db.closedWorld_.getItems(),
+           db.closedWorld_.size()*sizeof(bool));
+    //closedWorld_ = db.closedWorld_;
+    lazyFlag_ = db.lazyFlag_;
+    performingInference_ = db.performingInference_;
+    firstConstIdByType_ = db.firstConstIdByType_;
+    numberOfGroundings_ = db.numberOfGroundings_;
+    
+    gndPredValues_ = gndPredValues_;
+    gndPredActiveStatus_ = db.gndPredActiveStatus_;
+    gndPredEvidenceStatus_ = db.gndPredEvidenceStatus_;
+    oppEqGndPreds_ = db.oppEqGndPreds_;
+
+	termMultByPred_.growToSize(db.termMultByPred_.size(), NULL);
+	for (int i = 0; i < db.termMultByPred_.size(); i++)
+	{
+	  if (db.termMultByPred_[i])
+	  {
+	    Array<MultAndType>* matArr = new Array<MultAndType>;
+      	matArr->growToSize(db.termMultByPred_[i]->size());
+      	for (int j = 0; j < db.termMultByPred_[i]->size(); j++)
+      	{
+		  MultAndType mat;
+		  mat.first = (*db.termMultByPred_[i])[j].first;
+		  mat.second = (*db.termMultByPred_[i])[j].second;
+          (*matArr)[j] = mat;
+      	}
+      	termMultByPred_[i] = matArr;		
+	  }
+	}
+
+    //paramPredsArray = db.paramPredsArray;
+
+	if (db.predIdToGndPreds_)
+	{
+	  predIdToGndPreds_ = new Array<GroundPreds*>(db.predIdToGndPreds_->size());
+	  predIdToGndPreds_->growToSize(db.predIdToGndPreds_->size());
+	  for (int i = 0; i < db.predIdToGndPreds_->size(); i++)
+	  {
+	  	predIdToGndPreds_->append(db.predIdToGndPreds_[i]);
+	  }
+	}
+
+	if (db.predIdToNumTF_)
+	{
+	  predIdToNumTF_ = new Array<NumTrueFalse>(db.predIdToNumTF_->size());
+	  predIdToNumTF_->growToSize(db.predIdToNumTF_->size());
+	  for (int i = 0; i < db.predIdToNumTF_->size(); i++)
+	  {
+	  	(*predIdToNumTF_)[i] = (*db.predIdToNumTF_)[i];
+	  }
+	}
+	
+	if (db.truePredIdxSet_)
+	{
+	  truePredIdxSet_ = new Array<hash_set<int> >(db.truePredIdxSet_->size());
+	  truePredIdxSet_->growToSize(db.truePredIdxSet_->size());
+	  for (int i = 0; i < db.truePredIdxSet_->size(); i++)
+	  {
+	  	(*truePredIdxSet_)[i] = (*db.truePredIdxSet_)[i];
+	  }
+	}
+	
+	if (db.falsePredIdxSet_)
+	{	
+	  falsePredIdxSet_ = new Array<hash_set<int> >();
+	  falsePredIdxSet_->growToSize(db.falsePredIdxSet_->size());
+	  for (int i = 0; i < db.falsePredIdxSet_->size(); i++)
+	  	(*falsePredIdxSet_)[i] = (*db.falsePredIdxSet_)[i];
+	}
+	
+	if (db.activePredIdxSet_)
+	{
+	  activePredIdxSet_ = new Array<hash_set<int> >();
+	  activePredIdxSet_->growToSize(db.activePredIdxSet_->size());
+	  for (int i = 0; i < db.activePredIdxSet_->size(); i++)
+	  	(*activePredIdxSet_)[i] = (*db.activePredIdxSet_)[i];
+	}
+	
+	if (db.evidencePredIdxSet_)
+	{
+	  evidencePredIdxSet_ = new Array<hash_set<int> >();
+	  evidencePredIdxSet_->growToSize(db.evidencePredIdxSet_->size());
+	  for (int i = 0; i < db.evidencePredIdxSet_->size(); i++)
+	  	(*evidencePredIdxSet_)[i] = (*db.evidencePredIdxSet_)[i];
+	}
+
+	if (db.deactivatedPredIdxSet_)
+	{
+	  deactivatedPredIdxSet_ = new Array<hash_set<int> >();
+	  deactivatedPredIdxSet_->growToSize(db.deactivatedPredIdxSet_->size());
+	  for (int i = 0; i < db.deactivatedPredIdxSet_->size(); i++)
+	  	(*deactivatedPredIdxSet_)[i] = (*db.deactivatedPredIdxSet_)[i];
+	}
+  }
+  
+  void printInfo()
+  {
+    cout << "GNDINGS " << endl;
+    for (int i = 0; i < numberOfGroundings_.size(); i++)
+      cout << i << ": " << numberOfGroundings_[i] << endl;
+      
+    cout << "TRUE " << truePredIdxSet_->size() << endl;
+    for (int i = 0; i < truePredIdxSet_->size(); i++)
+    {
+      hash_set<int> hs = (*truePredIdxSet_)[i];
+      cout << i << ": " << hs.size() << endl;
+    }
+    cout << "FALSE " << falsePredIdxSet_->size() << endl;
+    cout << "ACTIVE " << activePredIdxSet_->size() << endl;
+    cout << "EVIDENCE " << evidencePredIdxSet_->size() << endl;
+    cout << "DEACTIVE " << deactivatedPredIdxSet_->size() << endl;
+  }
   
   // Set the lazy flag, update the structures accordingly
   void setLazyFlag()
@@ -185,8 +306,53 @@ class Database
 	  activePredIdxSet_ = new Array<hash_set<int> >(numFOPreds);
 	  evidencePredIdxSet_ = new Array<hash_set<int> >(numFOPreds);
 	  deactivatedPredIdxSet_ = new Array<hash_set<int> >(numFOPreds);
+	  activePredIdxSet_->growToSize(numFOPreds);
+	  evidencePredIdxSet_->growToSize(numFOPreds);
+	  deactivatedPredIdxSet_->growToSize(numFOPreds);
 	}
 
+  }
+
+  void setLazyFlag(bool lf)
+  {
+  	  // If lazyFlag_ is already set this way, do nothing
+  	if ((lf && lazyFlag_) || (!lf && !lazyFlag_)) return;
+  	if (lf) setLazyFlag();
+  	if (!lf)
+  	{
+  	  if (gndAtoms == 0)
+  	  {
+	    for (int i = 0; i < gndPredActiveStatus_.size(); i++)  
+        if (gndPredActiveStatus_[i]) delete gndPredActiveStatus_[i];
+        gndPredActiveStatus_.clearAndCompress();
+	 
+	    for (int i = 0; i < gndPredEvidenceStatus_.size(); i++)  
+          if (gndPredEvidenceStatus_[i]) delete gndPredEvidenceStatus_[i];
+        gndPredEvidenceStatus_.clearAndCompress();
+	  }
+	  else if (gndAtoms >= 1)
+	  {
+		if (activePredIdxSet_)
+		{
+		  for (int i = 0; i < activePredIdxSet_->size(); i++)
+		  	(*activePredIdxSet_)[i].clear();
+		  delete activePredIdxSet_;
+		}	  	
+		if (evidencePredIdxSet_)
+		{
+		  for (int i = 0; i < evidencePredIdxSet_->size(); i++)
+		  	(*evidencePredIdxSet_)[i].clear();
+		  delete evidencePredIdxSet_;
+		}	  	
+		if (deactivatedPredIdxSet_)
+		{
+		  for (int i = 0; i < deactivatedPredIdxSet_->size(); i++)
+		  	(*deactivatedPredIdxSet_)[i].clear();
+		  delete deactivatedPredIdxSet_;
+		}	
+		 lazyFlag_ = false; 	
+	  }
+  	}
   }
 	   
   //Set the performing inference flag
@@ -206,7 +372,7 @@ class Database
 	  if(lazyFlag_)
 	  {
 	    for (int i = 0; i < gndPredActiveStatus_.size(); i++)  
-        if (gndPredActiveStatus_[i]) delete gndPredActiveStatus_[i];
+          if (gndPredActiveStatus_[i]) delete gndPredActiveStatus_[i];
         gndPredActiveStatus_.clearAndCompress();
 	 
 	    for (int i = 0; i < gndPredEvidenceStatus_.size(); i++)  
@@ -222,9 +388,36 @@ class Database
         predIdToGndPreds_ = NULL;
       }
 	}
+	
     for (int i = 0; i < termMultByPred_.size(); i++) 
-    if (termMultByPred_[i]) delete termMultByPred_[i];
+      if (termMultByPred_[i]) delete termMultByPred_[i];
     termMultByPred_.clearAndCompress();
+
+	if (gndAtoms >= 1)
+	{
+	  for (int i = 0; i < truePredIdxSet_->size(); i++)
+	  	(*truePredIdxSet_)[i].clear();
+	  delete truePredIdxSet_;
+	  	
+	  for (int i = 0; i < falsePredIdxSet_->size(); i++)
+	  	(*falsePredIdxSet_)[i].clear();
+	  delete falsePredIdxSet_;
+
+	  if (lazyFlag_)
+	  {
+	  	for (int i = 0; i < activePredIdxSet_->size(); i++)
+	  	  (*activePredIdxSet_)[i].clear();
+	  	delete activePredIdxSet_;
+	  	
+	  	for (int i = 0; i < evidencePredIdxSet_->size(); i++)
+	  	  (*evidencePredIdxSet_)[i].clear();
+	  	delete evidencePredIdxSet_;
+	  	
+	  	for (int i = 0; i < deactivatedPredIdxSet_->size(); i++)
+	  	  (*deactivatedPredIdxSet_)[i].clear();
+	  	delete deactivatedPredIdxSet_;
+	  }
+	}
 
     if (predIdToNumTF_)  { delete predIdToNumTF_; predIdToNumTF_ = NULL; }
   }
@@ -256,7 +449,7 @@ class Database
       }
   	}
     for (int i = 0; i < termMultByPred_.size(); i++) 
-    if (termMultByPred_[i]) termMultByPred_[i]->compress();
+      if (termMultByPred_[i]) termMultByPred_[i]->compress();
     termMultByPred_.compress();
 
     firstConstIdByType_.compress();
@@ -688,7 +881,16 @@ class Database
   	if (dbdebug >= 1) cout << "Returning " << oldas << endl;
 	return oldas;
   }
-	   
+
+  void resetActiveStatus()
+  {
+  	assert(lazyFlag_);
+  	if (gndAtoms >= 1)
+ 	{
+ 	  for (int i = 0; i < activePredIdxSet_->size(); i++)
+ 	    (*activePredIdxSet_)[i].clear();
+ 	}
+  }  
 
   // Returns prev DeactivatedStatus of pred. Caller is responsible for deleting pred.
   bool setDeactivatedStatus(const Predicate* const & pred, const bool& das)
@@ -723,6 +925,15 @@ class Database
 	return olddas;
   }
 
+  void resetDeactivatedStatus()
+  {
+  	assert(lazyFlag_);
+  	if (gndAtoms >= 1)
+ 	{
+ 	  for (int i = 0; i < deactivatedPredIdxSet_->size(); i++)
+ 	    (*deactivatedPredIdxSet_)[i].clear();
+ 	}
+  }  
 
   // Returns prev EvidenceStatus of pred. Caller is responsible for deleting pred.
   bool setEvidenceStatus(const Predicate* const & pred, const bool& es)
@@ -890,6 +1101,30 @@ class Database
 	  return numberOfGroundings_[predId];
   }
 
+  int getNumEvidenceGndPreds(const int& predId) const
+  {
+      // All '=' predicates are evidence
+    const PredicateTemplate* t = domain_->getPredicateTemplate(predId);    
+    if (t->isEqualPredWithType())
+    {
+      int nc = domain_->getNumConstantsByType(t->getTermTypeAsInt(0));
+      return nc*nc;
+    }
+
+    if (gndAtoms == 0)
+    {
+      return gndPredEvidenceStatus_[predId]->size();
+    }
+    else if (gndAtoms >= 1)
+    {
+        // All closed-world preds are evidence
+      if (closedWorld_[predId])
+      {
+        return numberOfGroundings_[predId];
+      }
+      return (*evidencePredIdxSet_)[predId].size();
+    }
+  }
 
   int getNumTrueGndPreds(const int& predId) const
   {
@@ -995,6 +1230,24 @@ class Database
   { closedWorld_[predId] = b; }
   const Array<bool>& getClosedWorld() const { return closedWorld_; }
 
+    // Caller should delete returned array but not modify its contents.
+  const PredicateHashArray* getTrueNonEvidenceGndPreds(const int& predId) const 
+  {
+    PredicateHashArray* preds = new PredicateHashArray();
+    
+    hash_set<int>::const_iterator it = (*truePredIdxSet_)[predId].begin();
+    for (; it != (*truePredIdxSet_)[predId].end(); it++)
+    {
+        // Check if in evidence
+      if ((*evidencePredIdxSet_)[predId].find(*it) ==
+          (*evidencePredIdxSet_)[predId].end())
+      {
+        Predicate* p = getPredFromIdx((*it), domain_->getPredicateTemplate(predId));
+        preds->append(p);
+      }
+    }
+    return preds;
+  }
   
     // FOR TESTING ONLY
     // Caller should not delete returned array nor modify its contents.
@@ -1157,6 +1410,7 @@ class Database
   {
 	Predicate* p = new Predicate(predTemplate);
 	Array<int>* auxIdx = new Array<int>(predTemplate->getNumTerms());
+	auxIdx->growToSize(predTemplate->getNumTerms());
 	Array<MultAndType>* multAndTypes = termMultByPred_[p->getId()];
 	for (int i = 0; i < predTemplate->getNumTerms(); i++)
 	{
@@ -1228,11 +1482,11 @@ class Database
     //is indexed, and third - value of the parameter it is
     //indexed.
   Array<int> ***paramPredsArray[INDEX_TYPE_COUNT];
-  
+
 	// Hash set of true ground atoms
   Array<hash_set<int> >* truePredIdxSet_;
   
-	// Hash set of false ground atoms - only used if open world
+	// Hash set of false ground atoms - only used for open world preds
   Array<hash_set<int> >* falsePredIdxSet_;
 
 	// Hash set of active ground atoms

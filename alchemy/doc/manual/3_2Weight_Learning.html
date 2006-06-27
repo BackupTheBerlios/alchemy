@@ -50,12 +50,11 @@ original version by:  Nikos Drakos, CBLU, University of Leeds
 3.2 Weight Learning</A>
 </H2>
 To learn the weights of formulas, run the <TT>learnwts</TT> executable, e.g.,
-<TT>ALCHDIR/bin/learnwts -g -i univ.mln -o univ-out.mln -t univ-train.db
--functions univ-train.func</TT>.
+<TT>ALCHDIR/bin/learnwts -g -i univ.mln -o univ-out.mln -t univ-train.db</TT>.
 <TT>-g</TT> specifies that generative learning is to be used. Alternatively, 
 you can use <TT>-d</TT> for discriminative learning, e.g., 
 <TT>ALCHDIR/bin/learnwts -d -i univ.mln -o univ-out.mln -t univ-train.db 
--functions univ-train.func -ne advisedBy,student,professor</TT>.
+-ne advisedBy,student,professor</TT>.
 <TT>-i</TT> and <TT>-o</TT> specify the input and 
 output <TT>.mln</TT> files as <TT>univ.mln</TT> and <TT>univ-out.mln</TT> respectively.
 
@@ -69,8 +68,6 @@ case, you can use the option <TT>-multipleDatabases</TT> to specify that the
 constants in each <TT>.db</TT> file belong to a separate database, 
 and should not be mixed with those in other <TT>.db</TT> files 
 (e.g, <TT>-t ai.db,graphics.db,systems.db -multipleDatabases</TT>).
-<TT>-functions</TT> specifies the <TT>.func</TT> file containing the function
-mappings used by weight learning.
 
 <P>
 In the current version of Alchemy <TT>.db</TT> files that are used for learning 
@@ -148,7 +145,7 @@ its derived clauses.
 <!--End of Navigation Panel-->
 <ADDRESS>
 Marc Sumner
-2006-05-03
+2006-06-26
 </ADDRESS>
 </BODY>
 </HTML>

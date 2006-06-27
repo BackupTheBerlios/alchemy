@@ -66,12 +66,13 @@ void createDomainAndMLN(Array<Domain*>& domains, Array<MLN*>& mlns,
   bool allPredsExceptQueriesAreCW = true;
   bool warnAboutDupGndPreds = true;
   bool mustHaveWtOrFullStop = false;
+  bool flipWtsOfFlippedClause = false;
   Domain* domain0 = (checkPlusTypes) ? domains[0] : NULL;
 
   bool ok = runYYParser(mln, domain, tmpInMLN, allPredsExceptQueriesAreCW, 
                         NULL, nonEvidPredNames, addUnitClauses, 
                         warnAboutDupGndPreds, priorMean, mustHaveWtOrFullStop,
-                        domain0, mwsLazy);
+                        domain0, mwsLazy, flipWtsOfFlippedClause);
 
   if (!ok) { unlink(tmpInMLN); exit(-1); }
   domains.append(domain);

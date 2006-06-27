@@ -35,9 +35,11 @@ typedef hash_set<string, HashString, EqualString> FormulaStringSet;
 
 struct CacheCount
 {
-  CacheCount(const int& gg, const double& ccnt) : g(gg), cnt(ccnt) {}
+  CacheCount(const int& gg, const int& cc, const double& ccnt) :
+    g(gg), c(cc), cnt(ccnt) {}
   ~CacheCount() {}
   int g; // gth grounding of predicate
+  int c; // cth flip combination of the grounding (when in a block)
   double cnt; //counts
 };
 

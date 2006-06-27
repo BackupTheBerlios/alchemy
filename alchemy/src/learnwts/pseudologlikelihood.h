@@ -82,12 +82,12 @@ class PseudoLogLikelihood
       (*domains_)[i] = (*domains)[i];
 
     gndPredClauseIndexesAndCountsArr_ 
-      = new Array<Array<Array<Array<IndexAndCount*>*>*>*>;
+      = new Array<Array<Array<Array<Array<IndexAndCount*>*>*>*>*>;
     gndPredClauseIndexesAndCountsArr_->growToSize(numDomains,NULL);
     for (int i = 0; i < numDomains; i++)
     {        
       (*gndPredClauseIndexesAndCountsArr_)[i] 
-        = new Array<Array<Array<IndexAndCount*>*>*>;
+        = new Array<Array<Array<Array<IndexAndCount*>*>*>*>;
       (*gndPredClauseIndexesAndCountsArr_)[i]->growToSize(
                                        (*domains_)[i]->getNumPredicates(),NULL);
     }
@@ -123,7 +123,7 @@ class PseudoLogLikelihood
 
     for (int i = 0; i < gndPredClauseIndexesAndCountsArr_->size(); i++)
     {
-      Array<Array<Array<IndexAndCount*>*>*>* gndPredClauseIndexesAndCounts 
+      Array<Array<Array<Array<IndexAndCount*>*>*>*>* gndPredClauseIndexesAndCounts 
         = (*gndPredClauseIndexesAndCountsArr_)[i];
 
       int numPreds = gndPredClauseIndexesAndCounts->size();
@@ -131,13 +131,19 @@ class PseudoLogLikelihood
       {
         if ( (*gndPredClauseIndexesAndCounts)[p] )
         {
-          Array<Array<IndexAndCount*>*>* gndingsToClauseIndexesAndCounts 
+          Array<Array<Array<IndexAndCount*>*>*>* gndingsToClauseIndexesAndCounts 
             = (*gndPredClauseIndexesAndCounts)[p];
           int numGnds = gndingsToClauseIndexesAndCounts->size();
           for (int g = 0; g < numGnds; g++) // for each grounding
           {
-            for (int h=0; h<(*gndingsToClauseIndexesAndCounts)[g]->size(); h++)
+            for (int h = 0; h < (*gndingsToClauseIndexesAndCounts)[g]->size(); h++)
+            {
+              for (int j = 0; j < (*(*gndingsToClauseIndexesAndCounts)[g])[h]->size(); j++)
+              {
+                delete (*(*(*gndingsToClauseIndexesAndCounts)[g])[h])[j];
+              }
               delete (*(*gndingsToClauseIndexesAndCounts)[g])[h];
+            }
             delete (*gndingsToClauseIndexesAndCounts)[g];
           }
           delete gndingsToClauseIndexesAndCounts;
@@ -168,22 +174,30 @@ class PseudoLogLikelihood
   {
     for (int i = 0; i < gndPredClauseIndexesAndCountsArr_->size(); i++)
     {
-      Array<Array<Array<IndexAndCount*>*>*>* gndPredClauseIndexesAndCounts 
+      Array<Array<Array<Array<IndexAndCount*>*>*>*>* gndPredClauseIndexesAndCounts 
         = (*gndPredClauseIndexesAndCountsArr_)[i];
       
       int numPreds = gndPredClauseIndexesAndCounts->size();
       for (int p = 0; p < numPreds; p++) // for each predicate
       {
+
         if ((*gndPredClauseIndexesAndCounts)[p])
         {
-          Array<Array<IndexAndCount*>*>* gndingsToClauseIndexesAndCounts 
+          Array<Array<Array<IndexAndCount*>*>*>* gndingsToClauseIndexesAndCounts 
             = (*gndPredClauseIndexesAndCounts)[p];
           int numGnds = gndingsToClauseIndexesAndCounts->size();
           for (int g = 0; g < numGnds; g++) // for each grounding
-            (*gndingsToClauseIndexesAndCounts)[g]->compress();
+          {
+            Array<Array<IndexAndCount*>*>* combosToClauseIndexesAndCounts
+              = (*gndingsToClauseIndexesAndCounts)[g];
+            int numCombos = combosToClauseIndexesAndCounts->size();
+            for (int c = 0; c < numCombos; c++) // for each combo
+              (*combosToClauseIndexesAndCounts)[c]->compress();
+          }
         }
       }
     }
+
     //numGndings_ not compress because set to exact size in constructor
   }
 
@@ -194,7 +208,7 @@ class PseudoLogLikelihood
                     Array<Array<Array<CacheCount*>*>*>* const & cache,
                     const int& d)
   {
-    Array<Array<Array<IndexAndCount*>*>*>* gndPredClauseIndexesAndCounts;
+    Array<Array<Array<Array<IndexAndCount*>*>*>*>* gndPredClauseIndexesAndCounts;
     Array<IndexAndCount*>* gArr;
     CacheCount* cc;
     assert(cache->size() == domains_->size());
@@ -208,7 +222,7 @@ class PseudoLogLikelihood
       {
         assert((*gndPredClauseIndexesAndCounts)[p] != NULL);
         cc = (*ccArr)[i];
-        gArr =(*(*gndPredClauseIndexesAndCounts)[p])[cc->g];
+        gArr = (*(*(*gndPredClauseIndexesAndCounts)[p])[cc->g])[cc->c];
           //gth grounding of clause's pred should not have been looked at
         assert(gArr->size()==0 ||*(gArr->lastItem()->index)!=*clauseIdxInMLN);
         assert(cc->cnt != 0);
@@ -259,7 +273,7 @@ class PseudoLogLikelihood
     //the contents of undoInfos will be deleted
   void undoAppendRemoveCounts(const Array<UndoInfo*>* const & undoInfos)
   {
-    for (int i = undoInfos->size()-1; i >= 0; i--)
+    for (int i = undoInfos->size() - 1; i >= 0; i--)
     {
       if ((*undoInfos)[i]->remIacIdx >= 0) // if this was a removal
       {
@@ -279,7 +293,7 @@ class PseudoLogLikelihood
         }
       }
       else
-      {    // this was a addition
+      {    // this was an addition
         IndexAndCount* iac = (*undoInfos)[i]->affectedArr->removeLastItem();
         delete iac;
       }
@@ -397,13 +411,13 @@ class PseudoLogLikelihood
     bool ret = true;
     for (int d = 0; d < domains_->size(); d++)
     {
-      Array<Array<Array<IndexAndCount*>*>*>* gndPredClauseIndexesAndCounts
+      Array<Array<Array<Array<IndexAndCount*>*>*>*>* gndPredClauseIndexesAndCounts
         = (*gndPredClauseIndexesAndCountsArr_)[d];
 
       int numPreds = gndPredClauseIndexesAndCounts->size();
       for (int p = 0; p < numPreds; p++) // for each predicate
       {
-        Array<Array<IndexAndCount*>*>* gndingsToClauseIndexesAndCounts 
+        Array<Array<Array<IndexAndCount*>*>*>* gndingsToClauseIndexesAndCounts 
           = (*gndPredClauseIndexesAndCounts)[p];
         
         if (gndingsToClauseIndexesAndCounts == NULL) continue;
@@ -411,16 +425,19 @@ class PseudoLogLikelihood
         int numGnds = gndingsToClauseIndexesAndCounts->size();
         for (int g = 0; g < numGnds; g++) // for each grounding
         {
-          Array<IndexAndCount*>* gndings 
+          Array<Array<IndexAndCount*>*>* gndings 
             = (*gndingsToClauseIndexesAndCounts)[g];
 
-          bool ok = noRepeatedIndex(gndings, mln);
-          if (!ok) 
+          for (int c = 0; c < gndings->size(); c++)
           {
-            cout << "ERROR: repeated index in domain " << d << " for pred " 
-                 << (*domains_)[0]->getPredicateName(p) << " gnding " << g 
-                 << endl;
-            ret = false;
+            bool ok = noRepeatedIndex((*gndings)[c], mln);
+            if (!ok) 
+            {
+              cout << "ERROR: repeated index in domain " << d << " for pred " 
+                   << (*domains_)[0]->getPredicateName(p) << " gnding " << g 
+                   << " combination " << c << endl;
+              ret = false;
+            }
           }
         }
       } // for each predicate
@@ -434,15 +451,15 @@ class PseudoLogLikelihood
     for (int d = 0; d < domains_->size(); d++)
     {
       cout << "domainIdx: " << d << endl;
-      cout << "gndPredClauseIndexesAndCounts[predIdx][gndingIdx][i]" << endl;
+      cout << "gndPredClauseIndexesAndCounts[predIdx][gndingIdx][combIdx][i]" << endl;
 
-      Array<Array<Array<IndexAndCount*>*>*>* gndPredClauseIndexesAndCounts
+      Array<Array<Array<Array<IndexAndCount*>*>*>*>* gndPredClauseIndexesAndCounts
         = (*gndPredClauseIndexesAndCountsArr_)[d];
 
       int numPreds = gndPredClauseIndexesAndCounts->size();
       for (int p = 0; p < numPreds; p++) // for each predicate
       {
-        Array<Array<IndexAndCount*>*>* gndingsToClauseIndexesAndCounts 
+        Array<Array<Array<IndexAndCount*>*>*>* gndingsToClauseIndexesAndCounts 
           = (*gndPredClauseIndexesAndCounts)[p];
         
         if (gndingsToClauseIndexesAndCounts == NULL) 
@@ -454,30 +471,37 @@ class PseudoLogLikelihood
         int numGnds = gndingsToClauseIndexesAndCounts->size();
         for (int g = 0; g < numGnds; g++) // for each grounding
         {
-          Array<IndexAndCount*>* gndings 
+          Array<Array<IndexAndCount*>*>* gndings 
             = (*gndingsToClauseIndexesAndCounts)[g];
-          int numClauseIdx = gndings->size();
-          
-          if (numClauseIdx == 0)
+
+          for (int c = 0; c < gndings->size(); c++)
           {
-            cout << "gndPredClauseIndexesAndCounts[" << p << "][" << g 
-                 << "] = empty" << endl;
-            continue;
-          }
+            Array<IndexAndCount*>* combos 
+              = (*gndings)[c];
+            int numClauseIdx = combos->size();
           
-          for (int i = 0; i < numClauseIdx; i++)
-          {
-            cout << "gndPredClauseIndexesAndCounts[" << p << "][" << g << "][" 
-                 << i << "] (clauseIndex,count) = " << *((*gndings)[i]->index)
-                 << ", " << (*gndings)[i]->count 
-                 << ",  " << (*gndings)[i] << endl;
-            
-            if (mln)
+            if (numClauseIdx == 0)
             {
-              cout << "                                      \t";
-              mln->getClause(*((*gndings)[i]->index)) ->print(cout, 
-                                                              (*domains_)[0]);
-              cout << endl;
+              cout << "gndPredClauseIndexesAndCounts[" << p << "][" << g 
+                   << "][" << c << "] = empty" << endl;
+              continue;
+            }
+          
+            for (int i = 0; i < numClauseIdx; i++)
+            {
+              cout << "gndPredClauseIndexesAndCounts[" << p << "][" << g << "][" 
+                   << c << "][" << i << "] (clauseIndex,count) = "
+                   << *((*combos)[i]->index)
+                   << ", " << (*combos)[i]->count 
+                   << ",  " << (*combos)[i] << endl;
+            
+              if (mln)
+              {
+                cout << "                                      \t";
+                mln->getClause(*((*combos)[i]->index)) ->print(cout, 
+                                                               (*domains_)[0]);
+                cout << endl;
+              }
             }
           }
 
@@ -610,8 +634,10 @@ class PseudoLogLikelihood
           if (sampleGndPreds_ && !isSampledGndPred(g,sg)) continue;
           
           if (computeCounts)
+          {
             computeAndSetCounts(c, clauseIdxInMLN, predId, gndPred, g, db,
                                 domainIdx, undoInfos, sampleClauses, cache);
+          }
           else
             removeCounts(clauseIdxInMLN, predId, g, domainIdx, undoInfos);
         } //for each grounding of pred 
@@ -700,27 +726,14 @@ class PseudoLogLikelihood
   } //computeCountsRemoveCountsHelper()
 
     
-  void computePerPredPllAndGrad(const Array<Array<IndexAndCount*>*>*const& 
+  void computePerPredPllAndGrad(const Array<Array<Array<IndexAndCount*>*>*>*const& 
                                 gndingsToClauseIndexesAndCounts,
                                 const int& g, const double* const & wt, 
                                 long double& perPredPll, 
                                 long double * const & perPredGrad)
   {
       // compute W.(N^bar-N)
-    long double wdotn = 0;
-    Array<IndexAndCount*>* clauseIndexesAndCounts 
-      = (*gndingsToClauseIndexesAndCounts)[g];
-    
-    assert(noRepeatedIndex(clauseIndexesAndCounts));
-    
-    int numClausesUnifyWith = clauseIndexesAndCounts->size();
-    for (int i = 0; i < numClausesUnifyWith; i++)
-    {
-        // grounding g unifies with clause (*clauseIndexesAndCounts)[i].idx
-      wdotn += wt[ *( (*clauseIndexesAndCounts)[i]->index ) ] * 
-        (*clauseIndexesAndCounts)[i]->count;
-    }
-    
+
     //commented out: this works and helps to prevent overflow, but is a 
     //little slower. Since overflow can prevented by using long double,
     //we are not using this.
@@ -739,16 +752,50 @@ class PseudoLogLikelihood
       //perPredGrad[ *( (*clauseIndexesAndCounts)[i]->index ) ] 
         //+= (1.0/(pmb)-1) * (*clauseIndexesAndCounts)[i]->count;    
 
-	  // Marc: Changed to logl, expl because otherwise changing
+	  // Changed to logl, expl because otherwise changing
 	  // order of .mln files changes weight results
-	long double pmb = 1+expl(wdotn); 
-    perPredPll -= logl(pmb);
-      // update gradient
-    for (int i = 0; i < numClausesUnifyWith; i++)
-      perPredGrad[ *( (*clauseIndexesAndCounts)[i]->index ) ]
-        += ( (1.0/pmb-1) * (*clauseIndexesAndCounts)[i]->count );
-  }
+    long double wdotn = 0;
+      // pmb = 1 + sum(exp(wdotn))
+    long double pmb = 1;
+    
+    Array<Array<IndexAndCount*>*>* gndings =
+      (*gndingsToClauseIndexesAndCounts)[g];
 
+      // For each valid assignment of vars in block
+    for (int c = 0; c < gndings->size(); c++)
+    {
+      Array<IndexAndCount*>* clauseIndexesAndCounts 
+        = (*gndings)[c];
+      assert(noRepeatedIndex(clauseIndexesAndCounts));
+    
+      int numClausesUnifyWith = clauseIndexesAndCounts->size();
+//cout << "numClausesUnifyWith " << numClausesUnifyWith << endl;
+
+      for (int i = 0; i < numClausesUnifyWith; i++)
+      {
+//cout << "Clause " << (*clauseIndexesAndCounts)[i]->index << endl;
+//cout << "Count " << (*clauseIndexesAndCounts)[i]->count << endl << endl;
+          // grounding g unifies with clause (*clauseIndexesAndCounts)[i].idx
+        wdotn += wt[ *( (*clauseIndexesAndCounts)[i]->index ) ] * 
+          (*clauseIndexesAndCounts)[i]->count;
+      }
+      
+      pmb += expl(wdotn);
+    }
+
+    perPredPll -= logl(pmb);
+      // Is this still right with blocking?
+      // update gradient
+    for (int c = 0; c < gndings->size(); c++)
+    {
+      Array<IndexAndCount*>* clauseIndexesAndCounts 
+        = (*gndings)[c];
+      
+      for (int i = 0; i < clauseIndexesAndCounts->size(); i++)
+        perPredGrad[ *( (*clauseIndexesAndCounts)[i]->index ) ]
+          += ( (1.0/pmb-1) * (*clauseIndexesAndCounts)[i]->count );
+    }
+  }
 
   void computeSampledPerPredPllAndGrad(IntHashArray& gndings, 
                                        const int& totalGndings,
@@ -758,7 +805,7 @@ class PseudoLogLikelihood
                                        long double* const & perPredGrad,
                                        const int& arrSize,
                                        const double* const & wt,
-                                       const Array<Array<IndexAndCount*>*>*
+                                       const Array<Array<Array<IndexAndCount*>*>*>*
                                        const& gndingsToClauseIndexesAndCounts)
   {
     tmpPerPredPll = 0;
@@ -791,9 +838,9 @@ class PseudoLogLikelihood
     long double* tmpPerPredGrad = NULL;
     if (sampleGndPreds_) tmpPerPredGrad = new long double[arrSize];
     
-    Array<Array<Array<IndexAndCount*>*>*>* gndPredClauseIndexesAndCounts
+    Array<Array<Array<Array<IndexAndCount*>*>*>*>* gndPredClauseIndexesAndCounts
       = (*gndPredClauseIndexesAndCountsArr_)[domainIdx];
-    
+
     int numPreds = gndPredClauseIndexesAndCounts->size();
     for (int p = 0; p < numPreds; p++) // for each predicate
     {
@@ -809,7 +856,7 @@ class PseudoLogLikelihood
         //if pred p appears in one or more clauses
       if ((*gndPredClauseIndexesAndCounts)[p] != NULL)
       {
-        Array<Array<IndexAndCount*>*>* gndingsToClauseIndexesAndCounts 
+        Array<Array<Array<IndexAndCount*>*>*>* gndingsToClauseIndexesAndCounts 
           = (*gndPredClauseIndexesAndCounts)[p];
 
         if (sampleGndPreds_)
@@ -861,23 +908,53 @@ class PseudoLogLikelihood
     return wpll;
   }
 
-
   void createClauseIndexesAndCountsArrays(const int& predId, 
                                           const int& domainIdx)
   {
-    Array<Array<Array<IndexAndCount*>*>*>* gndPredClauseIndexesAndCounts
+    Array<Array<Array<Array<IndexAndCount*>*>*>*>* gndPredClauseIndexesAndCounts
       = (*gndPredClauseIndexesAndCountsArr_)[domainIdx];
     if ((*gndPredClauseIndexesAndCounts)[predId] != NULL) return;
 
-    Array<Array<IndexAndCount*>*>* arr = new Array<Array<IndexAndCount*>*>;
+    Array<Array<Array<IndexAndCount*>*>*>* arr =
+      new Array<Array<Array<IndexAndCount*>*>*>;
     double numGndings = (*((*numGndings_)[domainIdx]))[predId];
 
       //for each grounding, create a record of the indexes and counts of the
       //clauses in which the grounding appears
     for (int g = 0; g < numGndings; g++) 
-      arr->append(new Array<IndexAndCount*>);
+      arr->append(new Array<Array<IndexAndCount*>*>);
     arr->compress();
     (*gndPredClauseIndexesAndCounts)[predId] = arr;
+  }
+
+  void createComboClauseIndexesAndCountsArrays(const int& predId, 
+                                               const int& domainIdx,
+                                               Predicate* const & gndPred,
+                                               const int& g)
+  {
+    Array<Array<Array<Array<IndexAndCount*>*>*>*>* gndPredClauseIndexesAndCounts
+      = (*gndPredClauseIndexesAndCountsArr_)[domainIdx];
+
+    Array<Array<IndexAndCount*>*>* comboClauseIndexesAndCounts
+      = (*(*gndPredClauseIndexesAndCounts)[predId])[g];
+    if (comboClauseIndexesAndCounts->size() > 0) return;
+
+        // Check if this grounding is in a block
+    int numCombInBlock = 1;
+      
+    int blockIdx = (*domains_)[domainIdx]->getBlock(gndPred);
+    if (blockIdx >= 0)
+    {
+      const Array<Predicate*>* block = (*domains_)[domainIdx]->getPredBlock(blockIdx);
+      numCombInBlock = block->size() - 1;
+    }
+      
+    comboClauseIndexesAndCounts->growToSize(numCombInBlock, NULL);
+    for (int c = 0; c < numCombInBlock; c++)
+    {
+      (*comboClauseIndexesAndCounts)[c] = new Array<IndexAndCount*>;
+    }
+    comboClauseIndexesAndCounts->compress();
   }
 
 
@@ -888,7 +965,7 @@ class PseudoLogLikelihood
     //Array<IndexAndCount*>. If undoInfos is not NULL, a pointer to that 
     //Array<IndexAndCount*> is added in undoInfos.
     //Similar to insertCounts().
-  bool computeAndSetCounts(const Clause* const c, 
+  bool computeAndSetCounts(const Clause* const clause, 
                            int* const & clauseIdxInMLN, 
                            const int& predId, Predicate& gndPred, 
                            const int& g, Database* const & db, 
@@ -897,40 +974,63 @@ class PseudoLogLikelihood
                            const bool& sampleClauses,
                            Array<Array<Array<CacheCount*>*>*>* const & cache)
   {
-    Array<Array<Array<IndexAndCount*>*>*>* gndPredClauseIndexesAndCounts
+    Array<Array<Array<Array<IndexAndCount*>*>*>*>* gndPredClauseIndexesAndCounts
       = (*gndPredClauseIndexesAndCountsArr_)[domainIdx];
     const Domain* domain = (*domains_)[domainIdx];
 
     if ((*gndPredClauseIndexesAndCounts)[predId] == NULL)
       createClauseIndexesAndCountsArrays(predId, domainIdx);
 
-      //if gth grounding of pred with predId has been looked at, ignore it
-    Array<IndexAndCount*>* gArr =(*(*gndPredClauseIndexesAndCounts)[predId])[g];
-    if (gArr->size() > 0 && *( gArr->lastItem()->index )== *clauseIdxInMLN)
+    createComboClauseIndexesAndCountsArrays(predId, domainIdx, &gndPred, g);
+
+    Array<Array<IndexAndCount*>*>* comboClauseIndexesAndCounts
+      = (*(*gndPredClauseIndexesAndCounts)[predId])[g];
+
+//cout << "Clause: ";
+//clause->printWithoutWtWithStrVar(cout, domain);
+//cout << endl;
+//cout << "Pred: ";
+//gndPred.printWithStrVar(cout, domain);
+//cout << endl;
+
+//cout << "PredId: " << predId << " Gnding: " << g << " # of combos: "
+//     << comboClauseIndexesAndCounts->size() << endl;
+     
+      // For each combination
+    for (int c = 0; c < comboClauseIndexesAndCounts->size(); c++)
     {
-      //cout << "skipping, g = " << g << endl;
-      return false;
+//cout << endl << "Combo " << c << endl;
+        //if gth grounding of pred with predId has been looked at, ignore it
+      Array<IndexAndCount*>* gArr = (*comboClauseIndexesAndCounts)[c];
+      if (gArr->size() > 0 && *( gArr->lastItem()->index ) == *clauseIdxInMLN)
+      {
+//cout << "Already looked at" << endl;
+        //return false;
+        continue;
+      }
+
+      double cnt = ((Clause*)clause)->countDiffNumTrueGroundings(&gndPred, domain, db,
+                                                                 DB_HAS_UNKNOWN_PREDS,
+                                                                 sampleClauses, c);
+//cout << "Count " << cnt << endl;
+        //ignore clauses if the difference in counts is zero
+      if (cnt != 0)
+      {
+//cout << "Appending " << cnt << " " << *clauseIdxInMLN << endl;
+        gArr->append(new IndexAndCount(clauseIdxInMLN, cnt));
+        if (undoInfos) undoInfos->append(new UndoInfo(gArr, NULL, -1, domainIdx));
+
+        if (cache) 
+        {
+          Array<CacheCount*>*& ccArr = (*(*cache)[domainIdx])[predId];
+          if (ccArr == NULL) ccArr = new Array<CacheCount*>;
+          ccArr->append(new CacheCount(g, c, cnt));
+        }
+      }
+
+      assert(noRepeatedIndex(gArr));
     }
     
-    double cnt = ((Clause*)c)->countDiffNumTrueGroundings(&gndPred, domain, db,
-                                                          DB_HAS_UNKNOWN_PREDS,
-                                                          sampleClauses);
-      //ignore clauses if the difference in counts is zero
-    if (cnt != 0)
-    {
-      gArr->append(new IndexAndCount(clauseIdxInMLN, cnt));
-      if (undoInfos) undoInfos->append(new UndoInfo(gArr, NULL, -1, domainIdx));
-
-      if (cache) 
-      {
-        Array<CacheCount*>*& ccArr = (*(*cache)[domainIdx])[predId];
-        if (ccArr == NULL) ccArr = new Array<CacheCount*>;
-        ccArr->append(new CacheCount(g, cnt));
-      }
-    }
-
-    assert(noRepeatedIndex(gArr));
-
     return true;
   }
 
@@ -940,34 +1040,45 @@ class PseudoLogLikelihood
                     const int& g,  const int& domainIdx,
                     Array<UndoInfo*>* const & undoInfos)
   {
-    Array<Array<Array<IndexAndCount*>*>*>* gndPredClauseIndexesAndCounts
+    bool removed = false;
+    Array<Array<Array<Array<IndexAndCount*>*>*>*>* gndPredClauseIndexesAndCounts
       = (*gndPredClauseIndexesAndCountsArr_)[domainIdx];
 
     if ((*gndPredClauseIndexesAndCounts)[predId] == NULL) return false;
 
-    Array<IndexAndCount*>* gArr =(*(*gndPredClauseIndexesAndCounts)[predId])[g];
-    for (int i = 0; i < gArr->size(); i++)
+    Array<Array<IndexAndCount*>*>* comboClauseIndexesAndCounts
+      = (*(*gndPredClauseIndexesAndCounts)[domainIdx])[predId];
+      // For each combination
+    for (int c = 0; c < comboClauseIndexesAndCounts->size(); c++)
     {
-      if ((*gArr)[i]->index == clauseIdxInMLN)
+      Array<IndexAndCount*>* gArr =(*comboClauseIndexesAndCounts)[c];
+      for (int i = 0; i < gArr->size(); i++)
       {
-        IndexAndCount* ic = gArr->removeItemFastDisorder(i);
-
-        if (undoInfos) // this is a temporary removal
+        if ((*gArr)[i]->index == clauseIdxInMLN)
         {
-          undoInfos->append(new UndoInfo(gArr, ic, i, domainIdx));
-          assert(noRepeatedIndex(gArr));
-          return true;
-        }
-        else
-        { // removing this IndexCount for good
-          delete ic;
-          assert(noRepeatedIndex(gArr));
-          return true;
+          IndexAndCount* ic = gArr->removeItemFastDisorder(i);
+
+          if (undoInfos) // this is a temporary removal
+          {
+            undoInfos->append(new UndoInfo(gArr, ic, i, domainIdx));
+            assert(noRepeatedIndex(gArr));
+            //return true;
+            removed = true;
+          }
+          else
+          { // removing this IndexCount for good
+            delete ic;
+            assert(noRepeatedIndex(gArr));
+            //return true;
+            removed = true;
+          }
         }
       }
-    }
     assert(noRepeatedIndex(gArr));
-    return false;
+    }
+
+    //return false;
+    return removed;
   }
   
 
@@ -1201,7 +1312,7 @@ class PseudoLogLikelihood
     //gndPredClauseIndexesAndCountsArr_[d][p][g][i]->count is the difference
     //between the number of true groundings of the ith clause when g takes the  
     //opposite of its true value and its true value.
-  Array<Array<Array<Array<IndexAndCount*>*>*>*>* 
+  Array<Array<Array<Array<Array<IndexAndCount*>*>*>*>*>* 
     gndPredClauseIndexesAndCountsArr_;
 
   int numMeans_; // size priorMeans_ and priorStdDevs_ arrays

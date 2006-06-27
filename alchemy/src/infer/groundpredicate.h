@@ -160,7 +160,6 @@ class GroundPredicate
     for (int i = 1; i < size; i++)
     {
       string name = domain->getConstantName((*intArrRep_)[i]);
-      assert(name);
       string::size_type at = name.rfind("@");
       if (at != string::npos) name = name.substr(at+1, name.length()-at-1);
       out << name;
@@ -182,6 +181,38 @@ class GroundPredicate
     }
   }
   
+  /**
+   * Computes and returns the size of this ground predicate.
+   */
+  double sizeKB()
+  {
+    double size = 0;
+      //intArrRep_
+    if (intArrRep_)
+      size += (intArrRep_->size()*sizeof(unsigned int) / 1024.0);
+      // hashCode_
+    size += (sizeof(size_t) / 1024.0);
+      // gndClauses_
+    if (gndClauses_)
+    {
+      for (int i = 0; i < gndClauses_->size(); i++)
+        size += ((*gndClauses_)[i]->sizeKB());
+    }
+      // senseInGndClauses_
+    if (senseInGndClauses_)
+      size += (senseInGndClauses_->size()*sizeof(bool) / 1024.0);
+      // truthValues_
+    if (truthValues_)
+      size += (truthValues_->size()*sizeof(bool) / 1024.0);
+      // wtsWhenFalse_
+    if (wtsWhenFalse_)
+      size += (wtsWhenFalse_->size()*sizeof(double) / 1024.0);
+      // wtsWhenTrue_
+    if (wtsWhenTrue_)
+      size += (wtsWhenTrue_->size()*sizeof(double) / 1024.0);
+    
+    return size;
+  }
 
  private:
     //intArrRep_[0] is the pred id; intArrRep_[i] is the constant id where i > 0

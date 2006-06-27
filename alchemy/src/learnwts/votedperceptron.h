@@ -5,6 +5,7 @@
 #include "clause.h"
 #include "timer.h"
 #include "indextranslator.h"
+#include "lazywalksat.h"
 
 const double EPSILON=.00001;
 const int numChain = 1;
@@ -79,6 +80,14 @@ class VotedPerceptron
 	  	printf("Memory needed exceeds memory available (%d kbytes), using LazySat\n", memLimit_);      
     	lazyInference_ = true;
       }
+      else
+      {
+      	//Remove evidence atoms structure from DBs
+      	for (int i = 0; i < domainCnt_; i++)
+	  	{
+	  	  domains_[i]->getDB()->setLazyFlag(false);
+	  	}
+      }
   	}
     
     totalTrueCnts_.growToSize(domainCnt_);
@@ -146,7 +155,7 @@ class VotedPerceptron
 	    cout << endl << "constructing ground MRF for domain " << i << "..."<<endl;
     	mrf = new MRF(&gndPreds, &allPredGndingsAreNonEvid, domain, 
         		      domain->getDB(), mln, markHardGndClauses, 
-            	      trackParentClauseWts);
+            	      trackParentClauseWts, -1);
       	  //cout << "created mrf ..." << endl;
       	mrf->deleteGndClausesIntArrReps();
       	mrf->deleteGndPredsGndClauseSets();      
@@ -182,17 +191,6 @@ class VotedPerceptron
     wsparams_->hard = hard;
     wsparams_->lazyGnded = false;
   	wsparams_->lazyNoApprox = false;
-
-	int mwsSeed = -1;  
-  	if(mwsSeed == -1)
-  	{
-      struct timeval tv;
-      gettimeofday(&tv,0);
-      mwsSeed = (( tv.tv_sec & 0177 ) * 1000000) + tv.tv_usec;
-      //cout<<"seed = "<<mwsSeed<<endl;
-  	}
-  	wsparams_->seed = mwsSeed;
-
   }
 
 
@@ -748,7 +746,13 @@ class VotedPerceptron
 	  	domain->getDB()->setPerformingInference(true);
 	  	if (lazyReset_)
 	  	{
-  		  if (lwinfo) delete lwinfo;
+	  	  domain->getDB()->resetActiveStatus();
+	  	  domain->getDB()->resetDeactivatedStatus();
+  		  if (lwinfo)
+  		  {
+  		  	//lwinfo->setAllInactive();
+  		  	delete lwinfo;
+  		  }
   		  if (lw) delete lw;
 	  	  lwinfo = new LWInfo(mln, domain);
 		  lw = new LazyWalksat(lwinfo, memLimit_);
@@ -788,8 +792,9 @@ class VotedPerceptron
       	}
       	else 
       	{
-	      //cout << "maxwalksat did not succesfully complete" << endl;
-      	} 
+	      cout << "maxwalksat did not successfully complete" << endl;
+	      exit(-1);
+      	}
 	  }
     }
   }
@@ -972,7 +977,7 @@ class VotedPerceptron
       // add the deriative of the prior 
     if(usePrior_) 
     {
-	    for (int i = 0; i < numWts; i++) 
+	  for (int i = 0; i < numWts; i++) 
       {
         if(!relevantClausesFormulas_[i]) continue;
         double priorDerivative = -(weights[i]-priorMeans_[i])/
@@ -1022,8 +1027,8 @@ class VotedPerceptron
   bool lazyInference_;
   bool lazyReset_;
   
-  LWInfo *lwinfo;
-  LazyWalksat *lw;
+  LWInfo* lwinfo;
+  LazyWalksat* lw;
   
 };
 

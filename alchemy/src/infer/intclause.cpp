@@ -57,3 +57,26 @@ void IntClause::setWt(const double& wt)
 void IntClause::setWtToHardWt() { wt_ = LWInfo::HARD_WT; }
 
 bool IntClause::isHardClause() const { return (wt_ == LWInfo::HARD_WT); }
+
+/* 
+ * Checks if this intclause is satisfied given the reference predHashArray
+ * and the assignment in db.
+ */
+bool IntClause::isSatisfied(const PredicateHashArray* const & predHashArray,
+					   		const Database* const & db) const
+{
+  for (int i = 0; i < intPreds_->size(); i++)
+  {
+  	int index = (*intPreds_)[i];
+  	Predicate* pred = (*predHashArray)[abs(index)-1];
+  	assert(pred);
+  	if (index < 0) pred->setSense(false);
+  	else pred->setSense(true);
+  	TruthValue tv = db->getValue(pred);
+    if (db->sameTruthValueAndSense(tv, pred->getSense()))
+    {
+      return true;
+    }
+  }
+  return false;
+}

@@ -1,3 +1,15 @@
+June 26, 2006
+-------------
+* MC-SAT algorithm (also memory-efficient version) implemented (/infer dir)
+* Simulated tempering algorithm implemented (mrf.h)
+* Block inference and learning implemented
+* Bug fix involving flipping weights of unit clauses in inference
+* Bug fix involving checking constants in parser
+* Removal of default values in array.h/hasharray.h
+* Lazy flag added to parser for lazy versions of inference
+* Bug fix involving assert in groundpredicate.h and growToSize() in
+database.h
+
 May 5, 2006
 ------------
 * Hard clause weights handled correctly in LazySat

@@ -11,6 +11,7 @@ using namespace __gnu_cxx;
 
 class Domain;
 class Clause;
+class Database;
 
 //const double HARD_INTCLAUSE_WT = DBL_MAX;
 //const double HARD_INTCLAUSE_WT = 10.0;
@@ -28,7 +29,7 @@ class IntClause
  
   void deleteIntPredicates()
   {
-	if (intPreds_) delete intPreds_;
+	if (intPreds_) { intPreds_->compress(); delete intPreds_; }
   }
 
 //  void addWt(const double& wt) 
@@ -56,6 +57,9 @@ class IntClause
   
   const Array<int>* getIntPredicates() const 
   { return intPreds_; }
+
+  bool isSatisfied(const PredicateHashArray* const & predHashArray,
+	  		   	   const Database* const & db) const;
 
   /*
   const Array<unsigned int>* getIntArrRep() const

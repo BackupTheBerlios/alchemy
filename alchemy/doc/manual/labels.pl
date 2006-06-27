@@ -2,8 +2,20 @@
 # Associate labels original text with physical files.
 
 
+$key = q/cite_wei_SPMamp_al04/;
+$external_labels{$key} = "$URL/" . q|Bibliography.html|; 
+$noresave{$key} = "$nosave";
+
 $key = q/parserdir/;
 $external_labels{$key} = "$URL/" . q|6_2Parser.html|; 
+$noresave{$key} = "$nosave";
+
+$key = q/cite_marinari_SPMamp_parisi92/;
+$external_labels{$key} = "$URL/" . q|Bibliography.html|; 
+$noresave{$key} = "$nosave";
+
+$key = q/cite_singla_SPMamp_domingos06/;
+$external_labels{$key} = "$URL/" . q|Bibliography.html|; 
 $noresave{$key} = "$nosave";
 
 $key = q/cite_russell_SPMamp_norvig02/;
@@ -63,6 +75,10 @@ $external_labels{$key} = "$URL/" . q|6_4Weight_Learning.html|;
 $noresave{$key} = "$nosave";
 
 $key = q/cite_zhu_SPMamp_al97/;
+$external_labels{$key} = "$URL/" . q|Bibliography.html|; 
+$noresave{$key} = "$nosave";
+
+$key = q/cite_poon_SPMamp_domingos06/;
 $external_labels{$key} = "$URL/" . q|Bibliography.html|; 
 $noresave{$key} = "$nosave";
 

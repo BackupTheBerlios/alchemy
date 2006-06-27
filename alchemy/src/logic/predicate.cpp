@@ -108,7 +108,6 @@ void Predicate::createAllGroundings(const int& predId,
   }
 }
 
-//Parag:
 //get all the groundings unifying with the term given 
 //Caller is responsible for deleting the Predicate* in returnArray
 void Predicate::createAllGroundingsUnifyingWithTerm(const int& predId, 

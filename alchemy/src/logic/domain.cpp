@@ -34,12 +34,22 @@ Domain::~Domain()
   
   if (equalPredTemplate_) delete equalPredTemplate_;
   
+  if (emptyPredTemplate_) delete emptyPredTemplate_;
+  
+  if (emptyFuncUnaryTemplate_) delete emptyFuncUnaryTemplate_;
+  
+  if (emptyFuncBinaryTemplate_) delete emptyFuncBinaryTemplate_;
+  
   if (constantsByType_)
   {
     for (int i = 0; i < constantsByType_->size(); i++)
       delete (*constantsByType_)[i];
     delete constantsByType_;
   }
+
+  if (predBlocks_) delete predBlocks_;
+
+  if (blockEvidence_) delete blockEvidence_;
 
   if (db_) delete db_;
 
@@ -99,7 +109,7 @@ void Domain::changePredTermsToNewIds(Predicate* const & p,
   // consecutively. Ensure that the constants in the mln and map is consistent
   // with the new constant ids.
 void Domain::reorderConstants(MLN* const & mln,
-                           hash_map<int, PredicateHashArray*>& predIdToPredsMap)
+                              hash_map<int, PredicateHashArray*>& predIdToPredsMap)
 {  
   //order the constants so that those of the same type are ordered consecutively
 
@@ -166,6 +176,14 @@ void Domain::reorderConstants(MLN* const & mln,
     for (int i = 0; i < pha->size(); i++ )
       changePredTermsToNewIds((*pha)[i], oldToNewConstIds);
   }
+
+    // Change the const ids in the pred blocks
+  for (int i = 0; i < predBlocks_->size(); i++)
+  {
+    Array<Predicate*>* predBlock = (*predBlocks_)[i];
+    for (int j = 0; j < predBlock->size(); j++)
+      changePredTermsToNewIds((*predBlock)[j], oldToNewConstIds);
+  }
   
     //clauses and hence their hash values have changed, and they need to be 
     //inserted into the MLN
@@ -211,4 +229,112 @@ void Domain::createPredicates(Array<Predicate*>* const & preds,
   }
 }
 
+int Domain::getNumNonEvidenceAtoms() const
+{
+  int numAtoms = 0;
+  for (int i = 0; i < getNumPredicates(); i++)
+  {
+    numAtoms += (db_->getNumGroundings(i) - db_->getNumEvidenceGndPreds(i));
+  }
+  return numAtoms;
+}
 
+/*
+ * Caller is responsible for deleting returned Predicate* if necessary
+ */
+Predicate* Domain::getNonEvidenceAtom(int index) const
+{
+  int predId = -1;
+  int numAtomsPerPred;
+  int numAtoms = 0;
+  for (int i = 0; i < getNumPredicates(); i++)
+  {
+    numAtomsPerPred = (db_->getNumGroundings(i) - db_->getNumEvidenceGndPreds(i));
+    if (numAtoms + numAtomsPerPred >= index + 1)
+    {
+      predId = i;
+      break;
+    }
+    numAtoms += numAtomsPerPred;
+  }
+  assert(predId >= 0);
+  index = index - numAtoms;
+  
+  Array<Predicate*> preds;
+  Predicate* gndPred = NULL;
+  Predicate::createAllGroundings(predId, this, preds);
+  int nePreds = 0;
+  for (int i = 0; i < preds.size(); i++)
+  {
+    if (!db_->getEvidenceStatus(preds[i]) && index == nePreds++)
+      gndPred = preds[i];
+    else
+      delete preds[i];
+  }
+  assert(gndPred);
+  return gndPred;
+}
+
+int Domain::addPredBlock(Array<Predicate*>* const & predBlock) const
+{
+  int idx = predBlocks_->append(predBlock);
+  blockEvidence_->append(false);
+  return idx;
+}
+
+  // returns the index of the block which the ground predicate
+  // with index predIndex is in. If not in any, returns -1
+int Domain::getBlock(Predicate* pred) const
+{
+  for (int i = 0; i < predBlocks_->size(); i++)
+  {
+    Array<Predicate*>* block = (*predBlocks_)[i];
+    for (int j = 0; j < block->size(); j++)
+    {
+      if (pred->same((*block)[j]))
+        return i;
+    }
+  }
+  return -1;
+}
+
+int Domain::getNumPredBlocks() const
+{
+  return predBlocks_->size();
+}
+
+const Array<Array<Predicate*>*>* Domain::getPredBlocks() const
+{
+  return predBlocks_;
+}
+
+const Array<Predicate*>* Domain::getPredBlock(const int index) const
+{
+  return (*predBlocks_)[index];
+}
+
+const Array<bool>* Domain::getBlockEvidenceArray() const
+{
+  return blockEvidence_;
+}
+
+const bool Domain::getBlockEvidence(const int index) const
+{
+  return (*blockEvidence_)[index];
+}
+
+void Domain::setBlockEvidence(const int index, const bool value) const
+{
+  (*blockEvidence_)[index] = value;
+}
+
+int Domain::getEvidenceIdxInBlock(const int index) const
+{
+  Array<Predicate*>* block = (*predBlocks_)[index];
+  for (int i = 0; i < block->size(); i++)
+  {
+    if (db_->getEvidenceStatus((*block)[i]))
+      return i;
+  }
+  return -1;
+}

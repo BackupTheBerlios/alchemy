@@ -16,6 +16,7 @@
 #include "lwinfo.h"
 #include "wsutil.h"
 #include "maxwalksatparams.h"
+#include "samplesatparams.h"
 
 	/* Atoms start at 1 */
 	/* Not a is recorded as -1 * a */
@@ -25,9 +26,8 @@
 	/* (Arrays are not entirely dynamically allocated, because */
 	/* doing so slows execution by 25% on SGI workstations.) */
 
-class lwInfo;
-
-class LazyWalksat {
+class LazyWalksat
+{
 	 
  int numatom;
  int basenumatom;  // number of distinct atoms in the first set of unsatisfied clauses
@@ -37,7 +37,10 @@ class LazyWalksat {
  int atommem;    //current allocation of memory for atoms
  int clausemem;  //current allocation of memory for clauses
 
-#ifdef Huge
+ int saRatio;		// saRatio/100: percentage of SA steps
+ int temperature;	// temperature/100: fixed temperature for SA step
+ bool latesa;
+
  int ** clause;			/* clauses to be satisfied */
 				/* indexed as clause[clause_num][literal_num] */
  int * cost;			/* cost of each clause */
@@ -64,42 +67,12 @@ class LazyWalksat {
 
  int * breakcost;	/* the cost of clauses that introduces if var is flipped */
 
-#else
-
- int * clause[MAXCLAUSE];	/* clauses to be satisfied */
-				/* indexed as clause[clause_num][literal_num] */
- int cost[MAXCLAUSE];		/* cost of each clause */
- int size[MAXCLAUSE];		/* length of each clause */
- int falseclause[MAXCLAUSE];		/* clauses which are false */
- int wherefalse[MAXCLAUSE];	/* where each clause is listed in false */
- int numtruelit[MAXCLAUSE];	/* number of true literals in each clause */
-
- int *occurence[2*MAXATOM+1];	/* where each literal occurs */
-				/* indexed as occurence[literal+MAXATOM][occurence_num] */
-
- int numoccurence[2*MAXATOM+1];	/* number of times each literal occurs */
-
- int newnumoccurence[2*MAXATOM+1];	/* number of times each literal occurs in the newly added clause set*/
- int occurencemem[2*MAXATOM+1];	/* memory allocated (in terms of number of occurences) 
-								   which can be stored for this literal */
-
- int atom[MAXATOM+1];		/* value of each atom */ 
- int initatom[MAXATOM+1];	/* initial value of each atom */ 
-
- int lowatom[MAXATOM+1];
-
- int changed[MAXATOM+1];		/* step at which atom was last flipped */
-
- int breakcost[MAXATOM+1];	/* the cost of clauses that introduces if var is flipped */
-
-#endif
-
  int numfalse;			/* number of false clauses */
  int costofnumfalse;		/* cost associated with the number of false clauses */
 
 
- int costexpected;       /*indicate whether cost is expected from the input*/
- int abort_flag;
+ bool costexpected;       /*indicate whether cost is expected from the input*/
+ bool abort_flag;
 
  int heuristic;			/* heuristic to be used */
  int numerator;			/* make random flip with numerator/denominator frequency */
@@ -114,7 +87,7 @@ class LazyWalksat {
  int eqhighest;	/*Is there a clause violated with the highest cost*/
  int numhighest;      /*Number of violated clauses with the highest cost*/
 
- int hard; /* if true never break a highest cost clause */
+ bool hard; /* if true never break a highest cost clause */
 
  bool gnded; /* is the fully gnded given before hand or not */
  bool noApprox; /* If set to true, atoms are not deactivated when mem. is full */
@@ -149,6 +122,10 @@ public:
 
  ~LazyWalksat();
  
+ /* perform the lazy samplesat inference */ 
+ bool sample(const MaxWalksatParams* const & mwsParams,
+ 			 const SampleSatParams& sampleSatParams);
+
  /* perform the lazy walksat inference */ 
  void infer(const MaxWalksatParams* const & params,
  			const int& numSolutions, const bool&  includeUnsatSolutions,
@@ -160,9 +137,6 @@ public:
  int getNumClauses();
  
 private:
-
- /* Reset all values */
- //void reset();
 
  /* initialize - add the initial set of clauses*/
  void init();
@@ -228,6 +202,8 @@ private:
  int pickexponential(int *numbreak,int clausesize, int tofix);
  int pickzero(int *numbreak,int clausesize);
  int pickweight(int *weight,int clausesize);
+
+ bool simAnnealing();
 
  void print_false_clauses_cost(long int lowbad);
  void print_low_assign(long int lowbad);

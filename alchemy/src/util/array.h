@@ -205,7 +205,7 @@ class Array
 
 
     // linear search
-  int find(Type& item) const
+  int find(Type const & item) const
   {
     for (int i = 0; i < numItems_; i++)
       if (items_[i] == item) return i;
@@ -214,7 +214,7 @@ class Array
   
 
     // linear search
-  bool contains(Type& item) const { return find(item) >= 0;}
+  bool contains(Type const & item) const { return find(item) >= 0;}
 
 
     // Appends item only if it is not already in the array 
@@ -481,7 +481,7 @@ class Array
 
   // between is the filler string to be used between items
 template<typename T> 
-void writeArray(const Array<T*>& array, ostream& out, char* between=NULL, 
+void writeArray(const Array<T*>& array, ostream& out, char* between, 
                 const char& delimiter)
 {
   out << array.size() << delimiter;
@@ -513,7 +513,7 @@ void readArray(Array<T*>& array, istream& in)
 
 
 template<typename T> 
-void writeArray(const Array<T>& array, ostream& out, char* between=NULL, 
+void writeArray(const Array<T>& array, ostream& out, char* between, 
                 const char& delimiter)
 {
   out << array.Size() << delimiter;
@@ -545,7 +545,7 @@ void readArray(Array<T>& array, istream& in)
 
 
 template<typename T> 
-void writeBasicArray(const Array<T>& array, ostream& out, char* between=NULL,
+void writeBasicArray(const Array<T>& array, ostream& out, char* between,
                      const char& delimiter)
 {
   out << array.Size() << delimiter;

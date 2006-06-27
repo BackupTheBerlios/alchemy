@@ -2,8 +2,20 @@
 # Associate internals original text with physical files.
 
 
+$key = q/cite_wei_SPMamp_al04/;
+$ref_files{$key} = "$dir".q|Bibliography.html|; 
+$noresave{$key} = "$nosave";
+
 $key = q/parserdir/;
 $ref_files{$key} = "$dir".q|6_2Parser.html|; 
+$noresave{$key} = "$nosave";
+
+$key = q/cite_marinari_SPMamp_parisi92/;
+$ref_files{$key} = "$dir".q|Bibliography.html|; 
+$noresave{$key} = "$nosave";
+
+$key = q/cite_singla_SPMamp_domingos06/;
+$ref_files{$key} = "$dir".q|Bibliography.html|; 
 $noresave{$key} = "$nosave";
 
 $key = q/cite_russell_SPMamp_norvig02/;
@@ -63,6 +75,10 @@ $ref_files{$key} = "$dir".q|6_4Weight_Learning.html|;
 $noresave{$key} = "$nosave";
 
 $key = q/cite_zhu_SPMamp_al97/;
+$ref_files{$key} = "$dir".q|Bibliography.html|; 
+$noresave{$key} = "$nosave";
+
+$key = q/cite_poon_SPMamp_domingos06/;
 $ref_files{$key} = "$dir".q|Bibliography.html|; 
 $noresave{$key} = "$nosave";
 

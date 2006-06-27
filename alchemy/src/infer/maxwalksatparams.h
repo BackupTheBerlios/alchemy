@@ -9,7 +9,7 @@ struct MaxWalksatParams
   bool hard;
   bool lazyGnded;
   bool lazyNoApprox;
-  int seed;
+  //int seed;
 };
 
 #endif

@@ -377,7 +377,7 @@ class HashArray
   // between is the filler string to be used between items
 template <typename T, class HashFn, class EqualFn> 
 void writeHashArray(const HashArray<T*,HashFn,EqualFn>& array, ostream& out, 
-                    char* between=NULL, const char& delimiter)
+                    char* between, const char& delimiter)
 {
   out << array.size() << delimiter;
   for (int i = 0; i < array.size(); i++)
@@ -410,7 +410,7 @@ void readArray(HashArray<T*,HashFn,EqualFn>& array, istream& in)
 
 template <typename T, class HashFn, class EqualFn>
 void writeArray(HashArray<T,HashFn,EqualFn>& array, ostream& out, 
-                char* between=NULL, const char& delimiter)
+                char* between, const char& delimiter)
 {
   out << array.Size() << delimiter;
   for (int i = 0; i < array.Size(); i++)  
@@ -443,7 +443,7 @@ void readArray(HashArray<T,HashFn,EqualFn>& array, istream& in)
 
 template <typename T, class HashFn, class EqualFn>
 void writeBasicArray(HashArray<T,HashFn,EqualFn>& array, ostream& out, 
-                     char* between=NULL, const char& delimiter)
+                     char* between, const char& delimiter)
 {
   out << array.Size() << delimiter;
   for (int i = 0; i < array.Size(); i++)

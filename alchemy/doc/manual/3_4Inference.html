@@ -20,13 +20,13 @@ original version by:  Nikos Drakos, CBLU, University of Leeds
 
 <LINK REL="previous" HREF="3_3Structure_Learning.html">
 <LINK REL="up" HREF="3Quick_Start.html">
-<LINK REL="next" HREF="3_4_1Memory_efficient_MAP_i.html">
+<LINK REL="next" HREF="3_4_1Memory_efficient_infer.html">
 </HEAD>
 
 <BODY >
 <!--Navigation Panel-->
 <A NAME="tex2html98"
-  HREF="3_4_1Memory_efficient_MAP_i.html">
+  HREF="3_4_1Memory_efficient_infer.html">
 <IMG WIDTH="37" HEIGHT="24" ALIGN="BOTTOM" BORDER="0" ALT="next" SRC="next.png"></A> 
 <A NAME="tex2html96"
   HREF="3Quick_Start.html">
@@ -36,7 +36,7 @@ original version by:  Nikos Drakos, CBLU, University of Leeds
 <IMG WIDTH="63" HEIGHT="24" ALIGN="BOTTOM" BORDER="0" ALT="previous" SRC="prev.png"></A>   
 <BR>
 <B> Next:</B> <A NAME="tex2html99"
-  HREF="3_4_1Memory_efficient_MAP_i.html">3.4.1 Memory-efficient MAP inference</A>
+  HREF="3_4_1Memory_efficient_infer.html">3.4.1 Memory-efficient inference</A>
 <B> Up:</B> <A NAME="tex2html97"
   HREF="3Quick_Start.html">3 Quick Start</A>
 <B> Previous:</B> <A NAME="tex2html93"
@@ -50,8 +50,7 @@ original version by:  Nikos Drakos, CBLU, University of Leeds
 </H2>
 To perform inference, run the <TT>infer</TT> executable, 
 e.g., <TT>ALCHDIR/bin/infer -i univ-out.mln -e univ-test.db
--r univ.results -q advisedBy,student,professor -c -p -mcmcMaxSteps 20000
--functions univ-test.func</TT>. 
+-r univ.results -q advisedBy,student,professor -c -p -mcmcMaxSteps 20000</TT>. 
 
 <P>
 <TT>-i</TT> specifies the input <TT>.mln</TT> file. In that file all formulas 
@@ -75,7 +74,6 @@ a default weight that is 1.5 times the maximum soft clause weight.
 <P>
 <TT>-e</TT> specifies the evidence <TT>.db</TT> file; a comma-separated list 
 can be used to specify more than one <TT>.db</TT> file. 
-<TT>-functions</TT> specifies the function mappings used for inference.
 <TT>-r</TT> specifies the output file which contains the inference results. 
 
 <P>
@@ -87,11 +85,24 @@ predicates in quotes because of the presence of parentheses.) You can
 also use the <TT>-f</TT> option to specify a file 
 (same format as a <TT>.db</TT> file without false and unknown atoms) 
 containing the query ground atoms you are interested in. 
-(You may use both <TT>-q</TT> and <TT>-f</TT> together.) 
-<TT>-p</TT> indicates that inference using Gibbs sampling is to be used, 
-and the probabilities that the query atoms are true are to be returned.
-<TT>-mcmcMaxSteps</TT> is used to specify the maximum number of Gibbs 
-sampling steps. 
+(You may use both <TT>-q</TT> and <TT>-f</TT> together.)
+
+<P>
+By default, all first-order predicates are open world. 
+You can control the open/closed-world assumptions with the 
+<TT>-c</TT> and <TT>-o</TT> options. Type <TT>ALCHDIR/bin/infer</TT>
+without any parameters to see all available options.
+
+<P>
+Alchemy supports two basic types of inference:&nbsp;MCMC and MAP/MPE. The current
+implementation contains three MCMC algorithms: Gibbs sampling (option <TT>-p</TT>),
+MC-SAT&nbsp;[<A
+ HREF="Bibliography.html#poon_SPMamp_domingos06">6</A>] (option <TT>-ms</TT>) and simulated
+tempering&nbsp;[<A
+ HREF="Bibliography.html#marinari_SPMamp_parisi92">5</A>] (option <TT>-simtp</TT>). When MCMC inference is run,
+the probabilities that the query atoms are true are written to the
+output file specified. <TT>-mcmcMaxSteps</TT> is used to specify the maximum
+number of steps in the MCMC algorithm. 
 
 <P>
 To use MAP inference instead, specify either the 
@@ -102,20 +113,14 @@ clause, fraction of hard ground clauses that are satisfied, the sum
 of their weights, and the sum of the weights of satisfied soft ground 
 clauses. During MAP inference, each hard clause (derived from a hard 
 formula with a terminating period) is given a weight that is the sum 
-of the soft clause weights plus 10. The current version of Alchemy flips
-clauses with negative weights and distributes the weight among the
-resulting unit clauses. These are treated as separate clauses, although
-from a satisfiability standpoint, this is not quite correct; if one unit
-clause is satisfied, then the entire original clause is satisfied and the
-complete weight should be used, not just the new weight of the unit clause.
-Future versions of Alchemy will handle negative weights in this manner.
+of the soft clause weights plus 10.
 
 <P>
-By default, all first-order predicates are open world. 
-You can control the open/closed-world assumptions with the 
-<TT>-c</TT> and <TT>-o</TT> options. Type <TT>ALCHDIR/bin/infer</TT>
-without any parameters to see all available options, including those 
-pertaining to Gibbs sampling and MAP inference. 
+The MAP inference engine used in Alchemy attempts to satisfy clauses with
+positive weights (just as in the original MaxWalkSat algorithm) and keep
+clauses with negative weights unsatisfied. As an extension to the MaxWalkSat
+algorithm, when a clause with a negative weights is chosen to fix, all
+atoms in that clause are set to false.
 
 <P>
 <BR><HR>
@@ -124,13 +129,13 @@ pertaining to Gibbs sampling and MAP inference.
 
 <UL>
 <LI><A NAME="tex2html100"
-  HREF="3_4_1Memory_efficient_MAP_i.html">3.4.1 Memory-efficient MAP inference</A>
+  HREF="3_4_1Memory_efficient_infer.html">3.4.1 Memory-efficient inference</A>
 </UL>
 <!--End of Table of Child-Links-->
 <HR>
 <!--Navigation Panel-->
 <A NAME="tex2html98"
-  HREF="3_4_1Memory_efficient_MAP_i.html">
+  HREF="3_4_1Memory_efficient_infer.html">
 <IMG WIDTH="37" HEIGHT="24" ALIGN="BOTTOM" BORDER="0" ALT="next" SRC="next.png"></A> 
 <A NAME="tex2html96"
   HREF="3Quick_Start.html">
@@ -140,7 +145,7 @@ pertaining to Gibbs sampling and MAP inference.
 <IMG WIDTH="63" HEIGHT="24" ALIGN="BOTTOM" BORDER="0" ALT="previous" SRC="prev.png"></A>   
 <BR>
 <B> Next:</B> <A NAME="tex2html99"
-  HREF="3_4_1Memory_efficient_MAP_i.html">3.4.1 Memory-efficient MAP inference</A>
+  HREF="3_4_1Memory_efficient_infer.html">3.4.1 Memory-efficient inference</A>
 <B> Up:</B> <A NAME="tex2html97"
   HREF="3Quick_Start.html">3 Quick Start</A>
 <B> Previous:</B> <A NAME="tex2html93"
@@ -148,7 +153,7 @@ pertaining to Gibbs sampling and MAP inference.
 <!--End of Navigation Panel-->
 <ADDRESS>
 Marc Sumner
-2006-05-03
+2006-06-26
 </ADDRESS>
 </BODY>
 </HTML>

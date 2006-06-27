@@ -29,7 +29,9 @@ class Domain
              strToPredTemplateMap_(new StrToPredTemplateMap),
              strToFuncTemplateMap_(new StrToFuncTemplateMap),
              constantsByType_(new Array<Array<int>*>), db_(NULL),
-             trueFalseGroundingsStore_(NULL), funcSet_(new FunctionSet) 
+             trueFalseGroundingsStore_(NULL), funcSet_(new FunctionSet),
+             predBlocks_(new Array<Array<Predicate*>*>),
+             blockEvidence_(new Array<bool>)
   {
     equalPredTemplate_ = new PredicateTemplate();
     equalPredTemplate_->setName(PredicateTemplate::EQUAL_NAME);
@@ -564,9 +566,7 @@ class Domain
   }
 
 
-    // Returns the PredicateTemplate* with the given name or NULL if there is no
-    // PredicateTemplate with the specified name.
-    // Caller is responsible for deleting name if required.
+    // Returns the PredicateTemplate* with the given id.
     // Caller should not delete the returned PredicateTemplate* nor modify it.
   const PredicateTemplate* getPredicateTemplate(const int& id) const
   {
@@ -775,7 +775,30 @@ class Domain
     }
   }
 
+  int getNumNonEvidenceAtoms() const;
+  
+  Predicate* getNonEvidenceAtom(int index) const;
+  
+  int addPredBlock(Array<Predicate*>* const & predBlock) const;
+  
+  int getBlock(Predicate* pred) const;
+  
+  int getNumPredBlocks() const;
+  
+  const Array<Array<Predicate*>*>* getPredBlocks() const;
+
+  const Array<Predicate*>* Domain::getPredBlock(const int index) const;
+  
+  const Array<bool>* getBlockEvidenceArray() const;
+  
+  const bool getBlockEvidence(const int index) const;
+
+  void setBlockEvidence(const int index, const bool value) const;
+
+  int getEvidenceIdxInBlock(const int index) const;
+ 
  private:
+ 
   void changePredTermsToNewIds(Predicate* const & p,
                                hash_map<int,int>& oldToNewConstIds);
 
@@ -807,6 +830,10 @@ class Domain
   Database* db_;
   TrueFalseGroundingsStore* trueFalseGroundingsStore_; //for sampling clauses
   FunctionSet* funcSet_;
+    // Array storing blocks of preds which are mutually exclusive and exhaustive
+  Array<Array<Predicate*>*>* predBlocks_;
+    // Flags indicating if block is fulfilled by evidence
+  Array<bool >* blockEvidence_;
 };
 
 

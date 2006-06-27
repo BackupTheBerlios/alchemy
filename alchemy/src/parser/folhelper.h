@@ -78,7 +78,10 @@ bool zzafterRtParen;
 bool zzisParsing; //indicates whether a file is currently being parsed
 double zzdefaultWt; // default wt of a formula if no wt or . is specified
   //a formula must begin with a weight or end with full stop
-bool zzmustHaveWtOrFullStop; 
+bool zzmustHaveWtOrFullStop;
+  // indicates whether weights should be flipped when a clause is flipped.
+  // This should be true for inference and false for learning.
+bool zzflipWtsOfFlippedClause;
 bool zzwarnDuplicates;
 string zzinFileName;
 char zzerrMsg[1024];
@@ -1297,6 +1300,11 @@ void zzgetDisjunctions(const ListObj* const & lo, Array<ListObj*>& clauses)
     clauses.append(lobjs[i]);
 }
 
+  // Checks if name starts with upper case or " (string constant)
+const bool zzisConstant(const char* const & name)
+{
+  return (isupper(name[0]) || name[0] == '"');
+}
 
 Function* zzcreateFunc(const ListObj* const & lo)
 {
@@ -1309,7 +1317,8 @@ Function* zzcreateFunc(const ListObj* const & lo)
     if (termlo[i]->isStr())  // if is a constant or variable
     {
       const char* name = termlo[i]->getStr();
-      if (isupper(name[0]))  // if is a constant
+      //if (isupper(name[0]))  // if is a constant
+      if (zzisConstant(name))  // if is a constant
       {
         int constId = zzdomain->getConstantId(name);
         if (constId < 0) 
@@ -1360,7 +1369,8 @@ Predicate* zzcreatePred(const ListObj* const & lo)
     if (termlo[i]->isStr())  // if is a constant or variable
     {
       const char* name = termlo[i]->getStr();
-      if (isupper(name[0]))  // if is a constant
+      //if (isupper(name[0]))  // if is a constant
+      if (zzisConstant(name))  // if is a constant
       {
         int constId = zzdomain->getConstantId(name);
         if (constId < 0) 
@@ -1442,8 +1452,10 @@ void zzcreateClause(const ListObj* const & lo, Clause* const & clause)
 
 
   // clauses are those that occur together in CNF
-void zzcreateClauses(const ListObj* const & lo, Array<Clause*>& clauses)
+void zzcreateClauses(const ListObj* const & lo, Array<Clause*>& clauses,
+                     Clause*& flippedClause)
 {
+  flippedClause = NULL;
     // clauseOfUnitPreds contains the predicates of unit clauses
     // e.g if the cnf formula is P(x) ^ Q(x) ^ (P(y) v Q(y))
     // then clauseOfUnitPreds is !P(x) v !Q(x)
@@ -1473,6 +1485,7 @@ void zzcreateClauses(const ListObj* const & lo, Array<Clause*>& clauses)
     for (int i = 0; i < clauseOfUnitPreds->getNumPredicates(); i++)
       ((Predicate*)clauseOfUnitPreds->getPredicate(i))->invertSense();
     clauses.append(clauseOfUnitPreds);
+    flippedClause = clauseOfUnitPreds;
   }
   else
   if (clauseOfUnitPreds->getNumPredicates() == 1) 
@@ -1510,7 +1523,6 @@ int zzcreateExistUniqueClauses(Array<Clause*>& clauses,
   for (int i = 0; i < nonUniqVarIndexes.size(); i++)
     ((Term*)pred->getTerm(nonUniqVarIndexes[i]))->setId(1);
  
-
   Array<Predicate*> predArr;
   pred->createAllGroundings(domain, &predArr, NULL);
   int numPreds = predArr.size();
@@ -1524,8 +1536,11 @@ int zzcreateExistUniqueClauses(Array<Clause*>& clauses,
       t->setId(nonUniqVarIds[j]);
     }
   }
-  
 
+    // Commented out: Mut. excl. and exh. variables are handled
+    // internally by the learning and inference algorithms
+/*      
+    // At-least-one (ALO) clause
   Clause* cc = new Clause;
   for (int i = 0; i < numPreds; i++)
   {
@@ -1535,7 +1550,7 @@ int zzcreateExistUniqueClauses(Array<Clause*>& clauses,
   }
   clauses.append(cc);
 
-
+    // At-most-one (AMO) clauses
   for (int i = 0; i < numPreds; i++)
     for (int j = i+1; j < numPreds; j++)
     {
@@ -1551,8 +1566,69 @@ int zzcreateExistUniqueClauses(Array<Clause*>& clauses,
       cc->appendPredicate(newPred2);
       clauses.append(cc);
     }
-
+*/
+    // Add predicates to blocks
+  Array<Array<Predicate*>*>* predBlocks = new Array<Array<Predicate*>*>;
   
+    // # blocks = (# const. of nonUniqVar 1) * (# const. of nonUniqVar 2) ...
+  int numBlocks = 1;
+  for (int i = 0; i < nonUniqVarIndexes.size(); i++)
+  {
+    int typeId = pred->getTermTypeAsInt(nonUniqVarIndexes[i]);
+    numBlocks *= domain->getNumConstantsByType(typeId);
+  }
+  predBlocks->growToSize(numBlocks);
+
+  for (int i = 0; i < numBlocks; i++)
+  {
+    Array<Predicate*>* predBlock = new Array<Predicate*>;
+    (*predBlocks)[i] = predBlock;
+  }
+  
+  for (int i = 0; i < numPreds; i++)
+  {
+    Predicate* newPred = new Predicate(*(predArr[i]));
+    Array<Predicate*> predGndings;
+    newPred->createAllGroundings(domain, &predGndings, NULL);
+
+    for (int j = 0; j < predGndings.size(); j++)
+    {
+      Predicate* predGnding = new Predicate(*(predGndings[j]));
+      (*predBlocks)[j]->append(predGnding);
+    }
+    predGndings.deleteItemsAndClear();
+    delete newPred;
+  }
+
+  for (int i = 0; i < numBlocks; i++)
+  {
+    Array<Predicate*>* predBlock = (*predBlocks)[i];
+    int blockIdx = domain->addPredBlock(predBlock);
+    
+    for (int j = 0; j < predBlock->size(); j++)
+    {
+      Predicate* p = (*predBlock)[j];
+
+        // If groundings of this pred occur
+      if ((zzpredIdToGndPredMap.find(pred->getId())) != 
+           zzpredIdToGndPredMap.end())
+      {
+        PredicateHashArray* pha = zzpredIdToGndPredMap[pred->getId()];
+        int a = pha->find(p);
+      
+          // Only one atom in a block can be true
+        if (a >= 0 && (*pha)[a]->getTruthValue() == TRUE)
+        {
+          zzassert(!domain->getBlockEvidence(blockIdx),
+                   "More than one true atom found for mutually "
+                   "exclusive and exhaustive variables");
+          domain->setBlockEvidence(blockIdx, true);
+        }
+      }
+    }
+  }
+  delete predBlocks;
+
   predArr.deleteItemsAndClear();
   delete c;  
   return numPreds;
@@ -1842,7 +1918,8 @@ void zzcreateBoolArr(int idx, Array<bool>*& curArray,
 void zzaddConstantToDomain(const char* const & vs,const char* const & typeName)
 {
   //if it is not a string and it does not begin with an uppercase char
-  if (vs[0] != '"' && !isupper(vs[0]))
+  //if (vs[0] != '"' && !isupper(vs[0]))
+  if (!zzisConstant(vs))
   {
     zzerr("Constant %s must begin in uppercase char or be a \"string\".", vs);
     return;
@@ -1934,45 +2011,44 @@ void zztermIsConstant(const char* const & constName)
  */
 void zzputVariableInPred(const char* varName, const bool& folDbg)
 {
-    if (folDbg >= 1) printf("v_%s ", varName); 
+  if (folDbg >= 1) printf("v_%s ", varName); 
     
-    ++zzfdnumVars;
-    string newVarName = zzgetNewVarName(varName);
+  ++zzfdnumVars;
+  string newVarName = zzgetNewVarName(varName);
       
-	    if (zzpred != NULL) 
-      	{
-      		bool rightNumTerms = true;
-      		bool rightType = true;
-      		int exp, unexp;
+  if (zzpred != NULL) 
+  {
+    bool rightNumTerms = true;
+    bool rightType = true;
+    int exp, unexp;
       
-        	// check that we have not exceeded the number of terms
-        	if ((unexp=zzpred->getNumTerms()) ==
-        	(exp=zzpred->getTemplate()->getNumTerms()))
-        	{
-          		rightNumTerms = false;
-          		zzerr("Wrong number of terms for predicate %s. "
-          		"Expected %d but given %d", zzpred->getName(), exp, unexp+1);
-        	}
+      // check that we have not exceeded the number of terms
+    if ((unexp=zzpred->getNumTerms()) ==
+       	(exp=zzpred->getTemplate()->getNumTerms()))
+    {
+      rightNumTerms = false;
+      zzerr("Wrong number of terms for predicate %s. "
+            "Expected %d but given %d", zzpred->getName(), exp, unexp+1);
+    }
         
-        	int varId = -1;
-        	if (rightNumTerms)
-        	{
-          		// check that the variable is of the right type
-          		int typeId = zzpred->getTermTypeAsInt(zzpred->getNumTerms());
-          		rightType = zzcheckRightTypeAndGetVarId(typeId, newVarName.c_str(),
-          										  varId);
-        	}
+    int varId = -1;
+    if (rightNumTerms)
+    {
+        // check that the variable is of the right type
+      int typeId = zzpred->getTermTypeAsInt(zzpred->getNumTerms());
+      rightType = zzcheckRightTypeAndGetVarId(typeId, newVarName.c_str(),
+       										  varId);
+    }
       
-			if (rightNumTerms && rightType)
-			{
-		  		zzpred->appendTerm(new Term(varId, (void*)zzpred, true));
-		  		zzpredFuncListObjs.top()->append(newVarName.c_str());
-          		//zzformulaStr.append(varName);
-        	}
-      	}
-      	else 
-        	zzexit("No function or predicate to hold variable %s",varName);
-      	    
+    if (rightNumTerms && rightType)
+    {
+      zzpred->appendTerm(new Term(varId, (void*)zzpred, true));
+      zzpredFuncListObjs.top()->append(newVarName.c_str());
+      //zzformulaStr.append(varName);
+    }
+  }
+  else 
+    zzexit("No function or predicate to hold variable %s",varName);
 }
 	
 
@@ -1980,8 +2056,9 @@ void zztermIsVariable(const bool& folDbg)
 {
   const char* varName = zztokenList.removeLast();
   
-  // if it is a constant (starts in uppercase)
-  if (isupper(varName[0])) 
+  // if it is a constant (starts in uppercase or a string)
+  //if (isupper(varName[0])) 
+  if (zzisConstant(varName)) 
   {
     if (folDbg >= 1) printf("c2_%s ", varName); 
     
@@ -2476,6 +2553,7 @@ void zzappendFormulaClausesToMLN(const ListObj* const & formula,
                                  Array<string>& hardFormulas,
                                  Array<int>& existUniqueClauseIdxs,
                                  Array<string>& existUniqueFormulas,
+                                 Clause*& flippedClause,
                                  const Domain* const & domain0)
 {
   //cout << "orig formula = " << endl << "\t: " << formulaStr << endl;    
@@ -2528,7 +2606,7 @@ void zzappendFormulaClausesToMLN(const ListObj* const & formula,
         assert(formulas2.size() == 1); //no '*' is used
       }
       Array<Clause*> clauses;
-      zzcreateClauses(cnf, clauses);
+      zzcreateClauses(cnf, clauses, flippedClause);
       int numEPreds = 0;
       if (isExistUnique) 
         numEPreds=zzcreateExistUniqueClauses(clauses,uniqueVarIndexes,zzdomain);
@@ -2551,14 +2629,14 @@ void zzappendFormulaClausesToMLN(const ListObj* const & formula,
           { perClauseWt = (*wt)/clauses.size(); formulaWt = (*wt); }
           else    
           {   //set weight later to twice of max soft clause wt
-            perClauseWt = 0; formulaWt = 0; 
+            perClauseWt = 1; formulaWt = 1; 
             hardFormulas.append(formStr);
             setHardWtLater = true;
           }                   
         }
         else
         {   //set later to twice of max soft clause wt         
-          perClauseWt = 0; formulaWt = 0;
+          perClauseWt = 1; formulaWt = 1;
           hardFormulas.append(formStr);
           setHardWtLater = true;
         }
@@ -2596,9 +2674,21 @@ void zzappendFormulaClausesToMLN(const ListObj* const & formula,
           else        perClauseWt = 2*formulaWt/(n*n-1);
         }
 
+        ////// need a flag zzflipWtOfFlippedClause to indicate whether we should
+        ////// flip the sign of the wt of a flipped clause.
+        ////// During weight learning, we need not flip the sign because the
+        ////// specified wt is a prior mean. During inference, we should flip
+        ////// the sign because it's a real wt. This flag would have to 
+        ////// be passed in via runYYParser
+        double clauseWt = perClauseWt;
+        if (flippedClause && flippedClause == clauses[i] 
+            && zzflipWtsOfFlippedClause)
+          clauseWt = -clauseWt;
+
         int prevIdx;
         bool ok = mln->appendClause(formStr, hasExist, clauses[i], 
-                                    perClauseWt, hasFullStop, prevIdx);
+                                    clauseWt, hasFullStop, prevIdx);
+
         if (!ok)
         {
           cout << "\tsame clause (derived from another formula) has been added "
@@ -2631,6 +2721,7 @@ void zzappendFormulasToMLN(Array<ZZFormulaInfo*>& formulaInfos,
 
   Array<int> hardClauseIdxs, existUniqueClauseIdxs;
   Array<string> hardFormulas, existUniqueFormulas;
+  Clause* flippedClause = NULL;
 
   for (int i = 0; i < formulaInfos.size(); i++)
   {
@@ -2639,14 +2730,14 @@ void zzappendFormulasToMLN(Array<ZZFormulaInfo*>& formulaInfos,
     cout << "formula " << i << ": " << epfi->formulaStr << endl;
     assert(mln == epfi->mln);
     zzappendFormulaClausesToMLN(epfi->formula, epfi->formulaStr, epfi->numPreds,
-                                epfi->wt,epfi->defaultWt,epfi->domain,epfi->mln,
+                                epfi->wt, epfi->defaultWt, epfi->domain, epfi->mln,
                                 epfi->varNameToIdMap, epfi->plusVarMap,
                                 epfi->numAsterisk, epfi->uniqueVarIndexes,
                                 epfi->hasFullStop, epfi->readHardClauseWts,
                                 epfi->mustHaveWtOrFullStop, 
                                 hardClauseIdxs, hardFormulas, 
                                 existUniqueClauseIdxs, existUniqueFormulas,
-                                domain0);
+                                flippedClause, domain0);
     delete epfi;
     cout<<"CNF conversion took ";Timer::printTime(cout,zztimer.time()-startSec);
     cout<<endl;
@@ -2675,7 +2766,30 @@ void zzappendFormulasToMLN(Array<ZZFormulaInfo*>& formulaInfos,
   }
 
   for (int i = 0; i < hardClauseIdxs.size(); i++)
-    ((Clause*)mln->getClause(hardClauseIdxs[i]))->setWt(hardWt);
+  {
+    ////// need a flag zzflipWtOfFlippedClause to indicate whether we should
+    ////// flip the sign of the wt of a flipped clause.
+    ////// during weight learning, we need not flip the sign because the
+    ////// specified wt is a prior mean. During inference, we should flip
+    ////// the sign because it's a real wt. This flag would have to 
+    ////// be passed in via runYYParser
+    double hhardWt = hardWt;
+    /*
+    if (flippedClause && 
+        //flippedClause->same( (Clause*)mln->getClause(hardClauseIdxs[i]) )
+        flippedClause == (Clause*)mln->getClause(hardClauseIdxs[i])
+        && zzflipWtsOfFlippedClause)
+      hhardWt = -hhardWt;
+    */
+    
+      // Weight has been flipped when added to mln. So, if weight
+      // is neg. and marked as hard, then need to flip hard weight
+    if (zzflipWtsOfFlippedClause &&
+        ((Clause*)mln->getClause(hardClauseIdxs[i]))->getWt() < 0)
+      hhardWt = -hhardWt;
+          
+    ((Clause*)mln->getClause(hardClauseIdxs[i]))->setWt(hhardWt);
+  }
 
   for (int i = 0; i < hardFormulas.size(); i++)
   {

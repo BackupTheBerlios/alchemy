@@ -78,25 +78,47 @@ The Alchemy package provides a series of algorithms for
 statistical relational learning and probabilistic logic inference, 
 based on the Markov logic representation. If you are 
 not already familiar with Markov logic, we recommend that you read 
-the papers <a
- href="http://www.cs.washington.edu/homes/pedrod/papers/mlj05.pdf">
+the papers 
+
+<a href="http://www.cs.washington.edu/homes/pedrod/papers/mlj05.pdf">
 <i>Markov Logic Networks</i></a><a> [</a><a
  href="Bibliography.html#richardson_SPMamp_domingos05">5</a>],
 <a href="http://www.cs.washington.edu/homes/pedrod/papers/aaai05.pdf"><i>Discriminative
-Training of Markov Logic Networks</i></a><a> [</a><a
+Training of Markov Logic Networks</i></a><a> [</a><a 
  href="Bibliography.html#singla_SPMamp_domingos05">7</a>],
-and <a
- href="http://www.cs.washington.edu/homes/pedrod/papers/mlc05a.pdf">
+<a href="http://www.cs.washington.edu/homes/pedrod/papers/mlc05a.pdf">
 <i>Learning the Structure of Markov Logic Networks</i></a><a> [</a><a
- href="Bibliography.html#kok_SPMamp_domingos05">3</a>]
-(mln.pdf, dtmln.pdf, and lsmln.pdf in the <TT>papers/</TT> directory) 
+ href="Bibliography.html#kok_SPMamp_domingos05">3</a>],
+
+<a href="http://www.cs.washington.edu/homes/pedrod/papers/aaai06b.pdf">
+<i>Memory-Efficient Inference in Relational Domains</i></a><a> [</a><a
+ href="Bibliography.html#singla_SPMamp_domingos06">3</a>] and
+
+<a href="http://www.cs.washington.edu/homes/pedrod/papers/aaai06a.pdf">
+<i>Sound and Efficient Inference with Probabilistic and Deterministic
+Dependencies</i></a><a> [</a><a
+ href="Bibliography.html#poon_SPMamp_domingos06">3</a>]
+
+
+<I>Markov Logic Networks</I>&nbsp;[<A
+ HREF="Bibliography.html#richardson_SPMamp_domingos05">7</A>], 
+<I>Discriminative Training of Markov Logic Networks</I>&nbsp;[<A
+ HREF="Bibliography.html#singla_SPMamp_domingos05">9</A>], 
+<I>Learning the Structure of Markov Logic Networks</I>&nbsp;[<A
+ HREF="Bibliography.html#kok_SPMamp_domingos05">3</A>],
+<I>Memory-Efficient Inference in Relational Domains</I>&nbsp;[<A
+ HREF="Bibliography.html#singla_SPMamp_domingos06">10</A>]
+and <I>Sound and Efficient Inference with Probabilistic and Deterministic
+Dependencies</I>&nbsp;[<A
+ HREF="Bibliography.html#poon_SPMamp_domingos06">6</A>]
+
+
+(mln.pdf, dtmln.pdf, lsmln.pdf, lazysat.pdf and mcsat.pdf in the <TT>papers/</TT> directory) 
 before reading this manual.
 
 <P>
 We welcome your feedback on any aspect of the Alchemy package. Please 
-email us at <span style="font-family: monospace;">&lt;the
-system name&gt;</span><tt>@cs.washington.edu</tt>
-to let us know what you find 
+email us at <TT><the system name>@cs.washington.edu</TT> to let us know what you find 
 easy or hard to use, what results you have obtained with Alchemy, the 
 features you wish to have but are not currently provided, and any bugs 
 that you encounter.
@@ -121,11 +143,23 @@ This beta release includes:
 </LI>
 <LI>Structure learning
 </LI>
-<LI>MAP/MPE inference (including memory and time efficient)
+<LI>MAP/MPE inference (including memory efficient)
 </LI>
-<LI>MCMC (Gibbs sampling) inference
+<LI>MCMC inference
+
+<UL>
+<LI>Gibbs sampling
+</LI>
+<LI>MC-SAT (including memory efficient)
+</LI>
+<LI>Simulated Tempering
+</LI>
+</UL>
 </LI>
 <LI>Support for native and linked-in functions
+</LI>
+<LI>Block inference and learning over variables with mutually exclusive
+      and exhaustive values
 </LI>
 </UL>
 
@@ -134,11 +168,6 @@ In the next release we plan to include:
 
 <UL>
 <LI>EM (to handle ground atoms with unknown truth values during learning)
-</LI>
-<LI>More efficient MCMC inference (in memory and time)
-</LI>
-<LI>Block inference over variables with mutually exclusive and exhaustive 
-      values
 </LI>
 <LI>Specification of probabilities instead of weights for formulas in an MLN,
       and of probabilities for ground atoms in a database
@@ -154,16 +183,19 @@ In the next release we plan to include:
 Alchemy uses: 
 
 <UL>
-<LI>The MaxWalkSat package of Kautz et al. (1997) [<A
+<LI>C++ code from the MaxWalkSat package of Kautz et al. (1997) [<A
  HREF="Bibliography.html#kautz_SPMamp_al97b">2</A>].
+</LI>
+<LI>C++ code from the SampleSat algorithm of Wei et al. (2004) [<A
+ HREF="Bibliography.html#wei_SPMamp_al04">11</A>].
 </LI>
 <LI>A port from Fortran to C++ of the L-BFGS-B package of Zhu et al. (1997)
       [<A
- HREF="Bibliography.html#zhu_SPMamp_al97">8</A>].
+ HREF="Bibliography.html#zhu_SPMamp_al97">12</A>].
 </LI>
 <LI>A port from Lisp to C++ of the CNF conversion code of 
       Russell and Norvig (2002)&nbsp;[<A
- HREF="Bibliography.html#russell_SPMamp_norvig02">6</A>].
+ HREF="Bibliography.html#russell_SPMamp_norvig02">8</A>].
 </LI>
 <LI>The C++ code to compute the inverse cumulative standard normal 
       distribution of Acklam (2003) [<A
@@ -206,7 +238,7 @@ or the United States Government.
 <!--End of Navigation Panel-->
 <ADDRESS>
 Marc Sumner
-2006-05-03
+2006-06-26
 </ADDRESS>
 </BODY>
 </HTML>

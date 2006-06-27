@@ -12,7 +12,8 @@ bool createComLineQueryPreds(const string& queryPredsStr,
                              GroundPredicateHashArray* const & queries,
                              GroundPredicateHashArray* const & knownQueries,
                              Array<int>* const & allPredGndingsAreQueries,
-                             bool printToFile, ostream& out, bool amapPos)
+                             bool printToFile, ostream& out, bool amapPos,
+                             const GroundPredicateHashArray* const & trueQueries)
 {
   if (queryPredsStr.length() == 0) return true;
   string preds = Util::trim(queryPredsStr);
@@ -68,7 +69,7 @@ bool createComLineQueryPreds(const string& queryPredsStr,
         else        delimit[0] = ')';
         while(Util::substr(pred, cur, term, delimit))
         {
-          if (isupper(term.at(0))) // this is a constant
+          if (isupper(term.at(0)) || term.at(0) == '"') // this is a constant
           {
             termId = domain->getConstantId(term.c_str());
             if (termId < 0) 
@@ -117,10 +118,10 @@ bool createComLineQueryPreds(const string& queryPredsStr,
     {
       assert(ppred.isGrounded());
       assert(!evidenceDB->isClosedWorld(ppred.getId()));
-      TruthValue tv = evidenceDB->getValue(&ppred);              
+      TruthValue tv = evidenceDB->getValue(&ppred);
       GroundPredicate* gndPred = new GroundPredicate(&ppred);
       
-      // If just printing to file, then all values must be known
+        // If just printing to file, then all values must be known
       if (printToFile) assert(tv != UNKNOWN);
       if (tv == UNKNOWN)
       {
@@ -131,20 +132,40 @@ bool createComLineQueryPreds(const string& queryPredsStr,
           // If just printing to file
         if (printToFile)
         {
-          if (amapPos) //if show postive ground query predicates only
-      	  {
-      		if (tv == TRUE)
-      		{
-      	  	  ppred.printWithStrVar(out, domain);
-      	  	  out << endl;
-      		}
-      	  }
-      	  else
-      	  {
-      		  //print all ground query predicates
-	  		ppred.printWithStrVar(out, domain);
-	  		out << " " << tv << endl;
-      	  }
+            // If trueQueries is given as argument, then get prob. from there
+          if (trueQueries)
+          {
+            double prob = 0.0;
+            if (domain->getDB()->getEvidenceStatus(&ppred))
+            {
+              prob = (tv == TRUE) ? 1.0 : 0.0;
+            }
+            else
+            {
+              int found = trueQueries->find(gndPred);
+              if (found >= 0) prob = (*trueQueries)[found]->getProbTrue();
+            }
+            // Uniform smoothing
+            //if (asmooth>0) prob = (prob*numSamples+asmooth/2.0)/(numSamples+asmooth);
+            prob = (prob*10000+1/2.0)/(10000+1.0);
+            gndPred->print(out, domain); out << " " << prob << endl;
+          }
+          else
+          {
+            if (amapPos) //if show postive ground query predicates only
+            {
+      		  if (tv == TRUE)
+      		  {
+      	  	    ppred.printWithStrVar(out, domain);
+      	  	    out << endl;
+      		  }
+            }
+            else //print all ground query predicates
+            {
+              ppred.printWithStrVar(out, domain);
+              out << " " << tv << endl;
+            }
+          }
           delete gndPred;
         }
         else // Building queries
@@ -195,21 +216,41 @@ bool createComLineQueryPreds(const string& queryPredsStr,
           	// If just printing to file
           if (printToFile)
           {
-          	if (amapPos) //if show postive ground query predicates only
-      	  	{
-      		  if (tv == TRUE)
-      		  {
-      	  	  	ppred.printWithStrVar(out, domain);
-      	  	  	out << endl;
-      		  }
-      	  	}
-      	  	else
-      	  	{
-      		  	//print all ground query predicates
-	  		  ppred.printWithStrVar(out, domain);
-	  		  out << " " << tv << endl;
-      	  	}
-          	delete gndPred;
+              // If trueQueries is given as argument, then get prob. from there
+            if (trueQueries)
+            {
+              double prob = 0.0;
+              if (domain->getDB()->getEvidenceStatus(&ppred))
+              {
+                prob = (tv == TRUE) ? 1.0 : 0.0;
+              }
+              else
+              {
+                int found = trueQueries->find(gndPred);
+                if (found >= 0) prob = (*trueQueries)[found]->getProbTrue();
+              }
+                // Uniform smoothing
+                //if (asmooth>0) prob = (prob*numSamples+asmooth/2.0)/(numSamples+asmooth);
+              prob = (prob*10000+1/2.0)/(10000+1.0);
+              gndPred->print(out, domain); out << " " << prob << endl;
+            }
+            else
+            {
+              if (amapPos) //if show postive ground query predicates only
+              {
+                if (tv == TRUE)
+                {
+                  ppred.printWithStrVar(out, domain);
+                  out << endl;
+                }
+              }
+              else //print all ground query predicates
+              {
+                ppred.printWithStrVar(out, domain);
+                out << " " << tv << endl;
+              }
+            }
+            delete gndPred;          
           }
           else // Building queries
           {
@@ -242,8 +283,9 @@ bool createComLineQueryPreds(const string& queryPredsStr,
 {
   return createComLineQueryPreds(queryPredsStr, domain, evidenceDB,
                              	 queries, knownQueries, allPredGndingsAreQueries,
-                             	 false, cout, false);
+                             	 false, cout, false, NULL);
 }
+
   // note that preds is a copy
 bool extractPredNames(string preds, const string* queryFile, 
                       StringHashArray& predNames)
@@ -387,7 +429,8 @@ bool createQueryFilePreds(const string& queryFile, const Domain* const & domain,
                           Database* const & evidenceDB,
                           GroundPredicateHashArray* const &queries,
                           GroundPredicateHashArray* const &knownQueries,
-                          bool printToFile, ostream& out, bool amapPos)
+                          bool printToFile, ostream& out, bool amapPos,
+                          const GroundPredicateHashArray* const &trueQueries)
 {
   if (queryFile.length() == 0) return true;
 
@@ -499,20 +542,41 @@ bool createQueryFilePreds(const string& queryFile, const Domain* const & domain,
     	// If just printing to file
       if (printToFile)
       {
-        if (amapPos) //if show postive ground query predicates only
-    	{
-      	  if (tv == TRUE)
-      	  {
-      	    pred.printWithStrVar(out, domain);
-      	  	out << endl;
-      	  }
+
+          // If trueQueries is given as argument, then get prob. from there
+        if (trueQueries)
+        {
+          double prob = 0.0;
+          if (domain->getDB()->getEvidenceStatus(&pred))
+          {
+            prob = (tv == TRUE) ? 1.0 : 0.0;
+          }
+          else
+          {
+            int found = trueQueries->find(gndPred);
+            if (found >= 0) prob = (*trueQueries)[found]->getProbTrue();
+          }
+            // Uniform smoothing
+            //if (asmooth>0) prob = (prob*numSamples+asmooth/2.0)/(numSamples+asmooth);
+          prob = (prob*10000+1/2.0)/(10000+1.0);
+          gndPred->print(out, domain); out << " " << prob << endl;
         }
         else
         {
-         	//print all ground query predicates
-	  	  pred.printWithStrVar(out, domain);
-	  	  out << " " << tv << endl;
-      	}
+          if (amapPos) //if show postive ground query predicates only
+          {
+            if (tv == TRUE)
+            {
+              pred.printWithStrVar(out, domain);
+              out << endl;
+            }
+          }
+          else //print all ground query predicates
+          {
+            pred.printWithStrVar(out, domain);
+            out << " " << tv << endl;
+          }
+        }
         delete gndPred;
       }
       else // Building queries
@@ -534,7 +598,7 @@ bool createQueryFilePreds(const string& queryFile, const Domain* const & domain,
                           GroundPredicateHashArray* const &knownQueries)
 {
   return createQueryFilePreds(queryFile, domain, evidenceDB, queries,
-                          	  knownQueries, false, cout, false);
+                          	  knownQueries, false, cout, false, NULL);
 }
 
 void readPredValuesAndSetToUnknown( const StringHashArray& predNames,

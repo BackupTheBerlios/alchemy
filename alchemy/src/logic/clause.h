@@ -110,7 +110,8 @@ class Clause
             (*(*cache)[i])[j]->growToSize(ccArr->size());
             for (int k = 0; k < ccArr->size(); k++)
             {
-              (*(*(*cache)[i])[j])[k] = new CacheCount((*ccArr)[k]->g, 
+              (*(*(*cache)[i])[j])[k] = new CacheCount((*ccArr)[k]->g,
+                                                       (*ccArr)[k]->c,
                                                        (*ccArr)[k]->cnt); 
             }
           }
@@ -612,7 +613,8 @@ class Clause
         if (asInt)           (*predicates_)[i]->printAsInt(out);
         else if (withStrVar) (*predicates_)[i]->printWithStrVar(out, domain);
         else                 (*predicates_)[i]->print(out,domain);
-        if (i < predicates_->size()-1 || !eqPreds.empty()) out << " v ";
+        if (i < predicates_->size()-1 || !eqPreds.empty() ||
+        	!internalPreds.empty()) out << " v ";
       }
     }
 
@@ -621,7 +623,7 @@ class Clause
       if (asInt)           eqPreds[i]->printAsInt(out);
       else if (withStrVar) eqPreds[i]->printWithStrVar(out,domain);
       else                 eqPreds[i]->print(out,domain);
-      out << ((i!=eqPreds.size()-1)?" v ":"");      
+      out << ((i != eqPreds.size()-1 || !internalPreds.empty())?" v ":"");      
     }
 
     for (int i = 0; i < internalPreds.size(); i++)
@@ -924,15 +926,18 @@ class Clause
                                     const Domain* const & domain,
                                     Database* const & db,
                                     const bool& hasUnknownPreds,
-                                    const bool& sampleClauses)
+                                    const bool& sampleClauses,
+                                    const int& combo)
   {
     assert(gndPred->isGrounded());
 
       //store the indexes of the predicates that can be grounded as gndPred
     Array<int> gndPredIndexes;
-    for (int i = 0; i < predicates_->size(); i++)
-      if ((*predicates_)[i]->canBeGroundedAs(gndPred)) gndPredIndexes.append(i);
 
+    for (int i = 0; i < predicates_->size(); i++)
+    {
+      if ((*predicates_)[i]->canBeGroundedAs(gndPred)) gndPredIndexes.append(i);
+    }
       //create mapping of variable ids (e.g. -1) to variable addresses,
       //note whether they have been grounded, and store their types
     createVarIdToVarsGroundedType(domain); 
@@ -948,20 +953,67 @@ class Clause
                                        domain, hasUnknownPreds, sampleClauses);
     //cout << "numTrueGndActual = " << numTrueGndActual << endl;
     
-      //set gndPred to have the opposite of its actual value
-    db->setValue(gndPred, opp);
-    flipped = true;
-
       //count # true groundings when gndPred is held to opposite value
-    double numTrueGndOpp = 
-      countNumTrueGroundingsForAllComb(gndPredIndexes, gndPred, opp, flipped,
-                                       domain, hasUnknownPreds, sampleClauses);
+    double numTrueGndOpp = 0.0;
+    flipped = true;
+    
+    int blockIdx = domain->getBlock(gndPred);
+    if (blockIdx >= 0)
+    {
+        // Pred in block: We have to look at combination c
+        // of other preds in block
+      const Array<Predicate*>* block = domain->getPredBlock(blockIdx);
+      assert(combo < block->size());
+
+      int oldTrueOne = 0;
+      for (int i = 0; i < block->size(); i++)
+      {
+        
+        if (db->getValue((*block)[i]) == TRUE)
+        {
+          oldTrueOne = i;
+          break;
+        }
+      }
+
+      int newTrueOne = (oldTrueOne <= combo) ? combo + 1 : combo;
+      
+      assert(db->getValue((*block)[oldTrueOne]) == TRUE);
+      assert(db->getValue((*block)[newTrueOne]) == FALSE);
+      
+      db->setValue((*block)[oldTrueOne], FALSE);
+      db->setValue((*block)[newTrueOne], TRUE);
+      
+      //numTrueGndOpp +=
+      //  countNumTrueGroundingsForAllComb(gndPredIndexes, gndPred, opp, flipped,
+      //                                   domain, hasUnknownPreds, sampleClauses);
+
+      numTrueGndOpp +=
+        countNumTrueGroundingsForAllComb(gndPredIndexes, (*block)[oldTrueOne], opp, flipped,
+                                         domain, hasUnknownPreds, sampleClauses);
+      numTrueGndOpp +=
+        countNumTrueGroundingsForAllComb(gndPredIndexes, (*block)[newTrueOne], opp, flipped,
+                                         domain, hasUnknownPreds, sampleClauses);
+      
+      db->setValue((*block)[oldTrueOne], TRUE);
+      db->setValue((*block)[newTrueOne], FALSE);
+    }
+    else
+    {
+        // Pred not in block: Count gndings with pred flipped
+
+        //set gndPred to have the opposite of its actual value
+      db->setValue(gndPred, opp);
+
+      numTrueGndOpp +=
+        countNumTrueGroundingsForAllComb(gndPredIndexes, gndPred, opp, flipped,
+                                         domain, hasUnknownPreds, sampleClauses);
+
+      db->setValue(gndPred, actual);
+    }
     //cout << "numTrueGndOpp    = " << numTrueGndOpp << endl;
 
-    db->setValue(gndPred, actual);
-
     deleteVarIdToVarsGroundedType();
-
     return numTrueGndOpp - numTrueGndActual;
   }
 
@@ -1950,6 +2002,7 @@ bool isUnsatisfiedGivenActivePreds(Predicate* const & lit,
   return true;
 }
 
+
   // sort literals, putting negative literals first, then of increasing arity
 void sortLiteralsByNegationAndArity(Array<Predicate*>& clauseLits)
 {
@@ -2093,9 +2146,13 @@ void groundIndexableLiterals(const Domain* const & domain,
           for (int i = 0; i < vars.size(); i++) vars[i]->setId(constId);
         }
       }
-       
-        //proceed further only if partially grounded clause is unsatisfied
-      if (isUnsatisfiedGivenActivePreds(lit, ivg->subseqGndLits, db, ignoreActivePreds))
+        
+        //proceed further only if:
+        // 1. positive weight and partially grounded clause is unsatisfied or
+        // 2. negative weight and partially grounded clause is satisfied
+      bool unsat = isUnsatisfiedGivenActivePreds(lit, ivg->subseqGndLits, db, ignoreActivePreds);
+      if ((wt_ >= 0 && unsat) ||
+          (wt_ < 0 && !unsat))
       {
 		// if there are more literals
         if (ivgArrIdx+1 < ivgArr.size())
@@ -2201,8 +2258,12 @@ void getActiveClausesAndCnt(const Domain* const & domain,
           }
       	}
        
-   	 	  //proceed further only if partially grounded clause is unsatisfied
-      	if (isUnsatisfiedGivenActivePreds(lit, ivg->subseqGndLits, db, ignoreActivePreds))
+   	 	  //proceed further only if:
+          // 1. positive weight and partially grounded clause is unsatisfied or
+          // 2. negative weight and partially grounded clause is satisfied
+        bool unsat = isUnsatisfiedGivenActivePreds(lit, ivg->subseqGndLits, db, ignoreActivePreds);
+      	if ((wt_ >= 0 && unsat) ||
+            (wt_ < 0 && !unsat))
       	{
 			// if there are more literals
           if (ivgArrIdx+1 < ivgArr.size())
@@ -2310,7 +2371,7 @@ void getActiveClausesAndCnt(Predicate*  const & gndPred,
 	  restoreVars();
 	}
   }
-   
+
   assert(!uniqueClauses || uniqueClauses->size() == activeClauseCnt);
   assert(!activeIntClauses || activeIntClauses->size() == activeClauseCnt);
   assert(!activeGroundClauses || activeGroundClauses->size() == activeClauseCnt);

@@ -117,11 +117,11 @@ bool Clause::createAndAddActiveClause(Array<IntClause *> * const & activeIntClau
     Predicate* predicate = (*predicates_)[i];
     assert(predicate); 
 	assert(predicate->isGrounded());
-    if ( (iter=predSet.find(predicate)) != predSet.end() )
+    if ( (iter = predSet.find(predicate)) != predSet.end() )
     {
           // the two gnd preds are of opp sense, so clause must be satisfied
 		  // and no point in adding it 
-	  if ((*iter)->getSense() !=  predicate->getSense())
+	  if (wt_ >= 0 && (*iter)->getSense() !=  predicate->getSense())
       {
         if (fullClause) delete fullClause;
         if (clause) delete clause;
@@ -170,7 +170,6 @@ bool Clause::createAndAddActiveClause(Array<IntClause *> * const & activeIntClau
   //came at this point means that the clause is active (and hence nonEmpty)
   else
   {
-	   
   	//check if the clause is already present
   	if(uniqueClauses)
   	{
@@ -178,7 +177,7 @@ bool Clause::createAndAddActiveClause(Array<IntClause *> * const & activeIntClau
 	  assert(fullClause);  
      
 	 	//Note: fullClause should not be canonicalized
-	  intClause = new IntClause(fullClause,uniquePreds);
+	  intClause = new IntClause(fullClause, uniquePreds);
 	  delete fullClause; 
 	 
 	 	//if the clause is already present then it should
@@ -201,11 +200,10 @@ bool Clause::createAndAddActiveClause(Array<IntClause *> * const & activeIntClau
     
 	  if(activeIntClauses)
 	  {
-	  	intClause = new IntClause(clause,seenPreds);
+	  	intClause = new IntClause(clause, seenPreds);
    
        	if (isHardClause_) 
       	  intClause->setWtToHardWt();
-   
 	    activeIntClauses->append(intClause);
 	  }
 	  else

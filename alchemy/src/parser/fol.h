@@ -15,6 +15,7 @@ bool runYYParser(MLN* const & mln, Domain* const & domain,
                  const StringHashArray* const & queryPredNames,
                  const bool& addUnitClauses, const bool& warnDuplicates,
                  const double& defaultWt, const bool& mustHaveWtOrFullStop,
-                 const Domain* const & domains, const bool& lazyInference);
+                 const Domain* const & domains, const bool& lazyInference,
+                 const bool& flipWtsOfFlippedClause);
 
 #endif

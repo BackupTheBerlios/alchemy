@@ -62,10 +62,6 @@ ARGS ARGS::Args[] =
        "(of true/false ground atoms), including function definitions, "
        "e.g. ai.db,graphics.db,languages.db."),
 
-// Marc: functions defined in .db files
-//  ARGS("functions", ARGS::Opt, funcFiles, 
-//       "Comma-separated .func files containing function definitions."),
-
   ARGS("ne", ARGS::Opt, nonEvidPredsStr, 
        "First-order non-evidence predicates (comma-separated with no space),  "
        "e.g., cancer,smokes,friends. For discriminative learning, at least "
@@ -194,6 +190,9 @@ int main(int argc, char* argv[])
   if (mwsLimit <= 0 && mwsLimit != -1)
   { cout << "ERROR: mwsLimit must be positive (or -1)" << endl; return -1; }
 
+  if (!discLearn && mwsLazy)
+  { cout << "ERROR: mwsLazy can only be used with discriminative learning" << endl; return -1; }
+
   ofstream out(outMLNFile);
   if (!out.good())
   {
@@ -253,9 +252,11 @@ int main(int argc, char* argv[])
   Array<Domain*> domains;
   Array<MLN*> mlns;
   begSec = getTimeSec(discLearn, timer);
+    // Parse as if lazy inference is set to true to set evidence atoms in DB
+    // If lazy is not used, this is removed from DB
   createDomainsAndMLNs(domains, mlns, multipleDatabases, inMLNFile, 
                        constFilesArr, funcFilesArr, dbFilesArr, nePredNames,
-                       !noAddUnitClauses, priorMean, mwsLazy);  
+                       !noAddUnitClauses, priorMean, true);  
   cout << "Parsing MLN and creating domains took "; 
   Timer::printTime(cout, getTimeSec(discLearn,timer) - begSec); cout << endl;
 

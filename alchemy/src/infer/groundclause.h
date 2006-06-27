@@ -94,6 +94,12 @@ class GroundClause
 
   double getWt() const { return wt_; }
 
+  void setThreshold(const double& threshold) 
+  { threshold_ = threshold; }
+
+  double getThreshold() const { return threshold_; }
+
+
   void setWtToHardWt() { wt_ = HARD_GROUNDCLAUSE_WT; }
   bool isHardClause() const { return (wt_ == HARD_GROUNDCLAUSE_WT); }
 
@@ -170,6 +176,7 @@ class GroundClause
   void print(ostream& out, const Domain* const & domain) const;
   void print(ostream& out) const;
 
+  double sizeKB();
 
  private:
   Array<unsigned int>* intArrRep_;  // hash code is stored as the last item
@@ -182,6 +189,8 @@ class GroundClause
     // overloaded to indicate whether this is a hard clause
     // if this is a hard clause, wt_ is set to HARD_GROUNDCLAUSE_WT
   double wt_;
+
+  double threshold_;
 
     // pointers to weights of first-order clauses that, after being grounded 
     // and having their ground predicates with known truth values removed, 

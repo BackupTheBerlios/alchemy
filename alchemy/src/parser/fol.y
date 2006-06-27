@@ -111,7 +111,7 @@ input:
     //if the '!' operator is used, check that it's correctly used
     if (zzuniqueVarIndexes.size() > 0)
     { 
-      if (zzfdnumPreds != 1 || zznumAsterisk >0)
+      if (zzfdnumPreds != 1 || zznumAsterisk > 0)
         zzerr("'!' can only be used in a clause with one predicate, "
               "and cannot be used with '*'.");
       if (zzformulaStr.find("EXIST") != string::npos || 
@@ -567,7 +567,7 @@ ZZ_VARIABLE
   zzassert(zzpredTemplate,"expecting zzpredTemplate!=NULL");
   zzpredTemplate->setName(predName);
 
-  delete [] predName;
+  free(predName);
   delete [] funcName;
 }
 '(' 
@@ -720,6 +720,7 @@ constants_in_groundings ')'
     }
     delete zzpred;
   }
+  
   zzpred = NULL;
 }
 
@@ -1065,7 +1066,8 @@ quant_variable: ZZ_VARIABLE
   const char* varName = zztokenList.removeLast();  
   if (folDbg >= 1) printf("v_%s ", varName); 
 
-  if (isupper(varName[0])) 
+  //if (isupper(varName[0])) 
+  if (zzisConstant(varName)) 
   {
     zzerr("Variable %s must be begin with a lowercase character.", varName);
     ((char*)varName)[0] = tolower(varName[0]);
@@ -1258,17 +1260,16 @@ atomic_sentence:
 	{
 		// create the second part of the conjunction
 		//zzformulaStr.append(" ^ ");
-		ListObj* topPredlo = zzfuncConjStack.top();
-	    zzfuncConjStack.pop();
-		zzformulaListObjs.push(topPredlo);
-		zzcreateListObjFromTopTwo(zzformulaListObjs, "^");
-
+      ListObj* topPredlo = zzfuncConjStack.top();
+      zzfuncConjStack.pop();
+      zzformulaListObjs.push(topPredlo);
+      zzcreateListObjFromTopTwo(zzformulaListObjs, "^");
 	} //while (!zzfuncConjStack.empty())
 
 	if (!zzfuncConjStr.empty())
 	{
-		zzformulaStr.append(zzfuncConjStr);
-		zzfuncConjStr.clear();
+      zzformulaStr.append(zzfuncConjStr);
+      zzfuncConjStr.clear();
 	}
 	zzfunc = NULL;
   }
@@ -2122,7 +2123,8 @@ bool runYYParser(MLN* const & mln, Domain* const & dom,
                  const StringHashArray* const & queryPredNames,
                  const bool& addUnitClauses, const bool& warnDuplicates,
                  const double& defaultWt, const bool& mustHaveWtOrFullStop,
-                 const Domain* const & domain0, const bool& lazyInference)
+                 const Domain* const & domain0, const bool& lazyInference,
+                 const bool& flipWtsOfFlippedClause)
 {
   zzinit();
   if (fileName) { yyin = fopen(fileName, "r" ); zzinFileName = fileName; }
@@ -2137,6 +2139,7 @@ bool runYYParser(MLN* const & mln, Domain* const & dom,
   zzwarnDuplicates = warnDuplicates;
   zzdefaultWt = defaultWt;
   zzmustHaveWtOrFullStop = mustHaveWtOrFullStop;
+  zzflipWtsOfFlippedClause = flipWtsOfFlippedClause;
 
   ungetc('\n', yyin); // pretend that file begin with a newline
   zzmln = mln;

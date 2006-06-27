@@ -3,6 +3,8 @@
 
 #include <cstdlib>
 #include <cfloat>
+#include <fstream>
+#include "samplesat.h"
 #include "random.h"
 #include "timer.h"
 #include "mln.h"
@@ -11,6 +13,7 @@
 #include "convergencetest.h"
 #include "gelmanconvergencetest.h"
 
+#define MAX_LINE 1000
 
 enum WalksatType { NONE=0, MAXWALKSAT=1 };
 
@@ -27,6 +30,25 @@ struct GibbsParams
   WalksatType walksatType;
   int maxSeconds;
   int samplesPerConvergenceTest;
+
+  int hardWt;
+};
+
+struct MCSatParams
+{
+  // number of total steps (mcsat & Gibbs) for each MC-SAT step
+  int numStepsEveryMCSat;
+  GibbsParams gibbsParams;
+  SampleSatParams sampleSatParams;
+  bool showDebug;
+};
+
+struct TemperingParams
+{
+  int subInterval;	// interval between swap attempts
+  int numST;	
+  int numSwap;	
+  GibbsParams gibbsParams;
 };
 
 ///////////////////////////////////////////////////////////////////////////
@@ -101,7 +123,7 @@ class MRF
       const Array<int>* const & allPredGndingsAreQueries,
       const Domain* const & domain,  const Database * const & db, 
       const MLN* const & mln, const bool& markHardGndClauses,
-      const bool& trackParentClauseWts)
+      const bool& trackParentClauseWts, const int& memLimit)
   {
     random_.init(-1);
     cout << "creating mrf..." << endl; 
@@ -111,7 +133,12 @@ class MRF
     GroundClauseSet gndClausesSet;
     gndPreds_ = new Array<GroundPredicate*>;
     gndClauses_ = new Array<GroundClause*>;
-
+    blocks_ = new Array<Array<int> >;
+    blocks_->growToSize(domain->getNumPredBlocks());
+    blockEvidence_ = new Array<bool>(*(domain->getBlockEvidenceArray()));
+    //(*blockEvidence_) = domain->getBlockEvidenceArray();
+	long double memNeeded = 0;
+	
       //add GroundPredicates in queries to unseenPreds
     for (int i = 0; i < queries->size(); i++)
     {
@@ -122,6 +149,30 @@ class MRF
       gndPredsMap[gp] = gndPredIdx;
     }
 
+      // If too much memory to build MRF then destroy it
+	if (memLimit > 0)
+	{
+	  memNeeded = sizeKB();
+      if (memNeeded > memLimit)
+      {
+        for (int i = 0; i < gndClauses_->size(); i++)
+          delete (*gndClauses_)[i];
+        delete gndClauses_;    
+
+        for (int i = 0; i < gndPreds_->size(); i++)
+          if ((*gndPreds_)[i]) delete (*gndPreds_)[i];
+        delete gndPreds_;
+    
+        for (int i = 0; i < blocks_->size(); i++)
+          (*blocks_)[i].clearAndCompress();
+        delete blocks_;
+    
+        delete blockEvidence_;
+                    
+        throw 1;
+      }
+	}
+	
       //while there are still unknown preds we have not looked at
     while (!unseenPreds.empty())   
     {
@@ -174,10 +225,46 @@ class MRF
 		c->print(cout,domain);
 		cout<<endl<<endl;
 		*/
-		addUnknownGndClauses(pred,c,domain,db,genClausesForAllPredGndings,&agc);
+		try
+		{
+		  addUnknownGndClauses(pred,c,domain,db,genClausesForAllPredGndings,&agc);
+		}
+		catch (bad_alloc&)
+		{
+		  throw 1;
+		}
+
+          // If too much memory to build MRF then destroy it
+		if (memLimit > 0)
+		{
+	  	  memNeeded = sizeKB();
+    	  //cout << "preds " << gndPreds_->size() << endl;
+    	  //cout << "clauses " << gndClauses_->size() << endl;
+    	  //cout << "memory " << memNeeded << endl;
+          //cout << "limit " << memLimit << endl;
+      	  if (memNeeded > memLimit)
+          {
+            for (int i = 0; i < gndClauses_->size(); i++)
+              delete (*gndClauses_)[i];
+            delete gndClauses_;    
+
+            for (int i = 0; i < gndPreds_->size(); i++)
+              if ((*gndPreds_)[i]) delete (*gndPreds_)[i];
+            delete gndPreds_;
+    
+            for (int i = 0; i < blocks_->size(); i++)
+              (*blocks_)[i].clearAndCompress();
+            delete blocks_;
+    
+            delete blockEvidence_;
+            
+            throw 1;
+          }
+		}
+		
       }
 
-      //clauses with negative wts are flipped in prepareMaxWalksatData()
+      //clauses with negative wts are handled by the inference algorithms
 
       //if all the gnd clauses that pred appears in have known truth value,
       //it is not added to gndPreds_ and excluded from the MCMC network
@@ -199,22 +286,63 @@ class MRF
     if (gndClauses_->size() == 0)
       cout<< "Markov blankets of query ground predicates are empty" << endl;    
  
-    //cout << "grounded predicates:" << endl;
-    //for (int i = 0; i < gndPreds_->size(); i++)
-    //{ cout << "\t"; (*gndPreds_)[i]->print(cout, domain); cout << endl; }
-    //cout << "grounded clauses:" << endl;
-    //for (int i = 0; i < gndClauses_->size(); i++)
-    //{ cout << "\t"; (*gndClauses_)[i]->print(cout, domain); cout << endl; }
-
-    for (int i = 0; i < gndPreds_->size(); i++) 
+      // Compress preds and find blocks of preds
+    for (int i = 0; i < gndPreds_->size(); i++)
+    {
       (*gndPreds_)[i]->compress();
+
+      const Array<Array<Predicate*>*>* blocks = domain->getPredBlocks();
+      for (int j = 0; j < blocks->size(); j++)
+      {
+        Array<Predicate*>* block = (*blocks)[j];
+        for (int k = 0; k < block->size(); k++)
+        {
+          Predicate* pred = (*block)[k];
+          if (pred->canBeGroundedAs((*gndPreds_)[i]))
+          {
+            (*blocks_)[j].append(i);
+          }
+        }
+      }
+    }
+
+      // Remove empty blocks (blocks generated in domain, but contain no query atoms)
+    int i = 0;
+    while (i < blocks_->size())
+    {
+      Array<int> block = (*blocks_)[i];
+      if (block.empty())
+      {
+        blocks_->removeItem(i);
+        blockEvidence_->removeItem(i);
+        continue;
+      }
+      i++;
+    }
+    
     gndPreds_->compress();
     gndClauses_->compress();
 
-    cout <<"Time taken to construct MRF = ";Timer::printTime(cout,timer.time());
+    cout <<"Time taken to construct MRF = ";
+    Timer::printTime(cout,timer.time());
     cout << endl;
   }
 
+  /**
+   * Computes and returns size of the mrf in kilobytes
+   */
+  long double sizeKB()
+  {
+      // # of ground clauses times memory for a ground clause +
+      // # of ground predicates times memory for a ground predicate
+    long double size = 0;
+    for (int i = 0; i < gndClauses_->size(); i++)
+      size += (*gndClauses_)[i]->sizeKB();
+    for (int i = 0; i < gndPreds_->size(); i++)
+      size += (*gndPreds_)[i]->sizeKB();
+
+    return size;    
+  }
 
     //Do not delete the clause and truncClause argument.
     //This function is tightly bound to Clause::createAndAddUnknownClause().
@@ -273,8 +401,7 @@ class MRF
       if (parentWtPtr) 
       { 
         gndClause->appendParentWtPtr(parentWtPtr);
-		gndClause->incrementClauseFrequency(clauseId,1); 
-		
+		gndClause->incrementClauseFrequency(clauseId,1);		
 		assert(gndClause->getWt() == *parentWtPtr);
       }
 
@@ -317,12 +444,10 @@ class MRF
     {  // gndClause has appeared before, so just accumulate its weight
       (*iter)->addWt(gndClause->getWt());
 
-	  //Change as suggeted by STAN : Mar 8, 2006
-      //if (parentWtPtr) gndClause->appendParentWtPtr(parentWtPtr);
 	  if (parentWtPtr)
 	  {
-		   (*iter)->appendParentWtPtr(parentWtPtr);
-           (*iter)->incrementClauseFrequency(clauseId,1); 
+		(*iter)->appendParentWtPtr(parentWtPtr);
+        (*iter)->incrementClauseFrequency(clauseId,1); 
 	  }
 
 	  gndClause->deleteAllGndPreds();
@@ -341,6 +466,12 @@ class MRF
     for (int i = 0; i < gndPreds_->size(); i++)
       if ((*gndPreds_)[i]) delete (*gndPreds_)[i];
     delete gndPreds_;
+    
+    for (int i = 0; i < blocks_->size(); i++)
+      (*blocks_)[i].clearAndCompress();
+    delete blocks_;
+    
+    delete blockEvidence_;
   }
 
 
@@ -375,11 +506,12 @@ class MRF
       (*gndPreds_)[i]->initTruthValues(numChains);
   }
 
-
+  // ========================================================================= //
     // If saveSapce is set to true, the gndPredSenses_ and gndPredIndexes_
     // fields of the GroundClauses in gndClauses_ will be deleted in the 
     // function. This means that the function can only be correctly called once.
     // Returns the number of samples drawn per predicate.
+  // ========================================================================= //
   int runGibbsSampling(const GibbsParams& gibbsParams, 
                        const MaxWalksatParams* const & maxWalksatParams,
                        const bool& saveSpace, const Domain* const & domain)
@@ -475,11 +607,49 @@ class MRF
         Timer::printTime(cout,secondsElapsed); cout << endl;
       }
 
-        // for each chain, for each node, generate the node's new truth value
+        // For each chain, for each node, generate the node's new truth value
       for (int c = 0; c < numChains; c++) 
       {
+          // For each block: select one to set to true
+        for (int i = 0; i < blocks_->size(); i++)
+        {
+            // If evidence atom exists, then all others stay false
+          if ((*blockEvidence_)[i]) continue;
+
+          Array<int> block = (*blocks_)[i];
+            // chosen is index in the block, block[chosen] is index in gndPreds_
+          int chosen = gibbsSampleFromBlock(c, i);
+            // If chosen pred was false, then need set previous true
+            // one to false and update wts
+          if (!(*gndPreds_)[block[chosen]]->getTruthValue(c))
+          {
+            for (int j = 0; j < block.size(); j++)
+            {
+              if ((*gndPreds_)[block[j]]->getTruthValue(c))
+              {
+                (*gndPreds_)[block[j]]->setTruthValue(c, false);
+                affectedGndPreds.clear();
+                gndPredFlippedUpdates(block[j], c, affectedGndPreds);
+                updateWtsForAffectedGndPreds(affectedGndPreds, c);
+              }
+            }            
+              // Set truth value and update wts for chosen atom
+            (*gndPreds_)[block[chosen]]->setTruthValue(c, true);
+            affectedGndPreds.clear();
+            gndPredFlippedUpdates(block[chosen], c, affectedGndPreds);
+            updateWtsForAffectedGndPreds(affectedGndPreds, c);
+          }
+
+            // if in actual gibbs sampling phase, track the num of times
+            // the ground predicate is set to true
+          if (!burningIn) (*gndPreds_)[block[chosen]]->incrementNumTrue();
+        }
+
         for (int i = 0; i < gndPreds_->size(); i++) 
         {
+            // Predicates in blocks have been handled above
+          if (getBlock(i) >= 0) continue;
+
           bool newAssignment 
             = genTruthValueForProb((*gndPreds_)[i]->getProbability(c));
 
@@ -567,24 +737,679 @@ class MRF
     return numSamplesPerPred;
   }
 
-    //returns true if MaxWalksat succeeded; else returns false
+
+  // ----------------------------------------------------------------------- //
+  // MC-SAT sampling: returns the number of samples drawn per predicate.
+  //	- run 1 mc-sat steps every n Gibbs steps
+  //	- each mc-sat step calls upon SampleSat
+  //			which runs mixed WS and SA steps
+  // * If saveSapce is set to true, the gndPredSenses_ and gndPredIndexes_
+  //	fields of the GroundClauses in gndClauses_ will be deleted in the 
+  //	function. This means that the function can only be correctly called once.
+  // ----------------------------------------------------------------------- //
+  int runMCSatSampling(const MCSatParams& mcsatParams, 
+                       const MaxWalksatParams* const & maxWalksatParams,
+                       const bool& saveSpace=false, 
+                       const Domain* const & domain)
+  {
+      // this occurs when all query predicates don't appear in any UNKNOWN clause 
+    if (gndClauses_->size() == 0) return 0;
+
+	  // Randomizer for MC-SAT clause selection
+	int seed;
+	struct timeval tv;
+	struct timezone tzp;
+	gettimeofday(&tv,&tzp);
+	seed = (unsigned int)((( tv.tv_sec & 0177 ) * 1000000) + tv.tv_usec);
+    srandom(seed);
+	
+    Timer timer;
+    double begSec;
+
+      // extract MCSat sampling parameters
+	bool showDebug = mcsatParams.showDebug;
+	int numStepsEveryMCSat = mcsatParams.numStepsEveryMCSat;
+	SampleSatParams sampleSatParams = mcsatParams.sampleSatParams;
+	GibbsParams gibbsParams = mcsatParams.gibbsParams;
+
+    int samplesPerConvergenceTest = gibbsParams.samplesPerConvergenceTest;
+    int burnMaxSteps = gibbsParams.burnMaxSteps;
+    int gibbsMaxSteps = gibbsParams.gibbsMaxSteps;
+    int maxSeconds = gibbsParams.maxSeconds;	
+
+	int numGndPreds = gndPreds_->size();
+
+	  // We need just one chain for mcsat is supposed to be
+      // able to jump around diff modes.
+	int numChains = 1;
+
+	begSec = timer.time();
+    cout << "initializing ground predicates values " << endl; 
+
+	  //initialize gndPreds' truthValues & wts, and gndClauses' numSatLiterals
+    for (int i = 0; i < numGndPreds; i++)
+      (*gndPreds_)[i]->initTruthValuesAndWts(numChains);
+
+	  // Initialize samplesat
+	//cout<<"init numsatlit / samplesat ..."<<endl;
+	  // set maxclause to be 1 in case all are unit clauses - a trivial case though
+	int maxClause = 1, maxLen = 1;	
+	for (int i = 0; i < gndClauses_->size(); i++)
+	{
+	  GroundClause* c = (*gndClauses_)[i];
+		//-- singleton does not add to target set
+	  if (c->getWt() > 0 && c->getNumGroundPredicates() > 1) maxClause++; 
+	  if (c->getWt() > 0 && c->getNumGroundPredicates() > maxLen)
+	  	maxLen = c->getNumGroundPredicates();
+	}
+
+	int maxLitOccurence = 1;
+	for (int i = 0; i < numGndPreds; i++)
+	{
+	  GroundPredicate* p = (*gndPreds_)[i];
+	  if (p->getGndClauses()->size() > maxLitOccurence)
+	  	maxLitOccurence = p->getGndClauses()->size();		
+	}
+
+	//cout<<"maxclause="<<maxClause<<endl;
+	//cout<<"maxlen="<<maxLen<<endl;
+	//cout<<"maxLitOccurence="<<maxLitOccurence<<endl;
+
+	int* fixedAtoms = new int[numGndPreds+1];
+	bool* assignments = new bool[numGndPreds];
+	int** clauses = new int*[maxClause];
+	for (int i = 0; i < maxClause; i++) clauses[i] = new int[maxLen+1];	
+	SampleSat sampleSat(sampleSatParams, numGndPreds, maxClause,
+						maxLen, maxLitOccurence, fixedAtoms, clauses,
+                        blocks_, blockEvidence_);
+
+    hardClauseInitGndPredsTruthValues(numChains, sampleSat, fixedAtoms,
+                                      clauses, assignments);
+
+	for (int i = 0; i < gndClauses_->size(); i++)
+	{
+	  GroundClause* c = (*gndClauses_)[i];
+	  c->initNumSatLiterals(numChains);
+	}
+	cout << "initialization took " << (timer.time()-begSec)/60.0<<" mins"<<endl;
+
+	  // Precompute thresholds for mc-sat clause selection
+    begSec = timer.time();
+	for (int i = 0; i < gndClauses_->size(); i++)
+	{
+	  GroundClause* c = (*gndClauses_)[i];
+	  if (c->isHardClause()) c->setThreshold(RAND_MAX);
+	  else
+	  {
+		double w = c->getWt();
+		if (w > 0) w = -w;
+		c->setThreshold(RAND_MAX*(1-exp(w)));
+	  }
+	}
+	cout << "pre-computing thresholds took " << (timer.time()-begSec)<<" secs"<<endl;
+
+    int numSamplesPerPred = 0, isamp = 0;
+    bool done      = false;
+    bool burningIn = true;
+
+    GroundPredicateHashArray affectedGndPreds;
+
+	cout << "running MC-SAT sampling..." << endl;
+
+	// whether to show time stat etc.
+	showDebug = false;
+    double* times = new double[3]; int ti;	  
+
+    double secondsElapsed = 0;
+    double startTimeSec, currTimeSec;
+	startTimeSec = timer.time();
+
+	// -- sampling loop
+	while(!done) 
+    {
+      ++isamp;
+
+        // for each chain, for each node, generate the node's new truth value
+	  bool isMCSat = (isamp % numStepsEveryMCSat == 0);
+
+	    // Init weight for gibbs
+	  if (isamp % numStepsEveryMCSat == 1)
+	  {
+		for (int c = 0; c < numChains; c++)
+		{
+		  affectedGndPreds.clear();
+		  for (int i = 0; i < gndPreds_->size(); i++)
+            affectedGndPreds.append((*gndPreds_)[i]);
+		  updateWtsForAffectedGndPreds(affectedGndPreds, c);
+		}
+	  }
+
+	  for (int c = 0; c < numChains; c++)
+	  {	// numchain==1
+		if (showDebug) {ti = 0; times[ti++] = timer.time();}
+
+		  // update
+        affectedGndPreds.clear();
+        
+        if (isMCSat)
+        { // MC-SAT step
+		  for (int i = 1; i <= numGndPreds; i++) fixedAtoms[i] = -1;
+		  int numClauses = 0;
+		  int origNumClauses = 0;
+
+		    // generate sat query
+		  for (int i = 0; i < gndClauses_->size(); i++)
+		  {
+			GroundClause* clause = (*gndClauses_)[i];
+			double wt = clause->getWt();
+
+			  // -- if sat && weight>0, add clause to query
+			if (clause->getNumSatLiterals(c) > 0 && wt > 0)
+			{
+			  if ( clause->isHardClause() || random() <= clause->getThreshold() )
+			  {
+                origNumClauses++;
+
+				  // unit clause
+				if (clause->getNumGroundPredicates() == 1)
+				{
+                  fixedAtoms[clause->getGroundPredicateIndex(0) + 1] =
+                  	clause->getGroundPredicateSense(0);
+				}
+				else
+				{
+				  bool isSat = false;
+				  int k = 0;
+				  for (int j = 0; j < clause->getNumGroundPredicates(); j++)
+				  {
+                    int idx = clause->getGroundPredicateIndex(j) + 1;
+					if (fixedAtoms[idx] == clause->getGroundPredicateSense(j))
+					{
+                      isSat = true;
+					  break;
+					}
+					if (fixedAtoms[idx] >= 0) continue;	// fixed but not sat -> ignore
+                    int lit = (clause->getGroundPredicateSense(j)) ? idx : (-idx);
+                    clauses[numClauses][k++] = lit;
+				  }
+
+				    // already sat, roll back
+				  if (isSat) continue;
+				  else
+				  {
+					clauses[numClauses++][k] = 0;
+				  }
+				}
+			  }
+			} 
+			  // -- if unsat && weight<0, add each negated literal as a clause
+			else if ( clause->getNumSatLiterals(c) == 0 && wt < 0 )
+			{
+			  if (random() <= clause->getThreshold())
+			  {
+				for (int j = 0; j < clause->getNumGroundPredicates(); j++)
+				{
+				  origNumClauses++;
+                  int idx = clause->getGroundPredicateIndex(j) + 1;
+                    // negated literal
+                  fixedAtoms[idx] = 1 - clause->getGroundPredicateSense(j);
+				}
+			  }
+		    }
+		  }
+
+		  if (showDebug) times[ti++] = timer.time();
+
+		    // call samplesat
+		  if (sampleSat.sample(assignments, numClauses, blocks_, blockEvidence_))
+		  {
+            for (int i = 0; i < gndPreds_->size(); i++)
+            {
+              bool newAssignment = assignments[i];                      
+					
+                // No need to update weight but still need to update truth/NumSat
+              if (newAssignment != (*gndPreds_)[i]->getTruthValue(c))
+              {
+                (*gndPreds_)[i]->setTruthValue(c,newAssignment);
+                updateClauses(i, c);
+			  }
+
+                // if in actual sampling phase, track the num of times
+                // the ground predicate is set to true					  
+              if (!burningIn && newAssignment) (*gndPreds_)[i]->incrementNumTrue();
+			}
+		  }
+		  else
+		  {
+			cout <<"[" << isamp << "." << c << " : numcl=" << numClauses << 
+			"] No solution found!"<<endl;
+
+			  // need to count as well, otherwise undersample hard problems
+			if (!burningIn)
+			  for (int i = 0; i < gndPreds_->size(); i++) 
+				if ((*gndPreds_)[i]->getTruthValue(c))
+                  (*gndPreds_)[i]->incrementNumTrue();
+		  }
+            
+		  if (showDebug)
+		  {
+            times[ti++] = timer.time();
+			ti=0;
+			cout<<"["<<isamp<<"."<<c<<"]"<<endl;
+			cout<<"\tGenerate sat query: "<<(times[ti+1]-times[ti])<<" secs"<<endl; ti++;
+			cout<<"\tSampleSat: "<<(times[ti+1]-times[ti])<<" secs"<<endl; ti++;
+		  }
+		}
+		else
+		{ // Gibbs step
+            // For each block: select one to set to true
+          for (int i = 0; i < blocks_->size(); i++)
+          {
+              // If evidence atom exists, then all others stay false
+            if ((*blockEvidence_)[i]) continue;
+
+            Array<int> block = (*blocks_)[i];
+              // chosen is index in the block, block[chosen] is index in gndPreds_
+            int chosen = gibbsSampleFromBlock(c, i);
+              // If chosen pred was false, then need set previous true
+              // one to false and update wts
+            if (!(*gndPreds_)[block[chosen]]->getTruthValue(c))
+            {
+              for (int j = 0; j < block.size(); j++)
+              {
+                if ((*gndPreds_)[block[j]]->getTruthValue(c))
+                {
+                  (*gndPreds_)[block[j]]->setTruthValue(c, false);
+                  affectedGndPreds.clear();
+                  gndPredFlippedUpdates(block[j], c, affectedGndPreds);
+                  updateWtsForAffectedGndPreds(affectedGndPreds, c);
+                }
+              }
+                // Set truth value and update wts for chosen atom
+              (*gndPreds_)[block[chosen]]->setTruthValue(c, true);
+              affectedGndPreds.clear();
+              gndPredFlippedUpdates(block[chosen], c, affectedGndPreds);
+              updateWtsForAffectedGndPreds(affectedGndPreds, c);
+            }
+
+              // if in actual gibbs sampling phase, track the num of times
+              // the ground predicate is set to true
+            if (!burningIn) (*gndPreds_)[block[chosen]]->incrementNumTrue();
+          }
+
+          for (int i = 0; i < gndPreds_->size(); i++) 
+          {
+              // Predicates in blocks have been handled above
+            if (getBlock(i) >= 0) continue;
+
+            bool newAssignment 
+              = genTruthValueForProb((*gndPreds_)[i]->getProbability(c));
+
+              // if gndPred is flipped, do updates & find all affected gndPreds
+            if (newAssignment != (*gndPreds_)[i]->getTruthValue(c)) 
+            {            
+              (*gndPreds_)[i]->setTruthValue(c,newAssignment);
+              affectedGndPreds.clear();
+              gndPredFlippedUpdates(i, c, affectedGndPreds);
+              updateWtsForAffectedGndPreds(affectedGndPreds, c);
+            }
+
+              // if in actual gibbs sampling phase, track the num of times
+              // the ground predicate is set to true
+            if (!burningIn && newAssignment) (*gndPreds_)[i]->incrementNumTrue();
+          }
+		}
+		  // stat
+		if (!burningIn) numSamplesPerPred++;
+	  }
+
+	  currTimeSec = timer.time();
+	  secondsElapsed = currTimeSec-startTimeSec;
+
+      if (isamp % samplesPerConvergenceTest == 0)
+      { 
+        cout << "Sample (per chain) " << isamp << ", time elapsed = " 
+             << secondsElapsed << " sec" << endl;
+      }
+
+      if (burningIn) 
+      {
+        if (   (burnMaxSteps >= 0 && isamp >= burnMaxSteps) 
+            || (maxSeconds > 0 && secondsElapsed >= maxSeconds))
+		//if (isamp >= burnMaxSteps)
+		{
+          cout << "Done burning. " << isamp << " samples per chain "<<endl;
+          burningIn = false;
+          isamp=0;
+		}
+      }
+      else 
+      {
+        if (   (gibbsMaxSteps >= 0 && isamp >= gibbsMaxSteps) 
+            || (maxSeconds > 0 && secondsElapsed >= maxSeconds)) 
+		//if ( (maxSeconds > 0 && secondsElapsed >= maxSeconds) 
+		//  || (maxSeconds <= 0 && gibbsMaxSteps >= 0 && isamp >= gibbsMaxSteps) )
+			//|| (maxSeconds <= 0 && gibbsMaxSteps < 0 && isamp >= gibbsMinSteps && gibbsConverged) ) 
+        {
+          cout << "Done MC-SAT sampling. " << isamp << " samples per chain"				
+               << endl;
+          done = true;
+        }
+      }
+      cout.flush();
+    } // while (!done);    
+
+    cout<< "Time taken for MC-SAT sampling = "<<(timer.time()-startTimeSec)/60.0 
+        << " min" << endl;
+
+      // update gndPreds_ probability that it is true
+    for (int i = 0; i < gndPreds_->size(); i++)
+      (*gndPreds_)[i]->setProbTrue((*gndPreds_)[i]->getNumTrue()
+                                   / numSamplesPerPred);
+
+
+	// clean up samplesat
+	delete [] fixedAtoms;
+	for (int i = 0; i < maxClause; i++) delete clauses[i];
+	delete clauses;
+
+    return numSamplesPerPred;
+  } // runMCSatSampling
+
+
+  // ----------------------------------------------------------------------- //
+  // Simulated Tempering: returns the number of samples drawn per predicate.
+  // * If saveSapce is set to true, the gndPredSenses_ and gndPredIndexes_
+  //	fields of the GroundClauses in gndClauses_ will be deleted in the 
+  //	function. This means that the function can only be correctly called once.
+  // ----------------------------------------------------------------------- //
+  int runTemperingSampling(const TemperingParams& temperingParams, 
+                       const MaxWalksatParams* const & maxWalksatParams,
+                       const bool& saveSpace=false, 
+                       const Domain* const & domain)
+  {
+      // this occurs when all query predicates don't appear in any UNKNOWN clause 
+    if (gndClauses_->size()==0) return 0;
+ 
+	int numGndPreds = gndPreds_->size();
+
+	  // Randomizer for swap attempt
+	int seed;
+	struct timeval tv;
+	struct timezone tzp;
+	gettimeofday(&tv,&tzp);
+	seed = (unsigned int)((( tv.tv_sec & 0177 ) * 1000000) + tv.tv_usec);
+    srandom(seed);
+	
+	// variables
+	Timer timer;
+    double begSec;
+
+    GibbsParams gibbsParams = temperingParams.gibbsParams;	
+	
+    int samplesPerConvergenceTest = gibbsParams.samplesPerConvergenceTest;
+    int burnMaxSteps = gibbsParams.burnMaxSteps;
+    int gibbsMaxSteps = gibbsParams.gibbsMaxSteps;
+    int maxSeconds = gibbsParams.maxSeconds;    
+	
+	// ------------------------------------------ //
+	// Chained method
+    //	10 chains: i and i+1 swap attempt at 
+	//		selInterval*k + selInterval/10*i
+	// ------------------------------------------ //
+	// Hardcode chain params for now
+	int numST = temperingParams.numST;
+	int numSwap = temperingParams.numSwap;
+	int subInterval = temperingParams.subInterval;
+	int selInterval = subInterval*(numSwap-1);	// 9 possible swaps out of 10 chains
+	int numChains = numSwap*numST;
+	//double invTempInc = 0.1;
+	double** invTemps = new double*[numST];	// invTemp for chain chainIds[i]
+	int** chainIds = new int*[numST];	// curr chainId for ith temperature
+	int** tempIds = new int*[numST];	// curr tempId for ith chain
+
+      //initialize gndPreds' truthValues & wts, and gndClauses' numSatLiterals
+    for (int i = 0; i < gndPreds_->size(); i++)
+      (*gndPreds_)[i]->initTruthValuesAndWts(numChains);
+
+    begSec = timer.time();
+	cout << "initializing ground predicates values "; 
+
+	// *** Initialize w. all hard clauses ***
+	// TEMP: hardcode samplesat params
+    SampleSatParams sampleSatParams;
+    sampleSatParams.saRatio = 50;
+    sampleSatParams.temperature = 10;
+    sampleSatParams.latesa = true;
+    sampleSatParams.numsol = 10;
+    sampleSatParams.ws_noise = 15;
+    sampleSatParams.ws_restart = 10;
+    sampleSatParams.ws_cutoff = 100000;
+
+	cout<<"init numsatlit / samplesat ..."<<endl;
+    // set maxclause to be 1 in case all are unit clauses - a trivial case though
+	int maxClause = 1, maxLen = 1;	
+	int maxWt = 0;
+	for (int i = 0; i < gndClauses_->size(); i++)
+	{
+	  GroundClause* c = (*gndClauses_)[i];
+		//-- singleton does not add to target set
+	  if (c->getWt() > maxWt) maxWt = (int) c->getWt();
+	  if (c->getWt() > 0 && c->getNumGroundPredicates() > 1) maxClause++; 
+	  if (c->getWt() > 0 && c->getNumGroundPredicates() > maxLen)
+	    maxLen = c->getNumGroundPredicates();
+	}
+	int maxLitOccurence = 1;
+	for (int i = 0; i < numGndPreds; i++)
+	{
+	  GroundPredicate* p = (*gndPreds_)[i];
+	  if (p->getGndClauses()->size()>maxLitOccurence)
+	    maxLitOccurence=p->getGndClauses()->size();		
+	}
+	//cout<<"maxWt="<<maxWt<<endl;
+	//cout<<"maxclause="<<maxClause<<endl;
+	//cout<<"maxlen="<<maxLen<<endl;
+	//cout<<"maxLitOccurence="<<maxLitOccurence<<endl;
+
+	int* fixedAtoms = new int[numGndPreds+1];
+	bool* assignments = new bool[numGndPreds];
+	int** clauses = new int*[maxClause];
+	for (int i = 0; i < maxClause; i++) clauses[i] = new int[maxLen+1];	
+	SampleSat sampleSat(sampleSatParams, numGndPreds, maxClause, maxLen,
+						maxLitOccurence, fixedAtoms, clauses, blocks_, blockEvidence_);
+
+    hardClauseInitGndPredsTruthValues(numChains, sampleSat, fixedAtoms, clauses, assignments);
+
+	// *** Initialize temperature schedule ***
+	int maxWtForEvenSchedule = 100;
+	double base = log(maxWt)/log(numSwap);
+	double* divs = new double[numSwap];
+	divs[0] = 1.0;
+	for (int i = 1; i < numSwap; i++)
+	{
+	  divs[i] = divs[i-1]/base;
+	}
+	for (int i = 0; i < numST; i++)
+	{
+	  invTemps[i]=new double[numSwap];
+	  chainIds[i]=new int[numSwap];
+	  tempIds[i]=new int[numSwap];
+	  for (int j=0; j<numSwap; j++)
+	  {			
+		chainIds[i][j]=j;
+		tempIds[i][j]=j;
+		  // log vs even
+		if (maxWt>maxWtForEvenSchedule)
+		{
+          invTemps[i][j]=divs[j];
+		}
+		else
+		{
+		  invTemps[i][j]=1.0-((double)j)/((double) numSwap);
+		}
+	  }
+	}
+
+    for (int i = 0; i < gndClauses_->size(); i++)
+      (*gndClauses_)[i]->initNumSatLiterals(numChains);
+
+    GroundPredicateHashArray affectedGndPreds;
+    for (int c = 0; c < numChains; c++)
+    {
+      affectedGndPreds.clear();
+      for (int i = 0; i < gndPreds_->size(); i++)
+        affectedGndPreds.append((*gndPreds_)[i]);
+      updateWtsForAffectedGndPreds(affectedGndPreds, c);
+	}
+    cout << "initialization took "; Timer::printTime(cout, timer.time()-begSec);
+    cout << endl;
+
+    if (saveSpace)
+    {
+        // Delete to save space. Can be deleted because gndPredSenses and 
+        // gndPredIndexes are not required after being used by MaxWalksat
+      for (int i = 0; i < gndClauses_->size(); i++)
+      {
+        (*gndClauses_)[i]->deleteGndPredSenses();
+        (*gndClauses_)[i]->deleteGndPredIndexes();
+      }
+    }
+
+    int numSamplesPerPred = 0, isamp = 0;
+    bool done      = false;
+    bool burningIn = true;
+
+    double secondsElapsed = 0;
+    double startTimeSec, currTimeSec;
+	startTimeSec = timer.time();
+
+    cout << "running Tempering sampling..." << endl;
+      // start burn in and Tempering sampling
+    while(!done) 
+    {
+      ++isamp;
+
+      // log
+	  if (isamp % samplesPerConvergenceTest == 0)
+      { 
+        currTimeSec = timer.time();
+        secondsElapsed = currTimeSec-startTimeSec;
+        cout << "Sample (per pred per chain) " << isamp << ", time elapsed = ";
+        Timer::printTime(cout,secondsElapsed); cout << endl;
+      }
+
+	  // attempt to swap temperature
+	  if ((isamp % selInterval) % subInterval == 0)
+      {
+		int attemptTempId = (isamp % selInterval) / subInterval;
+		if (attemptTempId < numSwap-1)
+		{
+		  double wl, wh, itl, ith;
+		  for (int i=0; i<numST; i++)
+		  {
+			int lChainId = chainIds[i][attemptTempId];
+			int hChainId = chainIds[i][attemptTempId+1];
+			  // compute w_low, w_high: e = -w
+			  // swap acceptance ratio=e^(0.1*(w_h-w_l))
+			wl = getWeightSum(i*numSwap+lChainId);
+			wh = getWeightSum(i*numSwap+hChainId);
+			itl = invTemps[i][attemptTempId];
+			ith = invTemps[i][attemptTempId+1];
+
+			if (wl<=wh || random()<=RAND_MAX*exp((itl-ith)*(wh-wl)))
+			{
+			  chainIds[i][attemptTempId]=hChainId;
+			  chainIds[i][attemptTempId+1]=lChainId;
+			  tempIds[i][hChainId] = attemptTempId;
+			  tempIds[i][lChainId] = attemptTempId+1;
+			}
+		  }
+		}
+      }
+
+	    // -- generate new truth value based on temperature
+	  for (int c = 0; c < numChains; c++) 
+      {
+        for (int i = 0; i < gndPreds_->size(); i++) 
+        {
+			// calculate prob
+		  GroundPredicate* pred = (*gndPreds_)[i];
+          double p = 1.0 / ( 1.0 + exp( (pred->getWtWhenFalse(c)-pred->getWtWhenTrue(c)) *
+           							  	invTemps[c/numSwap][tempIds[c/numSwap][c%numSwap]]) );
+
+            // flip updates
+		  bool newAssignment = genTruthValueForProb(p);
+          if (newAssignment != pred->getTruthValue(c))
+          {
+            pred->setTruthValue(c,newAssignment);
+			affectedGndPreds.clear();
+            gndPredFlippedUpdates(i, c, affectedGndPreds);
+			updateWtsForAffectedGndPreds(affectedGndPreds, c);
+		  }
+
+            // if in actual sim. tempering phase, track the num of times
+            // the ground predicate is set to true
+		  if (!burningIn && newAssignment && tempIds[c/numSwap][c%numSwap]==0)
+		  	pred->incrementNumTrue();
+        }
+      }	  
+	  if (!burningIn) numSamplesPerPred+=numST;
+
+	  currTimeSec = timer.time();
+	  secondsElapsed = currTimeSec-startTimeSec;
+
+      if (burningIn) 
+      {
+        if (   (burnMaxSteps >= 0 && isamp >= burnMaxSteps) 
+            || (maxSeconds > 0 && secondsElapsed >= maxSeconds))
+	    //if (isamp >= burnMaxSteps)
+        {
+          cout << "Done burning. " << isamp << " samples per chain "<<endl;
+          burningIn = false;
+          isamp=0;
+		}
+      }
+      else 
+      {
+        if (   (gibbsMaxSteps >= 0 && isamp >= gibbsMaxSteps) 
+            || (maxSeconds > 0 && secondsElapsed >= maxSeconds)) 
+		//if ( (maxSeconds > 0 && secondsElapsed >= maxSeconds) 
+		//	|| (maxSeconds <= 0 && gibbsMaxSteps >= 0 && isamp >= gibbsMaxSteps) )
+			//|| (maxSeconds <= 0 && gibbsMaxSteps < 0 && isamp >= gibbsMinSteps && gibbsConverged) ) 
+        {
+          cout << "Done Simulated Tempering sampling. " << isamp << " samples per chain"				
+               << endl;
+          done = true;
+        }
+      } 	  
+      cout.flush();
+    } // while (!done);    
+
+
+    cout<< "Time taken for Tempering sampling = "; 
+    Timer::printTime(cout, timer.time()-startTimeSec); cout << endl;
+
+      // update gndPreds_ probability that it is true
+    for (int i = 0; i < gndPreds_->size(); i++)
+      (*gndPreds_)[i]->setProbTrue((*gndPreds_)[i]->getNumTrue()
+                                   / numSamplesPerPred);
+    
+    return numSamplesPerPred;
+  } // runTemperingSampling
+
+  
+  //returns true if MaxWalksat succeeded; else returns false
   bool runMaxWalksat(const int& chainIdx, const bool& randomInitIfFail,
                      const MaxWalksatParams* const & params, 
                      double& hardClauseWt)
   {
     cout << "running MaxWalksat..." << endl;
 
-    //NOTE: using wall clock time since MaxWalksat is a separate process 
-    //      use util/Timer instead when this is changed to our customized
-    //      memory efficient/fast MaxWalksat
-    struct timeval tv; struct timezone tzp;
-    gettimeofday(&tv,&tzp);
-
     MaxWalksatData* data = prepareMaxWalksatData();
     hardClauseWt = data->hardClauseWt;
-    MaxWalksat mws;
+    MaxWalksat mws(blocks_, blockEvidence_);
     Array<Array<bool>*> solutions;
-    mws.sample(data, chainIdx, solutions, params);
+    mws.sample(data, chainIdx, solutions, params, blocks_, blockEvidence_);
     
     cout << "MaxWalksat sampling for chain " << chainIdx << "..." << endl;
     
@@ -624,7 +1449,7 @@ class MRF
     else 
     if (randomInitIfFail)
     {
-      cout << "Randomly assigning initializing ground predicates' truth values."
+      cout << "Randomly initializing ground predicates' truth values."
            << endl;
       for (int i = 0; i < gndPreds_->size(); i++) 
         (*gndPreds_)[i]->setTruthValue(chainIdx, genTruthValueForProb(0.5) );
@@ -637,15 +1462,7 @@ class MRF
     for (int i = 0; i < data->clauses.size(); i++)
       delete (data->clauses)[i];
     delete data;
-
-
-    struct timeval tv2; struct timezone tzp2;
-    gettimeofday(&tv2,&tzp2);
-    cout << "Wall clock time is used because MaxWalksat is a separate process"
-         << endl;
-    cout << "MaxWalksat took "; Timer::printTime(cout, tv2.tv_sec-tv.tv_sec);
-    cout << endl;
-
+    
     return good;
   }
 
@@ -653,6 +1470,58 @@ class MRF
  private:
   double max(const double& a, const double& b) { if (a > b) return a; return b;}
 
+    // returns the index of the block which the ground predicate
+    // with index predIndex is in. If not in any, returns -1
+  int getBlock(const int& predIndex)
+  {
+    for (int i = 0; i < blocks_->size(); i++)
+    {
+      int block = (*blocks_)[i].find(predIndex);
+      if (block >= 0)
+        return i;
+    }
+    return -1;
+  }
+
+    // Sets the truth values for chain chain of all ground preds in the
+    // block block except for the one with index predIndex
+  void setOthersInBlockToFalse(const int& chain, const int& predIndex,
+                               const int& blockIdx)
+  {
+    Array<int> block = (*blocks_)[blockIdx];
+    for (int i = 0; i < block.size(); i++)
+    {
+      if (i != predIndex)
+        (*gndPreds_)[block[i]]->setTruthValue(chain, false);
+    }
+  }
+  
+    // Returns index of chosen atom in block with index blockIdx
+  int gibbsSampleFromBlock(const int& chain, const int& blockIdx)
+  {
+    Array<int> block = (*blocks_)[blockIdx];
+    
+    Array<double> numerators;
+    double denominator = 0;
+    
+    for (int i = 0; i < block.size(); i++)
+    {
+      double prob = (*gndPreds_)[block[i]]->getProbability(chain);
+      numerators.append(prob);
+      denominator += prob;
+    }
+    float random = random_.random();
+
+    double numSum = 0.0;    
+    for (int i = 0; i < block.size(); i++)
+    {
+      numSum += numerators[i];
+      if (random < (numSum / denominator))
+        return i;
+    }
+    return block.size() - 1;
+  }
+  
   void addToLitWtArray(const int& lit, const double& wt, 
                        LitWtHashArray& litWtArr)
   {
@@ -674,12 +1543,146 @@ class MRF
     {
       int idx = gndClause->getGroundPredicateIndex(j);
       int lit = (gndClause->getGroundPredicateSense(j)) ?
-                MaxWalksat::makeNegatedLiteral(idx) : idx;
+                //MaxWalksat::makeNegatedLiteral(idx) : idx;
+                WSUtil::makeNegatedLiteral(idx) : idx;
       addToLitWtArray(lit, negWt, litWtArr);
     }
   }
 
 
+    //The caller is responsible for deleting returned  maxWalksatData.
+  MaxWalksatData* prepareMaxWalksatData()
+  {  
+      //this is a reasonable number to prevent the external executable 
+      //MaxWalksat from have having overflow errors
+    int maxAllowedWt = 4000;
+
+      // prepare the propositional theory for use in MaxWalksat
+    MaxWalksatData* data = new MaxWalksatData;
+    data->numGndPreds = gndPreds_->size();
+
+      //used to hold lits in unit clauses (including those formed by flipping 
+      //negative wt clauses)
+    LitWtHashArray litWtArr;
+    Array<GroundClause*> negWtClauses;
+    Array<GroundClause*> hardGndClauses; //used to store hard ground clauses
+
+      // process ground clauses except the hard ones
+    for (int i = 0; i < gndClauses_->size(); i++) 
+    {
+      GroundClause* gndClause = (*gndClauses_)[i];
+
+      if (gndClause->isHardClause()){hardGndClauses.append(gndClause);continue;}
+
+      assert(!gndClause->isHardClause());
+      
+        // Weight could be negative: The inference algorithms now
+        // handle negative weights
+      double wt = gndClause->getWt();
+
+      int numGndPreds = gndClause->getNumGroundPredicates();
+      if (numGndPreds == 1)
+      {
+        int idx = gndClause->getGroundPredicateIndex(0);
+        int lit = (gndClause->getGroundPredicateSense(0)) ?
+                  //idx : MaxWalksat::makeNegatedLiteral(idx);
+                  idx : WSUtil::makeNegatedLiteral(idx);
+        addToLitWtArray(lit, wt, litWtArr);
+      }
+      else
+      {
+        Array<int>* litClause = new Array<int>;
+        litClause->growToSize(numGndPreds);
+        for (int j = 0; j < numGndPreds; j++) 
+        {
+          int idx = gndClause->getGroundPredicateIndex(j);
+          int lit = (gndClause->getGroundPredicateSense(j)) ?
+                    //idx : MaxWalksat::makeNegatedLiteral(idx);
+                    idx : WSUtil::makeNegatedLiteral(idx);
+          (*litClause)[j]= lit;
+        }
+        data->clauses.append(litClause);
+        data->clauseWts.append(wt);
+        //cout << wt << " " << litClause << endl;
+      }
+    }
+
+      // for each unit ground clause
+    for (int i = 0; i < litWtArr.size(); i++)
+    {
+      Array<int>* litClause = new Array<int>;
+      litClause->growToSize(1);
+      (*litClause)[0]= litWtArr[i]->lit;
+      data->clauses.append(litClause);
+      double wt = litWtArr[i]->wt;
+      data->clauseWts.append(wt);
+      delete litWtArr[i];
+    }
+
+      // find minimum wt among soft clauses
+    double minWt = DBL_MAX;
+    double maxWt = DBL_MIN;
+    for(int i = 0; i < data->clauseWts.size(); i++)
+    {
+    	//cout << (data->clauseWts)[i] << " " << (data->clauses)[i] << endl;
+        // Weight could be negative
+      double absWt = abs((data->clauseWts)[i]);
+      if (absWt < minWt) minWt = absWt;
+      else if (absWt > maxWt) maxWt = absWt;
+      assert(minWt >= 0);
+      assert(maxWt >= 0);
+    }
+    
+      //find out how much to scale weights by
+    double scale = 1;
+    if (maxWt > maxAllowedWt) scale = maxAllowedWt/maxWt;
+    else
+    {
+      if (minWt < 10)
+      {
+        scale = 10/minWt;
+        if (scale*maxWt > maxAllowedWt) scale = maxAllowedWt/maxWt;
+      }
+    }
+
+      // find the sum of all the weights of soft clauses, scaling up if needed
+    int sumSoftWts = 0;
+    for(int i = 0; i < data->clauseWts.size(); i++)
+    {
+      double oldwt = (data->clauseWts)[i];
+      int newwt = (int)(oldwt*scale + 0.5);
+      (data->clauseWts)[i] = (double)newwt;
+      sumSoftWts += newwt;
+    }
+    assert(sumSoftWts >= 0);
+    
+      // process the hard ground clauses
+    int largeWt = (int)(sumSoftWts + 10*scale);
+    data->hardClauseWt = (int)(largeWt/scale+0.5);
+    for (int i = 0; i < hardGndClauses.size(); i++) 
+    {
+      GroundClause* gndClause = hardGndClauses[i];
+
+      Array<int>* litClause = new Array<int>;
+      litClause->growToSize(gndClause->getNumGroundPredicates());
+
+      for (int j = 0; j < gndClause->getNumGroundPredicates(); j++) 
+      {
+        int idx = gndClause->getGroundPredicateIndex(j);
+        int lit = (gndClause->getGroundPredicateSense(j)) ?
+                  //idx : MaxWalksat::makeNegatedLiteral(idx);
+                  idx : WSUtil::makeNegatedLiteral(idx);
+        (*litClause)[j]= lit;
+      }
+      data->clauses.append(litClause);
+      data->clauseWts.append(largeWt);
+    }    
+
+    return data;
+  }
+
+
+/*
     //The caller is responsible for deleting returned  maxWalksatData.
   MaxWalksatData* prepareMaxWalksatData()
   {  
@@ -716,7 +1719,8 @@ class MRF
       {
         int idx = gndClause->getGroundPredicateIndex(0);
         int lit = (gndClause->getGroundPredicateSense(0)) ?
-                  idx : MaxWalksat::makeNegatedLiteral(idx);
+                  //idx : MaxWalksat::makeNegatedLiteral(idx);
+                  idx : makeNegatedLiteral(idx);
         addToLitWtArray(lit, wt, litWtArr);
       }
       else
@@ -727,14 +1731,15 @@ class MRF
         {
           int idx = gndClause->getGroundPredicateIndex(j);
           int lit = (gndClause->getGroundPredicateSense(j)) ?
-                    idx : MaxWalksat::makeNegatedLiteral(idx);
+                    //idx : MaxWalksat::makeNegatedLiteral(idx);
+                    idx : makeNegatedLiteral(idx);
           (*litClause)[j]= lit;
         }
         data->clauses.append(litClause);
         data->clauseWts.append(wt);
-        //cout << wt << " " << litClause << endl;
       }
-    }
+    }    
+
       // flip the negative clause wts
     for (int i = 0; i < negWtClauses.size(); i++)
       storeFlippedGndPreds(negWtClauses[i], negWtClauses[i]->getWt(), litWtArr);
@@ -757,7 +1762,6 @@ class MRF
     double maxWt = DBL_MIN;
     for(int i = 0; i < data->clauseWts.size(); i++)
     {
-    	//cout << (data->clauseWts)[i] << " " << (data->clauses)[i] << endl;
       if ((data->clauseWts)[i] < minWt) minWt = (data->clauseWts)[i];
       else if ((data->clauseWts)[i] > maxWt) maxWt = (data->clauseWts)[i];
       assert(minWt >= 0);
@@ -802,7 +1806,8 @@ class MRF
       {
         int idx = gndClause->getGroundPredicateIndex(j);
         int lit = (gndClause->getGroundPredicateSense(j)) ?
-                  idx : MaxWalksat::makeNegatedLiteral(idx);
+                  //idx : MaxWalksat::makeNegatedLiteral(idx);
+                  idx : makeNegatedLiteral(idx);
         (*litClause)[j]= lit;
       }
       data->clauses.append(litClause);
@@ -811,8 +1816,7 @@ class MRF
 
     return data;
   }
-
-
+*/
   void maxWalksatInitGndPredsTruthValues(const int& numChains, 
                                          const MaxWalksatParams* const & params)
   { 
@@ -882,11 +1886,141 @@ class MRF
 
   void randomInitGndPredsTruthValues(const int& numChains)
   {
+      // Randomizer
+    int seed;
+    struct timeval tv;
+    struct timezone tzp;
+    gettimeofday(&tv,&tzp);
+    seed = (unsigned int)((( tv.tv_sec & 0177 ) * 1000000) + tv.tv_usec);
+    srandom(seed);
+    
     for (int c = 0; c < numChains; c++)
+    {
+        // For each block: select one to set to true
+      for (int i = 0; i < blocks_->size(); i++)
+      {
+          // If evidence atom exists, then all others are false
+        if ((*blockEvidence_)[i])
+        {
+            // If 2nd argument is -1, then all are set to false
+          setOthersInBlockToFalse(c, -1, i);
+          continue;
+        }
+        
+        Array<int> block = (*blocks_)[i];
+        int chosen = random() % block.size();
+        (*gndPreds_)[block[chosen]]->setTruthValue(c, true);
+        setOthersInBlockToFalse(c, chosen, i);
+      }
+      
+        // Random tv for all not in blocks
       for (int i = 0; i < gndPreds_->size(); i++)
-        (*gndPreds_)[i]->setTruthValue(c, genTruthValueForProb(0.5));
+      {
+          // Predicates in blocks have been handled above
+        if (getBlock(i) == -1)
+        {
+          bool tv = genTruthValueForProb(0.5);
+	      (*gndPreds_)[i]->setTruthValue(c, tv);
+        }
+      }
+    }
   }
 
+  void randomInitPerChainGndPredsTruthValues(const int& c)
+  {
+      for (int i = 0; i < gndPreds_->size(); i++)        
+	    (*gndPreds_)[i]->setTruthValue(c, genTruthValueForProb(0.5));
+  }
+  
+  void hardClauseInitGndPredsTruthValues(const int& numChains, SampleSat& sampleSat,
+  										 int*& fixedAtoms, int**& clauses,
+  										 bool*& assignments)
+  {
+  	cout << "Initialize to satisfy all hard clauses ..." << endl;
+  	int numClauses = 0;
+  	for (int i = 1; i <= gndPreds_->size(); i++) fixedAtoms[i] = -1;
+
+      // generate sat query
+  	for (int i = 0; i < gndClauses_->size(); i++)
+  	{
+      GroundClause* clause = (*gndClauses_)[i];
+	  if ( clause->isHardClause() )
+	  {
+	     // unit clause
+	  	if (clause->getNumGroundPredicates() == 1)
+	  	{
+          fixedAtoms[clause->getGroundPredicateIndex(0) + 1] =
+          	clause->getGroundPredicateSense(0);
+	  	}
+      	else
+      	{
+          bool isSat = false;
+          int k = 0;
+          for (int j = 0; j < clause->getNumGroundPredicates(); j++)
+          {
+          	int idx = clause->getGroundPredicateIndex(j) + 1;
+          	if (fixedAtoms[idx] == clause->getGroundPredicateSense(j))
+          	{
+              isSat = true;
+              break;
+		  	}
+          	if (fixedAtoms[idx] >= 0) continue;	// fixed but not sat -> ignore
+          	int lit = (clause->getGroundPredicateSense(j))? idx : (-idx);
+          	clauses[numClauses][k++] = lit;
+		  }
+			// already sat, roll back
+		  if (isSat) continue;
+		  else clauses[numClauses++][k] = 0;
+	  	}
+	  }
+  	}
+
+ 	  // init
+  	for (int c = 0; c < numChains; c++)
+  	{
+	  	// sample for hard clauses
+	  if (sampleSat.sample(assignments, numClauses, blocks_, blockEvidence_))
+	  {
+      	for (int i = 0; i < gndPreds_->size(); i++)
+      	{
+          (*gndPreds_)[i]->setTruthValue(c, assignments[i]);
+	  	}
+      }
+      else
+      {
+	  	cout << "[" << c << " : numcl=" << numClauses
+             << "] No solution found! Init randomly."<<endl;
+
+          // For each block: select one to set to true
+        for (int i = 0; i < blocks_->size(); i++)
+        {
+            // If evidence atom exists, then all others are false
+          if ((*blockEvidence_)[i])
+          {
+              // If 2nd argument is -1, then all are set to false
+            setOthersInBlockToFalse(c, -1, i);
+            continue;
+          }
+        
+          Array<int> block = (*blocks_)[i];
+          int chosen = random() % block.size();
+          (*gndPreds_)[block[chosen]]->setTruthValue(c, true);
+          setOthersInBlockToFalse(c, chosen, i);
+        }
+      
+          // Random tv for all not in blocks
+        for (int i = 0; i < gndPreds_->size(); i++)
+        {
+            // Predicates in blocks have been handled above
+          if (getBlock(i) == -1)
+          {
+            bool tv = genTruthValueForProb(0.5);
+            (*gndPreds_)[i]->setTruthValue(c, tv);
+          }
+        }
+	  }			  
+  	}
+  }
 
   void gndPredFlippedUpdates(const int& gndPredIdx, const int& chainIdx,
                              GroundPredicateHashArray& affectedGndPreds)
@@ -918,6 +2052,27 @@ class MRF
                                  gndPreds_->size());
         assert(affectedGndPreds.size() <= gndPreds_->size());
       }
+    }
+  }
+
+  void updateClauses(const int& gndPredIdx, const int& chainIdx)
+  {
+    GroundPredicate* gndPred = (*gndPreds_)[gndPredIdx];
+    const Array<GroundClause*>* gndClauses = gndPred->getGndClauses();
+    const Array<bool>* senseInGndClauses = gndPred->getSenseInGndClauses();
+    assert(gndClauses->size() == senseInGndClauses->size());
+    GroundClause* gndClause;
+
+    for (int i = 0; i < gndClauses->size(); i++)
+    {
+      gndClause = (*gndClauses)[i];
+      if (gndPred->getTruthValue(chainIdx) == (*senseInGndClauses)[i])
+        gndClause->incrementNumSatLiterals(chainIdx);
+      else
+        gndClause->decrementNumSatLiterals(chainIdx);
+
+      assert(gndClause->getNumSatLiterals(chainIdx)
+             <= gndClause->getNumGroundPredicates());
     }
   }
 
@@ -981,60 +2136,69 @@ class MRF
     } // for each ground predicate whose MB has changed
   }
 
+  // --- Calculate energy as the sum of weights of sat clauses
+  double getWeightSum(int ci)
+  {
+    double w = 0;
+    for (int i=0; i<gndClauses_->size(); i++)
+    {
+      GroundClause* clause = (*gndClauses_)[i];
+      double wt = clause->getWt();
+      if (clause->getNumSatLiterals(ci)>0) w+=wt;
+	}
+	return w;
+  }
+
  public:
 
   
-// initialize the structure to store the number of satisfied literals in
-// each clause
-void initNumSatLiterals(const int& numChains)
-{
-  for(int i=0;i<gndClauses_->size();i++)
+    // initialize the structure to store the number of satisfied literals in
+    // each clause
+  void initNumSatLiterals(const int& numChains)
   {
-	(*gndClauses_)[i]->initNumSatLiterals(numChains);
+    for(int i=0;i<gndClauses_->size();i++)
+    {
+      (*gndClauses_)[i]->initNumSatLiterals(numChains);
+    }
   }
-}
   
-// get the number of clause gndings using the first order clause frequencies
-void getNumClauseGndings(double numGndings[], int clauseCnt, bool tv,
-						 int chainIdx, const Domain *domain)
-{
-  IntPairItr itr;
-  IntPair *clauseFrequencies;
-	 
-	 //cout<<"ground clause frequency stats => "<<endl;
-  for(int clauseno=0;clauseno<clauseCnt;clauseno++)
-    numGndings[clauseno] = 0;
-
-  for(int i=0;i<gndClauses_->size();i++)
+    // get the number of clause gndings using the first order clause frequencies
+  void getNumClauseGndings(double numGndings[], int clauseCnt, bool tv,
+                           int chainIdx, const Domain *domain)
   {
-	GroundClause *gndClause = (*gndClauses_)[i];
-	int satLitcnt = gndClause->getNumSatLiterals(chainIdx);
-	if(tv == true && satLitcnt == 0)
-	  continue;
-	if(tv == false && satLitcnt > 0)
-	  continue;
+    IntPairItr itr;
+    IntPair *clauseFrequencies;
+	 
+    for(int clauseno = 0; clauseno < clauseCnt; clauseno++)
+      numGndings[clauseno] = 0;
+    
+    for(int i = 0; i < gndClauses_->size(); i++)
+    {
+      GroundClause *gndClause = (*gndClauses_)[i];
+      int satLitcnt = gndClause->getNumSatLiterals(chainIdx);
+      if(tv == true && satLitcnt == 0)
+        continue;
+      if(tv == false && satLitcnt > 0)
+        continue;
 		  
-	clauseFrequencies = gndClause->getClauseFrequencies();
-	for(itr=clauseFrequencies->begin();itr != clauseFrequencies->end();itr++)
-	{
-	  int clauseno = itr->first;
-	  int frequency = itr->second;
-		   //cout<<"cno = "<<clauseno<<" ** f = "<<frequency<<" ,";
-	  numGndings[clauseno] += frequency;
-	}
-	      //cout<<endl;
+      clauseFrequencies = gndClause->getClauseFrequencies();
+      for(itr = clauseFrequencies->begin(); itr != clauseFrequencies->end(); itr++)
+      {
+        int clauseno = itr->first;
+        int frequency = itr->second;
+        numGndings[clauseno] += frequency;
+      }
+    }
   }
-	 /*
-	 for(int clauseno=0;clauseno<clauseCnt;clauseno++)
-		  cout<<"number of "<<tv<<" groundings for clause "<<clauseno
-			   <<" = "<<numGndings[clauseno]<<endl;
-     */
-}
 
  private:
   Array<GroundPredicate*>* gndPreds_;
   Array<GroundClause*>* gndClauses_;
   Random random_;
+    // Blocks of gndPred indices which belong together
+  Array<Array<int> >* blocks_;
+    // Flags indicating if block is fulfilled by evidence
+  Array<bool>* blockEvidence_;
 };
 
 

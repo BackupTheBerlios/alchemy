@@ -81,7 +81,7 @@
 
 
 /* Copy the first part of user declarations.  */
-#line 1 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
+#line 1 "/homes/gws/marcs/workspace/alchemy/src/parser/fol.y"
 
 #define YYSTYPE int
 #define YYDEBUG 1
@@ -316,15 +316,15 @@ static const unsigned short int yyrline[] =
      332,   334,   341,   347,   358,   364,   391,   356,   402,   439,
      446,   444,   453,   456,   493,   505,   506,   492,   526,   549,
      574,   525,   603,   603,   609,   608,   613,   612,   615,   616,
-     620,   633,   652,   655,   661,   673,   686,   672,   730,   736,
-     781,   728,   826,   834,   844,   845,   851,   860,   868,   877,
-     889,   898,   913,   916,   931,   930,   945,   945,   949,   948,
-     961,   960,   973,   972,   984,   983,   995,   997,  1003,   995,
-    1014,  1013,  1029,  1037,  1050,  1052,  1050,  1059,  1063,  1089,
-    1119,  1088,  1277,  1296,  1277,  1453,  1467,  1481,  1498,  1515,
-    1530,  1532,  1550,  1548,  1560,  1588,  1762,  1772,  1784,  1799,
-    1805,  1829,  1831,  1843,  1879,  1842,  1961,  1977,  1982,  1961,
-    2066,  2075,  2084,  2093,  2102
+     620,   633,   652,   655,   661,   673,   686,   672,   731,   737,
+     782,   729,   827,   835,   845,   846,   852,   861,   869,   878,
+     890,   899,   914,   917,   932,   931,   946,   946,   950,   949,
+     962,   961,   974,   973,   985,   984,   996,   998,  1004,   996,
+    1015,  1014,  1030,  1038,  1051,  1053,  1051,  1060,  1064,  1091,
+    1121,  1090,  1278,  1297,  1278,  1454,  1468,  1482,  1499,  1516,
+    1531,  1533,  1551,  1549,  1561,  1589,  1763,  1773,  1785,  1800,
+    1806,  1830,  1832,  1844,  1880,  1843,  1962,  1978,  1983,  1962,
+    2067,  2076,  2085,  2094,  2103
 };
 #endif
 
@@ -961,12 +961,12 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
   switch (yyn)
     {
         case 2:
-#line 49 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
+#line 49 "/homes/gws/marcs/workspace/alchemy/src/parser/fol.y"
     { if (folDbg >= 2) printf("input: empty\n"); ;}
     break;
 
   case 3:
-#line 52 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
+#line 52 "/homes/gws/marcs/workspace/alchemy/src/parser/fol.y"
     { 
     yyerrok; // tell Bison not to suppress any errors
     const char* tok; 
@@ -980,7 +980,7 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 13:
-#line 76 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
+#line 76 "/homes/gws/marcs/workspace/alchemy/src/parser/fol.y"
     { 
     if (folDbg >= 2) printf("input: weight\n"); 
     zzreset();
@@ -988,7 +988,7 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 14:
-#line 81 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
+#line 81 "/homes/gws/marcs/workspace/alchemy/src/parser/fol.y"
     {  
     if (folDbg >= 2) printf("input: sentence\n");
       // the states should be reset because a parse error may have occurred
@@ -996,7 +996,7 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 15:
-#line 86 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
+#line 86 "/homes/gws/marcs/workspace/alchemy/src/parser/fol.y"
     {
 
     ListObj* formula;
@@ -1025,7 +1025,7 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     //if the '!' operator is used, check that it's correctly used
     if (zzuniqueVarIndexes.size() > 0)
     { 
-      if (zzfdnumPreds != 1 || zznumAsterisk >0)
+      if (zzfdnumPreds != 1 || zznumAsterisk > 0)
         zzerr("'!' can only be used in a clause with one predicate, "
               "and cannot be used with '*'.");
       if (zzformulaStr.find("EXIST") != string::npos || 
@@ -1053,17 +1053,17 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 17:
-#line 144 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
+#line 144 "/homes/gws/marcs/workspace/alchemy/src/parser/fol.y"
     { zzconsumeToken(zztokenList,"@"); ;}
     break;
 
   case 18:
-#line 145 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
+#line 145 "/homes/gws/marcs/workspace/alchemy/src/parser/fol.y"
     { zzconsumeToken(zztokenList,"@"); ;}
     break;
 
   case 20:
-#line 152 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
+#line 152 "/homes/gws/marcs/workspace/alchemy/src/parser/fol.y"
     { 
   if (folDbg >= 1) printf(".\n"); zzconsumeToken(zztokenList,"."); 
   zzassert(!zzhasFullStop, "expecting no full stop");
@@ -1073,27 +1073,27 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 21:
-#line 161 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
+#line 161 "/homes/gws/marcs/workspace/alchemy/src/parser/fol.y"
     { if (folDbg >= 1) printf("\\n\n"); zzconsumeToken(zztokenList,"\n"); ;}
     break;
 
   case 22:
-#line 163 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
+#line 163 "/homes/gws/marcs/workspace/alchemy/src/parser/fol.y"
     { if (folDbg >= 1) printf("\\r\n"); zzconsumeToken(zztokenList,"\r"); ;}
     break;
 
   case 24:
-#line 169 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
+#line 169 "/homes/gws/marcs/workspace/alchemy/src/parser/fol.y"
     { if (folDbg >= 1) printf("\\n\n"); zzconsumeToken(zztokenList,"\n"); ;}
     break;
 
   case 25:
-#line 171 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
+#line 171 "/homes/gws/marcs/workspace/alchemy/src/parser/fol.y"
     { if (folDbg >= 1) printf("\\r\n"); zzconsumeToken(zztokenList,"\r"); ;}
     break;
 
   case 26:
-#line 178 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
+#line 178 "/homes/gws/marcs/workspace/alchemy/src/parser/fol.y"
     {
   const char* inc = zztokenList.removeLast();
   const char* str = zztokenList.removeLast();
@@ -1156,17 +1156,17 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 27:
-#line 240 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
+#line 240 "/homes/gws/marcs/workspace/alchemy/src/parser/fol.y"
     { if (folDbg >= 1) printf("\\n\n"); ;}
     break;
 
   case 28:
-#line 242 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
+#line 242 "/homes/gws/marcs/workspace/alchemy/src/parser/fol.y"
     { if (folDbg >= 1) printf("\\r\n"); ;}
     break;
 
   case 29:
-#line 253 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
+#line 253 "/homes/gws/marcs/workspace/alchemy/src/parser/fol.y"
     { 
   zzconsumeToken(zztokenList,"=");
   zzconsumeToken(zztokenList,"{");
@@ -1176,7 +1176,7 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 30:
-#line 261 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
+#line 261 "/homes/gws/marcs/workspace/alchemy/src/parser/fol.y"
     {
   if (folDbg >= 1) printf("} ");           
   zzconsumeToken(zztokenList, "}");
@@ -1186,7 +1186,7 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 31:
-#line 272 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
+#line 272 "/homes/gws/marcs/workspace/alchemy/src/parser/fol.y"
     {
   const char* idf = zztokenList.removeLast();
   if (folDbg >= 1) printf("type t_%s ", idf);
@@ -1201,7 +1201,7 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 32:
-#line 285 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
+#line 285 "/homes/gws/marcs/workspace/alchemy/src/parser/fol.y"
     {
   const char* idf = zztokenList.removeLast();
   if (folDbg >= 1) printf("type t_%s ", idf);
@@ -1215,12 +1215,12 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 34:
-#line 304 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
+#line 304 "/homes/gws/marcs/workspace/alchemy/src/parser/fol.y"
     { if (folDbg >= 2) printf("constant_declarations: ZZ_VARIABLE\n"); ;}
     break;
 
   case 35:
-#line 306 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
+#line 306 "/homes/gws/marcs/workspace/alchemy/src/parser/fol.y"
     {
     const char* vsc = zztokenList.removeLast();
     if (folDbg >= 1) printf("cd_%s ", vsc);
@@ -1239,12 +1239,12 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 40:
-#line 332 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
+#line 332 "/homes/gws/marcs/workspace/alchemy/src/parser/fol.y"
     { zzconsumeToken(zztokenList, ","); ;}
     break;
 
   case 41:
-#line 335 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
+#line 335 "/homes/gws/marcs/workspace/alchemy/src/parser/fol.y"
     { 
     zzconsumeToken(zztokenList,"\n");
     zzconsumeToken(zztokenList,",");
@@ -1253,7 +1253,7 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 42:
-#line 342 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
+#line 342 "/homes/gws/marcs/workspace/alchemy/src/parser/fol.y"
     { 
     zzconsumeToken(zztokenList,"\n");
     zzconsumeToken(zztokenList,",");
@@ -1261,7 +1261,7 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 43:
-#line 348 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
+#line 348 "/homes/gws/marcs/workspace/alchemy/src/parser/fol.y"
     { 
     zzconsumeToken(zztokenList,",");
     zzconsumeToken(zztokenList,"\n");
@@ -1269,7 +1269,7 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 44:
-#line 358 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
+#line 358 "/homes/gws/marcs/workspace/alchemy/src/parser/fol.y"
     {
   if (folDbg >= 2) printf("numeric_type_declarations: \n");
   zzconsumeToken(zztokenList,"=");
@@ -1278,7 +1278,7 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 45:
-#line 364 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
+#line 364 "/homes/gws/marcs/workspace/alchemy/src/parser/fol.y"
     {
   const char* numStr = zztokenList.removeLast();
   if (folDbg >= 1) printf(" %s ", numStr);
@@ -1308,21 +1308,21 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 46:
-#line 391 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
+#line 391 "/homes/gws/marcs/workspace/alchemy/src/parser/fol.y"
     {
   zzconsumeToken(zztokenList, ",");
 ;}
     break;
 
   case 47:
-#line 396 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
+#line 396 "/homes/gws/marcs/workspace/alchemy/src/parser/fol.y"
     {
   zzconsumeToken(zztokenList, "}");
 ;}
     break;
 
   case 48:
-#line 403 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
+#line 403 "/homes/gws/marcs/workspace/alchemy/src/parser/fol.y"
     {
   //const char* numStr1 = zztokenList.removeLast();
   zzconsumeToken(zztokenList, "...");
@@ -1361,7 +1361,7 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 50:
-#line 446 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
+#line 446 "/homes/gws/marcs/workspace/alchemy/src/parser/fol.y"
     {  
     zzconsumeToken(zztokenList, ",");
     if (folDbg >= 1) printf(", "); 
@@ -1370,7 +1370,7 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 53:
-#line 457 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
+#line 457 "/homes/gws/marcs/workspace/alchemy/src/parser/fol.y"
     {
   const char* numStr = zztokenList.removeLast();
   if (folDbg >= 1) printf(" %s ", numStr);
@@ -1400,7 +1400,7 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 54:
-#line 493 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
+#line 493 "/homes/gws/marcs/workspace/alchemy/src/parser/fol.y"
     {
   const char* predName= zztokenList.removeLast();
 
@@ -1416,17 +1416,17 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 55:
-#line 505 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
+#line 505 "/homes/gws/marcs/workspace/alchemy/src/parser/fol.y"
     { if (folDbg >= 1) printf("( "); zzconsumeToken(zztokenList,"("); ;}
     break;
 
   case 56:
-#line 506 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
+#line 506 "/homes/gws/marcs/workspace/alchemy/src/parser/fol.y"
     { if (folDbg >= 2) printf("predicate_declaration: types\n"); ;}
     break;
 
   case 57:
-#line 508 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
+#line 508 "/homes/gws/marcs/workspace/alchemy/src/parser/fol.y"
     {  
   if (folDbg >= 1) printf(") "); 
 
@@ -1441,7 +1441,7 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 58:
-#line 526 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
+#line 526 "/homes/gws/marcs/workspace/alchemy/src/parser/fol.y"
     { 
   const char* retTypeName = zztokenList.removeLast();
   if (folDbg >= 1) printf("ZZ_FUNCTION t_%s ", retTypeName); 
@@ -1467,7 +1467,7 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 59:
-#line 549 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
+#line 549 "/homes/gws/marcs/workspace/alchemy/src/parser/fol.y"
     {
   const char* funcName = zztokenList.removeLast();
 
@@ -1489,13 +1489,13 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
   zzassert(zzpredTemplate,"expecting zzpredTemplate!=NULL");
   zzpredTemplate->setName(predName);
 
-  delete [] predName;
+  free(predName);
   delete [] funcName;
 ;}
     break;
 
   case 60:
-#line 574 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
+#line 574 "/homes/gws/marcs/workspace/alchemy/src/parser/fol.y"
     {
   zzconsumeToken(zztokenList,"(");
   if (folDbg >= 1) printf("( "); 
@@ -1504,7 +1504,7 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 61:
-#line 580 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
+#line 580 "/homes/gws/marcs/workspace/alchemy/src/parser/fol.y"
     {  
   zzconsumeToken(zztokenList,")");
   if (folDbg >= 1) printf(") "); 
@@ -1528,17 +1528,17 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 64:
-#line 609 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
+#line 609 "/homes/gws/marcs/workspace/alchemy/src/parser/fol.y"
     { if (folDbg >= 1) printf(", "); zzconsumeToken(zztokenList,","); ;}
     break;
 
   case 66:
-#line 613 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
+#line 613 "/homes/gws/marcs/workspace/alchemy/src/parser/fol.y"
     { if (folDbg >= 1) printf(", "); zzconsumeToken(zztokenList,","); ;}
     break;
 
   case 70:
-#line 621 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
+#line 621 "/homes/gws/marcs/workspace/alchemy/src/parser/fol.y"
     {  
   const char* ttype = zztokenList.removeLast();
   if (folDbg >= 1) printf("t_%s ", ttype);
@@ -1552,7 +1552,7 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 71:
-#line 634 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
+#line 634 "/homes/gws/marcs/workspace/alchemy/src/parser/fol.y"
     {
   const char* varName = zztokenList.removeLast();;
   if (folDbg >= 1) printf("t_%s ", varName);
@@ -1568,14 +1568,14 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 72:
-#line 652 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
+#line 652 "/homes/gws/marcs/workspace/alchemy/src/parser/fol.y"
     { 
     zztrueFalseUnknown = 't';
   ;}
     break;
 
   case 73:
-#line 656 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
+#line 656 "/homes/gws/marcs/workspace/alchemy/src/parser/fol.y"
     { 
     zzconsumeToken(zztokenList,"!"); 
     if (folDbg >= 1) printf("! "); 
@@ -1584,7 +1584,7 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 74:
-#line 662 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
+#line 662 "/homes/gws/marcs/workspace/alchemy/src/parser/fol.y"
     { 
     zzconsumeToken(zztokenList,"?"); 
     if (folDbg >= 1) printf("? "); 
@@ -1593,7 +1593,7 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 75:
-#line 673 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
+#line 673 "/homes/gws/marcs/workspace/alchemy/src/parser/fol.y"
     {
   const char* predName = zztokenList.removeLast();
   if (folDbg >= 1) printf("pd_%s ", predName); 
@@ -1609,7 +1609,7 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 76:
-#line 686 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
+#line 686 "/homes/gws/marcs/workspace/alchemy/src/parser/fol.y"
     { 
   zzconsumeToken(zztokenList,"("); 
   if (folDbg >= 1) printf("( "); 
@@ -1618,7 +1618,7 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 77:
-#line 692 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
+#line 692 "/homes/gws/marcs/workspace/alchemy/src/parser/fol.y"
     { 
   zzconsumeToken(zztokenList,")"); 
   if (folDbg >= 1) printf(")\n"); 
@@ -1650,12 +1650,13 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     }
     delete zzpred;
   }
+  
   zzpred = NULL;
 ;}
     break;
 
   case 78:
-#line 730 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
+#line 731 "/homes/gws/marcs/workspace/alchemy/src/parser/fol.y"
     { 
   zzconsumeToken(zztokenList,"="); 
   if (folDbg >= 1) printf("= "); 
@@ -1664,7 +1665,7 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 79:
-#line 736 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
+#line 737 "/homes/gws/marcs/workspace/alchemy/src/parser/fol.y"
     {
   // Predicate name is PredicateTemplate::ZZ_RETURN_PREFIX + function name
   const char* funcName = zztokenList.removeLast();
@@ -1712,7 +1713,7 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 80:
-#line 781 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
+#line 782 "/homes/gws/marcs/workspace/alchemy/src/parser/fol.y"
     { 
   zzconsumeToken(zztokenList,"("); 
   if (folDbg >= 1) printf("( "); 
@@ -1721,7 +1722,7 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 81:
-#line 787 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
+#line 788 "/homes/gws/marcs/workspace/alchemy/src/parser/fol.y"
     { 
   zzconsumeToken(zztokenList,")"); 
   if (folDbg >= 1) printf(")\n"); 
@@ -1761,7 +1762,7 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 82:
-#line 827 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
+#line 828 "/homes/gws/marcs/workspace/alchemy/src/parser/fol.y"
     {     
     const char* constName = zztokenList.removeLast();
     if (folDbg >= 1) printf("cg_%s ", constName);
@@ -1771,7 +1772,7 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 83:
-#line 835 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
+#line 836 "/homes/gws/marcs/workspace/alchemy/src/parser/fol.y"
     {     
     const char* constName = zztokenList.removeLast();
     if (folDbg >= 1) printf("cg_%s ", constName);
@@ -1781,7 +1782,7 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 85:
-#line 846 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
+#line 847 "/homes/gws/marcs/workspace/alchemy/src/parser/fol.y"
     {
     if (zzconstantMustBeDeclared)
       zzerr("Constant %s must be declared before it is used.",
@@ -1790,7 +1791,7 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 86:
-#line 852 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
+#line 853 "/homes/gws/marcs/workspace/alchemy/src/parser/fol.y"
     {
     const char* intStr = zztokenList.removeLast();
     char constName[100];
@@ -1802,7 +1803,7 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 87:
-#line 861 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
+#line 862 "/homes/gws/marcs/workspace/alchemy/src/parser/fol.y"
     {
     if (zzconstantMustBeDeclared)
       zzerr("Constant %s must be declared before it is used",
@@ -1811,7 +1812,7 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 88:
-#line 869 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
+#line 870 "/homes/gws/marcs/workspace/alchemy/src/parser/fol.y"
     {
     const char* tmp = zztokenList.removeLast();
 	zztmpReturnConstant = (char *)malloc((strlen(tmp) + 1)*sizeof(char));
@@ -1823,7 +1824,7 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 89:
-#line 878 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
+#line 879 "/homes/gws/marcs/workspace/alchemy/src/parser/fol.y"
     {
     if (zzconstantMustBeDeclared)
       zzerr("Constant %s must be declared before it is used.",
@@ -1838,7 +1839,7 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 90:
-#line 890 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
+#line 891 "/homes/gws/marcs/workspace/alchemy/src/parser/fol.y"
     {
   	const char* tmp = zztokenList.removeLast();
   	zztmpReturnConstant = (char *)malloc((strlen(tmp) + 1)*sizeof(char));
@@ -1850,7 +1851,7 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 91:
-#line 899 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
+#line 900 "/homes/gws/marcs/workspace/alchemy/src/parser/fol.y"
     {
     if (zzconstantMustBeDeclared)
       zzerr("Constant %s must be declared before it is used",
@@ -1865,7 +1866,7 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 93:
-#line 917 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
+#line 918 "/homes/gws/marcs/workspace/alchemy/src/parser/fol.y"
     {
     const char* wt = zztokenList.removeLast();
     if (folDbg >= 1) printf("n_%f ", atof(wt));
@@ -1876,7 +1877,7 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 94:
-#line 931 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
+#line 932 "/homes/gws/marcs/workspace/alchemy/src/parser/fol.y"
     { 
     zzconsumeToken(zztokenList,"("); 
     if (folDbg >= 1) printf("( "); 
@@ -1886,7 +1887,7 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 95:
-#line 939 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
+#line 940 "/homes/gws/marcs/workspace/alchemy/src/parser/fol.y"
     { 
     zzconsumeToken(zztokenList,")"); 
     if (folDbg >= 1) printf(") "); 
@@ -1895,12 +1896,12 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 96:
-#line 945 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
+#line 946 "/homes/gws/marcs/workspace/alchemy/src/parser/fol.y"
     { if (folDbg >= 2) printf("sentence: atomic_sentence\n"); ;}
     break;
 
   case 98:
-#line 949 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
+#line 950 "/homes/gws/marcs/workspace/alchemy/src/parser/fol.y"
     {
     const char* imp = zztokenList.removeLast(); 
     if (folDbg >= 1) printf("=> ");
@@ -1910,12 +1911,12 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 99:
-#line 957 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
+#line 958 "/homes/gws/marcs/workspace/alchemy/src/parser/fol.y"
     { zzcreateListObjFromTopTwo(zzformulaListObjs, "=>"); ;}
     break;
 
   case 100:
-#line 961 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
+#line 962 "/homes/gws/marcs/workspace/alchemy/src/parser/fol.y"
     { 
     const char* eq = zztokenList.removeLast(); 
     if (folDbg >= 1) printf("<=> ");
@@ -1925,12 +1926,12 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 101:
-#line 969 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
+#line 970 "/homes/gws/marcs/workspace/alchemy/src/parser/fol.y"
     { zzcreateListObjFromTopTwo(zzformulaListObjs, "<=>"); ;}
     break;
 
   case 102:
-#line 973 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
+#line 974 "/homes/gws/marcs/workspace/alchemy/src/parser/fol.y"
     { 
     zzconsumeToken(zztokenList,"v"); 
     if (folDbg >= 1) printf("v "); 
@@ -1939,12 +1940,12 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 103:
-#line 980 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
+#line 981 "/homes/gws/marcs/workspace/alchemy/src/parser/fol.y"
     { zzcreateListObjFromTopTwo(zzformulaListObjs, "v"); ;}
     break;
 
   case 104:
-#line 984 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
+#line 985 "/homes/gws/marcs/workspace/alchemy/src/parser/fol.y"
     { 
     zzconsumeToken(zztokenList,"^"); 
     if (folDbg >= 1) printf("^ "); 
@@ -1953,17 +1954,17 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 105:
-#line 991 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
+#line 992 "/homes/gws/marcs/workspace/alchemy/src/parser/fol.y"
     { zzcreateListObjFromTopTwo(zzformulaListObjs, "^"); ;}
     break;
 
   case 106:
-#line 995 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
+#line 996 "/homes/gws/marcs/workspace/alchemy/src/parser/fol.y"
     { if (folDbg >= 2) printf("sentence: quantifier\n"); ;}
     break;
 
   case 107:
-#line 997 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
+#line 998 "/homes/gws/marcs/workspace/alchemy/src/parser/fol.y"
     { 
     if (folDbg >= 2) printf("sentence: variables\n"); 
     zzformulaListObjs.push(new ListObj);
@@ -1973,12 +1974,12 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 108:
-#line 1003 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
+#line 1004 "/homes/gws/marcs/workspace/alchemy/src/parser/fol.y"
     { if (folDbg >= 2) printf("sentence: sentence\n"); ;}
     break;
 
   case 109:
-#line 1005 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
+#line 1006 "/homes/gws/marcs/workspace/alchemy/src/parser/fol.y"
     { 
     zzcreateListObjFromTopThree(zzformulaListObjs);
     pair<StringToStringMap*, int> pr = zzoldNewVarList.front();
@@ -1988,7 +1989,7 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 110:
-#line 1014 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
+#line 1015 "/homes/gws/marcs/workspace/alchemy/src/parser/fol.y"
     { 
     zzassert(!zzisNegated,"expecting !zzisNegated");
     zzisNegated = true;
@@ -2001,12 +2002,12 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 111:
-#line 1024 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
+#line 1025 "/homes/gws/marcs/workspace/alchemy/src/parser/fol.y"
     { zzcreateListObjFromTop(zzformulaListObjs, "!"); ;}
     break;
 
   case 112:
-#line 1030 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
+#line 1031 "/homes/gws/marcs/workspace/alchemy/src/parser/fol.y"
     { 
     const char* fa = zztokenList.removeLast();
     if (folDbg >= 1) printf("FORALL ");
@@ -2017,7 +2018,7 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 113:
-#line 1038 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
+#line 1039 "/homes/gws/marcs/workspace/alchemy/src/parser/fol.y"
     { 
     const char* ex = zztokenList.removeLast();
     if (folDbg >= 1) printf("EXIST "); 
@@ -2028,12 +2029,12 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 114:
-#line 1050 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
+#line 1051 "/homes/gws/marcs/workspace/alchemy/src/parser/fol.y"
     { if (folDbg >= 2) printf("variables: variables\n"); ;}
     break;
 
   case 115:
-#line 1052 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
+#line 1053 "/homes/gws/marcs/workspace/alchemy/src/parser/fol.y"
     {  
     zzconsumeToken(zztokenList,",");
     if (folDbg >= 1) printf(", "); 
@@ -2042,17 +2043,18 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 117:
-#line 1059 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
+#line 1060 "/homes/gws/marcs/workspace/alchemy/src/parser/fol.y"
     { zzformulaStr.append(" "); ;}
     break;
 
   case 118:
-#line 1064 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
+#line 1065 "/homes/gws/marcs/workspace/alchemy/src/parser/fol.y"
     {
   const char* varName = zztokenList.removeLast();  
   if (folDbg >= 1) printf("v_%s ", varName); 
 
-  if (isupper(varName[0])) 
+  //if (isupper(varName[0])) 
+  if (zzisConstant(varName)) 
   {
     zzerr("Variable %s must be begin with a lowercase character.", varName);
     ((char*)varName)[0] = tolower(varName[0]);
@@ -2071,7 +2073,7 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 119:
-#line 1089 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
+#line 1091 "/homes/gws/marcs/workspace/alchemy/src/parser/fol.y"
     {
     const char* predName = zztokenList.removeLast();
     if (folDbg >= 1) printf("p_%s ", predName); 
@@ -2104,7 +2106,7 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 120:
-#line 1119 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
+#line 1121 "/homes/gws/marcs/workspace/alchemy/src/parser/fol.y"
     {  
     zzconsumeToken(zztokenList, "(");
     if (folDbg >= 1) printf("( "); 
@@ -2115,7 +2117,7 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 121:
-#line 1128 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
+#line 1130 "/homes/gws/marcs/workspace/alchemy/src/parser/fol.y"
     {  
     zzconsumeToken(zztokenList, ")");
     if (folDbg >= 1) printf(") "); 
@@ -2249,24 +2251,23 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
 	{
 		// create the second part of the conjunction
 		//zzformulaStr.append(" ^ ");
-		ListObj* topPredlo = zzfuncConjStack.top();
-	    zzfuncConjStack.pop();
-		zzformulaListObjs.push(topPredlo);
-		zzcreateListObjFromTopTwo(zzformulaListObjs, "^");
-
+      ListObj* topPredlo = zzfuncConjStack.top();
+      zzfuncConjStack.pop();
+      zzformulaListObjs.push(topPredlo);
+      zzcreateListObjFromTopTwo(zzformulaListObjs, "^");
 	} //while (!zzfuncConjStack.empty())
 
 	if (!zzfuncConjStr.empty())
 	{
-		zzformulaStr.append(zzfuncConjStr);
-		zzfuncConjStr.clear();
+      zzformulaStr.append(zzfuncConjStr);
+      zzfuncConjStr.clear();
 	}
 	zzfunc = NULL;
   ;}
     break;
 
   case 122:
-#line 1277 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
+#line 1278 "/homes/gws/marcs/workspace/alchemy/src/parser/fol.y"
     {
     ++zzfdnumPreds;
     //zzfdisEqualPred = true;
@@ -2287,7 +2288,7 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 123:
-#line 1296 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
+#line 1297 "/homes/gws/marcs/workspace/alchemy/src/parser/fol.y"
     {
   	ListObj* predlo = zzpredFuncListObjs.top();
     predlo->replace(PredicateTemplate::EMPTY_NAME, zzinfixPredName);
@@ -2309,7 +2310,7 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 124:
-#line 1315 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
+#line 1316 "/homes/gws/marcs/workspace/alchemy/src/parser/fol.y"
     {  
     ListObj* predlo = zzpredFuncListObjs.top();
     //predlo->replace(PredicateTemplate::EMPTY_NAME, zzinfixPredName);
@@ -2448,7 +2449,7 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 125:
-#line 1454 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
+#line 1455 "/homes/gws/marcs/workspace/alchemy/src/parser/fol.y"
     {
   	zzconsumeToken(zztokenList, ">");
     if (folDbg >= 1) printf("> "); 
@@ -2464,7 +2465,7 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 126:
-#line 1468 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
+#line 1469 "/homes/gws/marcs/workspace/alchemy/src/parser/fol.y"
     {
    	zzconsumeToken(zztokenList, "<");
     if (folDbg >= 1) printf("< "); 
@@ -2480,7 +2481,7 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 127:
-#line 1482 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
+#line 1483 "/homes/gws/marcs/workspace/alchemy/src/parser/fol.y"
     {
   	zzconsumeToken(zztokenList, ">");
     if (folDbg >= 1) printf(">");
@@ -2499,7 +2500,7 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 128:
-#line 1499 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
+#line 1500 "/homes/gws/marcs/workspace/alchemy/src/parser/fol.y"
     {
 	zzconsumeToken(zztokenList, "<");
     if (folDbg >= 1) printf("<");
@@ -2518,7 +2519,7 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 129:
-#line 1516 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
+#line 1517 "/homes/gws/marcs/workspace/alchemy/src/parser/fol.y"
     {
   	zzconsumeToken(zztokenList, "=");
     if (folDbg >= 1) printf("= "); 
@@ -2533,7 +2534,7 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 131:
-#line 1533 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
+#line 1534 "/homes/gws/marcs/workspace/alchemy/src/parser/fol.y"
     { 
     zzconsumeToken(zztokenList, "*");
     if (folDbg >= 1) printf("* "); 
@@ -2546,7 +2547,7 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 132:
-#line 1550 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
+#line 1551 "/homes/gws/marcs/workspace/alchemy/src/parser/fol.y"
     {  
     zzconsumeToken(zztokenList, ",");
     if (folDbg >= 1) printf(", "); 
@@ -2557,7 +2558,7 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 134:
-#line 1561 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
+#line 1562 "/homes/gws/marcs/workspace/alchemy/src/parser/fol.y"
     {
   	// After the first term in an internal pred., check if we can determine type
   	if (zzpred && zzpred->isEmptyPred() &&
@@ -2584,7 +2585,7 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 135:
-#line 1589 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
+#line 1590 "/homes/gws/marcs/workspace/alchemy/src/parser/fol.y"
     {  
     zzassert(zzfunc != NULL,"expecting zzfunc != NULL");
     zzcheckFuncNumTerm(zzfunc);
@@ -2760,7 +2761,7 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 136:
-#line 1763 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
+#line 1764 "/homes/gws/marcs/workspace/alchemy/src/parser/fol.y"
     {
     const char* constName = zztokenList.removeLast();
     if (folDbg >= 1) printf("c2_%s ", constName); 
@@ -2772,7 +2773,7 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 137:
-#line 1773 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
+#line 1774 "/homes/gws/marcs/workspace/alchemy/src/parser/fol.y"
     {
     const char* constName = zztokenList.removeLast();
     if (folDbg >= 1) printf("c2_%s ", constName); 
@@ -2786,7 +2787,7 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 138:
-#line 1785 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
+#line 1786 "/homes/gws/marcs/workspace/alchemy/src/parser/fol.y"
     {
     const char* intStr = zztokenList.removeLast();
     if (folDbg >= 1) printf("c3_%s ", intStr);
@@ -2803,7 +2804,7 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 139:
-#line 1800 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
+#line 1801 "/homes/gws/marcs/workspace/alchemy/src/parser/fol.y"
     {
     zztermIsVariable(folDbg);
     if (zzisPlus) zzisPlus = false;
@@ -2811,7 +2812,7 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 140:
-#line 1806 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
+#line 1807 "/homes/gws/marcs/workspace/alchemy/src/parser/fol.y"
     {
     zztermIsVariable(folDbg);
 
@@ -2836,7 +2837,7 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 142:
-#line 1832 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
+#line 1833 "/homes/gws/marcs/workspace/alchemy/src/parser/fol.y"
     { 
     zzconsumeToken(zztokenList, "+");
     if (folDbg >= 1) printf("+ "); 
@@ -2847,7 +2848,7 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 143:
-#line 1843 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
+#line 1844 "/homes/gws/marcs/workspace/alchemy/src/parser/fol.y"
     {
     const char* funcName = zztokenList.removeLast();
     if (folDbg >= 1) printf("f_%s ", funcName);
@@ -2886,7 +2887,7 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 144:
-#line 1879 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
+#line 1880 "/homes/gws/marcs/workspace/alchemy/src/parser/fol.y"
     {
     zzconsumeToken(zztokenList, "(");
     if (folDbg >= 1) printf("( "); 
@@ -2895,7 +2896,7 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 145:
-#line 1885 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
+#line 1886 "/homes/gws/marcs/workspace/alchemy/src/parser/fol.y"
     {
   	  //If an internal func., then need to determine type
 	if (zzinfixFuncName)
@@ -2974,7 +2975,7 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 146:
-#line 1961 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
+#line 1962 "/homes/gws/marcs/workspace/alchemy/src/parser/fol.y"
     {
     // Make an "empty" function
     const char* funcName = FunctionTemplate::EMPTY_FTEMPLATE_NAME;
@@ -2993,7 +2994,7 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 147:
-#line 1977 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
+#line 1978 "/homes/gws/marcs/workspace/alchemy/src/parser/fol.y"
     {
     zzconsumeToken(zztokenList, "(");
     if (folDbg >= 1) printf("( ");
@@ -3001,7 +3002,7 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 148:
-#line 1982 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
+#line 1983 "/homes/gws/marcs/workspace/alchemy/src/parser/fol.y"
     {
     //Replace empty function with function sign just parsed
     //zzcreateInternalFuncTemplate(zzinfixFuncName);
@@ -3016,7 +3017,7 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 149:
-#line 1994 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
+#line 1995 "/homes/gws/marcs/workspace/alchemy/src/parser/fol.y"
     {
 	ListObj* funclo = zzpredFuncListObjs.top();
     funclo->replace(FunctionTemplate::EMPTY_FTEMPLATE_NAME, zzinfixFuncName);
@@ -3088,7 +3089,7 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 150:
-#line 2067 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
+#line 2068 "/homes/gws/marcs/workspace/alchemy/src/parser/fol.y"
     {
   	zzconsumeToken(zztokenList, "+");
     if (folDbg >= 1) printf("+ "); 
@@ -3099,7 +3100,7 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 151:
-#line 2076 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
+#line 2077 "/homes/gws/marcs/workspace/alchemy/src/parser/fol.y"
     {
    	zzconsumeToken(zztokenList, "-");
     if (folDbg >= 1) printf("- "); 
@@ -3110,7 +3111,7 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 152:
-#line 2085 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
+#line 2086 "/homes/gws/marcs/workspace/alchemy/src/parser/fol.y"
     {
   	zzconsumeToken(zztokenList, "*");
     if (folDbg >= 1) printf("* ");
@@ -3121,7 +3122,7 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 153:
-#line 2094 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
+#line 2095 "/homes/gws/marcs/workspace/alchemy/src/parser/fol.y"
     {
 	zzconsumeToken(zztokenList, "/");
     if (folDbg >= 1) printf("/ ");
@@ -3132,7 +3133,7 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 154:
-#line 2103 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
+#line 2104 "/homes/gws/marcs/workspace/alchemy/src/parser/fol.y"
     {
   	zzconsumeToken(zztokenList, "%");
     if (folDbg >= 1) printf("%% ");
@@ -3154,7 +3155,7 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
 # undef yyclearin
 # undef YYRECOVERING
 /* Line 750 of glr.c.  */
-#line 3158 "fol.cpp"
+#line 3159 "fol.cpp"
 }
 
 
@@ -4440,7 +4441,7 @@ yypdumpstack (yyGLRStack* yystack)
 #endif
 
 
-#line 2113 "/homes/gws/marcs/release/alchemy/src/parser/fol.y"
+#line 2114 "/homes/gws/marcs/workspace/alchemy/src/parser/fol.y"
 
 
 /******************* function definitions ****************************/
@@ -4453,7 +4454,8 @@ bool runYYParser(MLN* const & mln, Domain* const & dom,
                  const StringHashArray* const & queryPredNames,
                  const bool& addUnitClauses, const bool& warnDuplicates,
                  const double& defaultWt, const bool& mustHaveWtOrFullStop,
-                 const Domain* const & domain0, const bool& lazyInference)
+                 const Domain* const & domain0, const bool& lazyInference,
+                 const bool& flipWtsOfFlippedClause)
 {
   zzinit();
   if (fileName) { yyin = fopen(fileName, "r" ); zzinFileName = fileName; }
@@ -4468,6 +4470,7 @@ bool runYYParser(MLN* const & mln, Domain* const & dom,
   zzwarnDuplicates = warnDuplicates;
   zzdefaultWt = defaultWt;
   zzmustHaveWtOrFullStop = mustHaveWtOrFullStop;
+  zzflipWtsOfFlippedClause = flipWtsOfFlippedClause;
 
   ungetc('\n', yyin); // pretend that file begin with a newline
   zzmln = mln;
