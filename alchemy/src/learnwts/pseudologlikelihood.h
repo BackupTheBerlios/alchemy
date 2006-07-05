@@ -1047,7 +1047,7 @@ class PseudoLogLikelihood
     if ((*gndPredClauseIndexesAndCounts)[predId] == NULL) return false;
 
     Array<Array<IndexAndCount*>*>* comboClauseIndexesAndCounts
-      = (*(*gndPredClauseIndexesAndCounts)[domainIdx])[predId];
+      = (*(*gndPredClauseIndexesAndCounts)[predId])[g];
       // For each combination
     for (int c = 0; c < comboClauseIndexesAndCounts->size(); c++)
     {
