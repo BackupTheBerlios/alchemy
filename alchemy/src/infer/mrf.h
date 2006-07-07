@@ -1652,7 +1652,7 @@ class MRF
       double oldwt = (data->clauseWts)[i];
       int newwt = (int)(oldwt*scale + 0.5);
       (data->clauseWts)[i] = (double)newwt;
-      sumSoftWts += newwt;
+      sumSoftWts += abs(newwt);
     }
     assert(sumSoftWts >= 0);
     
