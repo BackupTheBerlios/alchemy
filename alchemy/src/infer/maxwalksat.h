@@ -1,6 +1,70 @@
-/* This code is based on the MaxWalkSat package of Kautz et al. */
-#ifndef MAXWALKSAT_H_OCT_1_2005
-#define MAXWALKSAT_H_OCT_1_2005
+/*
+ * All of the documentation and software included in the
+ * Alchemy Software is copyrighted by Stanley Kok, Parag
+ * Singla, Matthew Richardson, Pedro Domingos, Marc
+ * Sumner and Hoifung Poon.
+ * 
+ * Copyright [2004-07] Stanley Kok, Parag Singla, Matthew
+ * Richardson, Pedro Domingos, Marc Sumner and Hoifung
+ * Poon. All rights reserved.
+ * 
+ * Contact: Pedro Domingos, University of Washington
+ * (pedrod@cs.washington.edu).
+ * 
+ * Redistribution and use in source and binary forms, with
+ * or without modification, are permitted provided that
+ * the following conditions are met:
+ * 
+ * 1. Redistributions of source code must retain the above
+ * copyright notice, this list of conditions and the
+ * following disclaimer.
+ * 
+ * 2. Redistributions in binary form must reproduce the
+ * above copyright notice, this list of conditions and the
+ * following disclaimer in the documentation and/or other
+ * materials provided with the distribution.
+ * 
+ * 3. All advertising materials mentioning features or use
+ * of this software must display the following
+ * acknowledgment: "This product includes software
+ * developed by Stanley Kok, Parag Singla, Matthew
+ * Richardson, Pedro Domingos, Marc Sumner and Hoifung
+ * Poon in the Department of Computer Science and
+ * Engineering at the University of Washington".
+ * 
+ * 4. Your publications acknowledge the use or
+ * contribution made by the Software to your research
+ * using the following citation(s): 
+ * Stanley Kok, Parag Singla, Matthew Richardson and
+ * Pedro Domingos (2005). "The Alchemy System for
+ * Statistical Relational AI", Technical Report,
+ * Department of Computer Science and Engineering,
+ * University of Washington, Seattle, WA.
+ * http://www.cs.washington.edu/ai/alchemy.
+ * 
+ * 5. Neither the name of the University of Washington nor
+ * the names of its contributors may be used to endorse or
+ * promote products derived from this software without
+ * specific prior written permission.
+ * 
+ * THIS SOFTWARE IS PROVIDED BY THE UNIVERSITY OF WASHINGTON
+ * AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED
+ * WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+ * PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE UNIVERSITY
+ * OF WASHINGTON OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
+ * INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+ * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
+ * ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
+ * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * 
+ */
+#ifndef MAXWALKSAT_H
+#define MAXWALKSAT_H
 
 #include <cfloat>
 #include <unistd.h>
@@ -12,1652 +76,744 @@
 #include "array.h"
 #include "timer.h"
 #include "util.h"
-#include "wsutil.h"
+#include "sat.h"
 #include "maxwalksatparams.h"
 
-struct MaxWalksatData
-{
-  Array<Array<int>*> clauses;
-  Array<double> clauseWts;
-  int numGndPreds;
-  double hardClauseWt;
-};
+enum heuristics {RANDOM = 0, BEST = 1, TABU = 2, SS = 3};
+const bool mwsdebug = false;
 
-  //Wrapper class for Max Walksat
-class MaxWalksat
+/**
+ * The MaxWalkSat algorithm. This code is based on the MaxWalkSat
+ * package of Kautz et al. and SampleSat by Wei et al.
+ * 
+ * Walksat is achieved by using unit weights (1 and -1) in the clauses
+ * in the state and setting the target cost to 0.
+ * 
+ * SampleSat is achieved by using unit weights (1 and -1) in the clauses
+ * in the state and setting the target cost to 0 and the heuristic to SS.
+ */
+class MaxWalkSat : public SAT
 {
  public:
-  MaxWalksat(const Array<Array<int> >* const & blocks,
-             const Array<bool>* const & blockEvidence)
+
+  /**
+   * Constructor: user-set parameters are set.
+   */
+  MaxWalkSat(VariableState* state, int seed, const bool& trackClauseTrueCnts,
+             MaxWalksatParams* params)
+    : SAT(state, seed, trackClauseTrueCnts)
   {
-    costexpected = false;   
-    highestcost = 1;               
-    eqhighest = 0;    
-    numhighest = 0;      
-    hard = 0;
+    int numAtoms = state_->getNumAtoms();
+
+      // User-set parameters
+    maxSteps_ = params->maxSteps;
+    maxTries_ = params->maxTries;
+    targetCost_ = params->targetCost;
+    hard_ = params->hard;
+    numSolutions_ = params->numSolutions;
+    heuristic_ = params->heuristic;
+    tabuLength_ = params->tabuLength;
+    lazyLowState_ = params->lazyLowState;
+      // For SampleSat
+    saRatio_ = params->ssParams->saRatio;
+    saTemp_ = params->ssParams->saTemp;
+    lateSa_ = params->ssParams->lateSa;
     
-    blocks_ = new Array<Array<int> >(*blocks);
-    blockEvidence_ = new Array<bool>(*blockEvidence);
-  
-      // Init to not in block
-    inBlock = false;
-    flipInBlock = NOVALUE;
+      // Info from SAT class
+    if (heuristic_ == TABU || heuristic_ == SS)
+      changed_.growToSize(numAtoms + 1);
+    numFlips_ = 0;
+
+      // Info from MaxWalkSat
+    numerator_ = 50; // User-set?
+    denominator_ = 100; // User-set?
+      // We assume we are not in a block
+    inBlock_ = false;
+    flipInBlock_ = NOVALUE;
+
+      // Initialize array of function pointers
+    int idx = 0;
+    pickcode[idx++] = &MaxWalkSat::pickRandom;
+    pickcode[idx++] = &MaxWalkSat::pickBest;
+    pickcode[idx++] = &MaxWalkSat::pickTabu;
+    pickcode[idx++] = &MaxWalkSat::pickSS;
   }
-
-  ~MaxWalksat()
-  {
-    free(occurence);
-    free(numoccurence);
-    free(atom);
-    free(lowatom);
-    free(changed);
-    free(breakcost);
-    
-    free(clause);
-    free(cost);
-    free(size);
-    free(falseclause);
-    free(lowfalse);
-    free(wherefalse);
-    free(numtruelit);
-     
-    for(int i = 0; i < storePtrArray.size(); i++)
-      free(storePtrArray[i]);
-      
-    for (int i = 0; i < blocks_->size(); i++)
-      (*blocks_)[i].clearAndCompress();
-    delete blocks_;
-    
-    delete blockEvidence_; 
-  }
-
-  // Caller is responsible for deleting the contents of solutions
-  void sample(const MaxWalksatData* const & data, const int& identifier,
-              Array<Array<bool>*>& solutions,
-              const MaxWalksatParams* const & params,
-              const Array<Array<int> >* const & blocks,
-              const Array<bool>* const & blockEvidence)
-  {
-    const Array<Array<int>*>& clauses = data->clauses;
-    const Array<double>& clauseWts = data->clauseWts;
-    int numGndPreds = data->numGndPreds;
-    int numSolutions = 1;
-    bool includeUnsatSolutions = true;
-    int maxSteps = params->maxSteps;
-    int tries = params->tries;
-    int targetWt = params->targetWt;
-    bool hard = params->hard;
-	
-    char targetWtParam[20]; targetWtParam[0] = '\0';
-    if (targetWt != INT_MAX) sprintf(targetWtParam, "-targetcost %d", targetWt);
-    
-    char hardParam[20]; hardParam[0] = '\0';
-    if (hard) sprintf(hardParam, "-hard");
-
-      // run Max Walksat
-    Array<int> numBad;
-    string cnfFile, resultsFile;
-    string commandStr;
-
-	Array<char *> argArray;
-    argArray.append("null"); 
-	argArray.append("-withcost"); 
-	argArray.append("-tries");
-    argArray.append((char *)(Util::intToString(tries).c_str()));
-	argArray.append("-numsol");
-    argArray.append((char *)(Util::intToString(numSolutions).c_str()));
-	argArray.append("-cutoff");
-    argArray.append((char *)(Util::intToString(maxSteps).c_str()));
-	 
-	if(strcmp(targetWtParam,"")) 
-	  argArray.append(targetWtParam);
-	 
-	if(strcmp(hardParam,"")) 
-	  argArray.append(hardParam);
-	 
-	argArray.append("-low");   
-	 
-	int argc = argArray.size();
-	char **argv = (char **)argArray.getItems();
-    Array<int> truePreds;
-	int numbad = 0;
-    
-    for (int i = 0; i < blocks_->size(); i++)
-      (*blocks_)[i].clearAndCompress();
-    delete blocks_;
-    delete blockEvidence_;
   
-    blocks_ = new Array<Array<int> >(*blocks);
-    blockEvidence_ = new Array<bool>(*blockEvidence);
-  
-	//for(int i = 0; i < argc; i++) 
-	//  cout << argv[i] << " ";
-	//cout<<endl;
-	 
-	infer(argc, argv, numGndPreds, clauses, clauseWts, truePreds, numbad);
-    bool ok = readResults(truePreds, numbad, numGndPreds, includeUnsatSolutions, 
-                          solutions, numBad);
-    if (!ok) return;
-  }
- 
- 
-  int infer(int argc, char *argv[], int atomCnt,
-            const Array<Array<int>*>& clauseArray, 
-            const Array<double>& wtArray, Array<int>& trueAtomArray,
-            int & numbad)
+  /**
+   * Destructor (destructors from superclasses are called)
+   */
+  ~MaxWalkSat() { }
+
+  /**
+   * Initializes the MaxWalkSat algorithm. A random assignment is given to the
+   * atoms and the state is initialized.
+   */
+  void init()
   {
-    int i;          /* loop counter */
-    int k;          /* another loop counter */
-    
-    int numrun = 10;
-    int cutoff = 100000;
-    int base_cutoff = 100000;
-    bool printonlysol = false;
-    //bool printsolcnf = false;
-    bool printfalse = false;
-    bool printlow = false;
-    bool initoptions = false;
-    bool superlinear = false;
-    //int printtrace = 10000;
-    int printtrace = 0;
-    long int totalflip = 0; /* total number of flips in all tries so far */
-    long int totalsuccessflip = 0; /* total number of flips in all tries which succeeded so far */
-    int numtry = 0;     /* total attempts at solutions */
-    int numsuccesstry = 0;  /* total found solutions */
-    int numsol = 1;         /* stop after this many tries succeeds */
-    int seed;           /* seed for random */
-    struct timeval tv;
-    struct timezone tzp;
-    
-    int prior_setuptime=0;
-    double setuptime;
-    double expertime;
-    double totaltime;
-    
-    long int lowbad;        /* lowest number of bad clauses during try */
-    long int lowcost;       /* lowest cost of bad clauses during try */
-    int targetcost = 0;     /* the cost at which the program terminates*/
-    long x;
-    long integer_sum_x = 0;
-    double sum_x = 0.0;
-    double sum_x_squared = 0.0;
-    double mean_x=-1;
-    double second_moment_x;
-    double variance_x=-1;
-    double std_dev_x=-1;
-    double std_error_mean_x=-1;
-    double seconds_per_flip;
-    int r;
-    int sum_r = 0;
-    double sum_r_squared = 0.0;
-    double mean_r = -1;
-    double variance_r;
-    double std_dev_r;
-    double std_error_mean_r;
-    int worst_cost, computed_cost;
-
-    gettimeofday(&tv,&tzp);
-    seed = (( tv.tv_sec & 0177 ) * 1000000) + tv.tv_usec;
-    heuristic = BEST;
-    numerator = NOVALUE;
-    denominator = 100;
-
-    for (i = 1; i < argc; i++)
+      // Init changed array if using tabu
+    if (heuristic_ == TABU || heuristic_ == SS)
     {
-      if (strcmp(argv[i],"-withcost") == 0)
-        costexpected = true;
-      else if (strcmp(argv[i],"-seed") == 0)
-        scanone(argc, argv, ++i, &seed);
-      else if (strcmp(argv[i],"-targetcost") == 0)
-        scanone(argc, argv, ++i, &targetcost);
-      else if (strcmp(argv[i],"-cutoff") == 0)
-        scanone(argc, argv, ++i, &cutoff);
-      else if (strcmp(argv[i],"-random") == 0)
-        heuristic = RANDOM;
-      else if (strcmp(argv[i],"-productsum") == 0)
-        heuristic = PRODUCTSUM;
-      else if (strcmp(argv[i],"-reciprocal") == 0)
-        heuristic = RECIPROCAL;
-      else if (strcmp(argv[i],"-additive") == 0)
-        heuristic = ADDITIVE;
-      else if (strcmp(argv[i],"-exponential") == 0)
-        heuristic = EXPONENTIAL;
-      else if (strcmp(argv[i],"-best") == 0)
-        heuristic = BEST;
-      else if (strcmp(argv[i],"-noise") == 0)
+      int numAtoms = state_->getNumAtoms();
+      if (changed_.size() != numAtoms + 1)
       {
-        scanone(argc,argv,++i,&numerator);
-        scanone(argc,argv,++i,&denominator);
-      }
-      else if (strcmp(argv[i],"-super") == 0)
-        superlinear = true;
-      else if (strcmp(argv[i],"-tries") == 0)
-        scanone(argc,argv,++i,&numrun);
-      else if (strcmp(argv[i],"-tabu") == 0)
-      {
-        scanone(argc,argv,++i,&tabu_length);
-        heuristic = TABU;
-      }
-      else if (strcmp(argv[i],"-low") == 0)
-        printlow = true;
-      else if (strcmp(argv[i],"-sol") == 0)
-      {
-        printonlysol = true;
-        printlow = true;
-      }
-      else if (strcmp(argv[i],"-bad") == 0)
-        printfalse = true;
-      else if (strcmp(argv[i],"-hard") == 0)
-        hard = true;
-      else if (strcmp(argv[i],"-numsol") == 0)
-        scanone(argc, argv, ++i, &numsol);
-      else if (strcmp(argv[i],"-trace") == 0)
-        scanone(argc, argv, ++i, &printtrace);
-      //to incorporate the time taken in setting up the walksat clauses etc.
-      else if (strcmp(argv[i],"-setuptime") == 0)
-        scanone(argc, argv, ++i, &prior_setuptime);
-      else 
-      {
-        fprintf(stderr, "Bad argument %s\n", argv[i]);
-        fprintf(stderr, "General parameters:\n");
-        fprintf(stderr, "  -seed N -cutoff N -tries N\n");
-        fprintf(stderr, "  -numsol N = stop after finding N solutions\n");
-        fprintf(stderr, "  -withcost = input is a set of weighted clauses\n");
-        fprintf(stderr, "  -targetcost N = find assignments of cost <= N (MAXSAT)\n");
-        fprintf(stderr, "  -hard = never break a highest-cost clause\n");
-        fprintf(stderr, "Heuristics:\n");
-        fprintf(stderr, "  -noise N M -best -super -tabu N\n");
-        fprintf(stderr, "  -productsum -reciprocal -additive -exponential\n");
-        fprintf(stderr, "Printing:\n");
-        fprintf(stderr, "  -trace N = print statistics every N flips\n");
-        fprintf(stderr, "  -sol = print assignments where cost < target\n");
-        fprintf(stderr, "  -low = print lowest assignment each try\n");
-        fprintf(stderr, "  -bad = print unsat clauses each try\n");
-        fprintf(stderr, "  -solcnf = print sat assign in cnf format, and exit\n");
-        fprintf(stderr, "  -setuptime S = time taken for setting up the clauses for walksat\n");
-        exit(-1);
-      }
-    }
-        
-    base_cutoff = cutoff;
-    if (numerator==NOVALUE)
-    {
-      if (heuristic==BEST)
-        numerator = 50;
-      else
-        numerator = 0;
-    }
-
-    srandom(seed);
-
-    if (printtrace)
-    {
-      printf("maxwalksat version 20\n");
-      printf("seed = %i\n",seed);
-      printf("cutoff = %i\n",cutoff);
-      printf("tries = %i\n",numrun);
-      printf("numsol = %i\n",numsol);
-      printf("targetcost = %i\n",targetcost);
-
-      printf("heuristic = ");
-
-      switch(heuristic)
-      {
-      case RANDOM:
-        printf("random");
-        break;
-      case PRODUCTSUM:
-        printf("productsum");
-        break;
-      case RECIPROCAL:
-        printf("reciprocal");
-        break;
-      case ADDITIVE:
-        printf("additive");
-        break;
-      case BEST:
-        printf("best");
-        break;
-      case EXPONENTIAL:
-        printf("exponential");
-        break;
-      case TABU:
-        printf("tabu %d", tabu_length);
-        break;
-      }
-    
-      if (numerator > 0)
-      {
-        printf(", noise %d / %d", numerator, denominator);
-      }
-
-      if (superlinear)
-        printf(", super");
-
-      printf(", trace %d", printtrace);
-
-      printf("\n");
-      printf("Prior set up time = %d \n", prior_setuptime);
-    }
-    
-    expertime = 0;
-    elapsed_seconds();
-    initprob(atomCnt, clauseArray, wtArray);
-    setuptime = prior_setuptime +  elapsed_seconds();
-    
-    if (printtrace)
-    {
-      if (costexpected) printf("clauses contain explicit costs\n");
-      else printf("clauses all assigned default cost of 1\n");
-
-      if(hard)
-        printf("hard option is set \n");
-      else
-        printf("hard option is not set \n");
-
-    
-      printf("numatom = %i, numclause = %i, numliterals = %i\n",numatom,numclause,numliterals);
-    
-      printf("                                           average             average       mean              standard\n");
-      printf("    lowest     worst    number                when                over      flips                 error\n");
-      printf("      cost    clause    #unsat    #flips     model   success       all      until        std         of\n");
-      printf("  this try  this try  this try  this try     found      rate     tries     assign        dev       mean\n");
-    }
-    abort_flag = false;
-    numnullflip = 0;
-    x = 0; r = 0;
-    lowcost = BIG;
-    
-    for(k = 0; k < numrun; k++)
-    {
-      if (printtrace) printf("performing the Run %d \n", k);
-      init(initoptions);
-      lowbad = numfalse; 
-      lowcost = costofnumfalse;
-      save_low_assign();
-      numflip = 0;
-
-      if (superlinear) cutoff = base_cutoff * super(r+1);
-    
-      if (printtrace)
-      {
-        printf("in the beginning, costofnumfalse = %d \n",costofnumfalse); 
-        printf("cutoff = %d \n",cutoff);
-        printf("numflip = %li \n",numflip);
-        printf("numfalse = %d \n",numfalse);
-        printf("numclause = %d \n",numclause);
-      
-        printf("costofnumfalse \t  numfalse \t numflip \t numclause \n");
-      }
-      while((numflip < cutoff) && (costofnumfalse > targetcost))
-      {
-        //printf("flip number .. %d \n",numflip);
-        if (printtrace && (numflip % printtrace == 0))
-        {
-          printf("%10i \t %10i \t %10li \t %10i\n", costofnumfalse,numfalse,numflip,numclause);
-        }
-        numflip++;
-
-        if (hard && (eqhighest) && (highestcost!=1))
-          fix(selecthigh(1 + random()%numhighest));
+        if (changed_.size() < numAtoms + 1)
+          changed_.growToSize(numAtoms + 1);
         else
-          fix(falseclause[random()%numfalse]);
-         
-        if (costofnumfalse < lowcost)
-        {
-          lowcost = costofnumfalse;
-          lowbad = numfalse;
-          save_low_assign();       
-        }
-
-        if(numflip % 100000 == 0 && printtrace)
-        {
-          expertime += elapsed_seconds();     
-          totaltime = setuptime + expertime;
-          printf("Averaging for %li flips \n",(totalflip+numflip));
-          printf("expertime - average flips per second = %10li\n", (long)((totalflip+numflip)/expertime));
-          printf("totaltime - average flips per second = %10li\n", (long)((totalflip+numflip)/totaltime));
-          printf("numatom = %d , numclause = %d \n",numatom,numclause);
-          printf("\n");
-        }
+          changed_.shrinkToSize(numAtoms + 1);
       }
+      for (int i = 1; i <= numAtoms; i++)
+        changed_[i] = -(tabuLength_ + 1);
+    }
+    state_->initRandom();
+  }
+  
+  /**
+   * Performs the given number of MaxWalkSat inference tries.
+   */
+  void infer()
+  {
+    int numtry = 0;
+    int numsuccesstry = 0;
+    long double lowCost = LDBL_MAX;
 
-      if(printtrace)
-      {
-        printf("Inside the run %d \n",k);
-        printf("numatom = %d , numclause = %d \n",numatom,numclause);
-      }
-      
+      // If keeping track of true clause groundings, then init to zero
+    if (trackClauseTrueCnts_)
+      for (int clauseno = 0; clauseno < clauseTrueCnts_->size(); clauseno++)
+        (*clauseTrueCnts_)[clauseno] = 0;
+
+      // Perform up to maxTries tries or numSolutions successful tries
+    while (numsuccesstry < numSolutions_ &&
+           numtry < maxTries_*numSolutions_)
+    {
       numtry++;
-      totalflip += numflip;
-      x += numflip;
-      r++;
-      
-        // If succesful try
-      if(costofnumfalse <= targetcost)
+      numFlips_ = 0;
+      bool lowStateInThisTry = false;
+      if (lazyLowState_)
+        varsFlippedSinceLowState_.clear();
+
+        // Make random assigment in subsequent tries
+        // (for first try, init() should have been called)
+      if (numtry > 1 && numsuccesstry == 0) init();
+
+      if (mwsdebug)
       {
-        numsuccesstry++;
-        totalsuccessflip += numflip;
-        integer_sum_x += x;
-        sum_x = (double) integer_sum_x;
-        sum_x_squared += ((double)x)*((double)x);
-        mean_x = sum_x / numsuccesstry;
-        if (numsuccesstry > 1)
-        {
-          second_moment_x = sum_x_squared / numsuccesstry;
-          variance_x = second_moment_x - (mean_x * mean_x);
-            /* Adjustment for small small sample size */
-          variance_x = (variance_x * numsuccesstry)/(numsuccesstry - 1);
-          std_dev_x = sqrt(variance_x);
-          std_error_mean_x = std_dev_x / sqrt((double)numsuccesstry);
-        }
-        sum_r += r;
-        mean_r = ((double)sum_r)/numsuccesstry;
-        sum_r_squared += ((double)r)*((double)r);
-        x = 0;
-        r = 0;
-      }
-
-      countlowunsatcost(&computed_cost, &worst_cost);
-      if(lowcost != computed_cost)
-      {
-        fprintf(stderr, "Program error, verification of assignment cost fails!\n");
-        exit(-1);
-      }
-/*      
-      if(numsuccesstry == 0)
-        printf("%10li%10i%10li%10li         *         0         *          *          *          *\n",
-               lowcost,worst_cost,lowbad,numflip);
-      else if (numsuccesstry == 1)
-        printf("%10li%10i%10li%10li%10li%10i%10li %10.1f          *          *\n",
-               lowcost,worst_cost,lowbad,numflip,totalsuccessflip/numsuccesstry,
-               (numsuccesstry*100)/numtry,totalflip/numsuccesstry,
-               mean_x);
-      else
-        printf("%10li%10i%10li%10li%10li%10i%10li %10.1f %10.1f %10.1f\n",
-               lowcost,worst_cost,lowbad,numflip,totalsuccessflip/numsuccesstry,
-               (numsuccesstry*100)/numtry,totalflip/numsuccesstry,
-               mean_x, std_dev_x, std_error_mean_x);
-
-      if (numfalse>0 && printfalse)
-        print_false_clauses_cost(lowbad);
-
-      if (printlow && (!printonlysol || costofnumfalse <= targetcost))
-        print_low_assign(lowcost);
-*/
-      
-      extract_low_assign(trueAtomArray);
-      numbad = lowcost;
-      
-      if (numsuccesstry >= numsol) break;
-      if (abort_flag) break;
-    }
-    
-    expertime += elapsed_seconds();
-    totaltime = setuptime + expertime;
-    seconds_per_flip = expertime / totalflip;
-
-    if(printtrace)
-    {
-      printf("\nset up seconds = %f\n", setuptime);
-      printf("\nwalksat run seconds = %f\n", expertime);
-      printf("\ntotal elapsed seconds = %f\n", totaltime);
-    
-      printf("Averaging for all the flips (%li) \n",totalflip);
-      printf("expertime - average flips per second = %10li\n", (long)(totalflip/expertime));
-      printf("totaltime - average flips per second = %10li\n", (long)(totalflip/totaltime));
-      printf("\n");
-    }
-/*    
-    if (heuristic == TABU)
-      printf("proportion null flips = %f\n", ((double)numnullflip)/totalflip);
-    printf("number of solutions found = %d\n", numsuccesstry);
-*/    
-    if (numsuccesstry > 0)
-    {
-/*
-      printf("mean flips until assign = %f\n", mean_x);
-      if (numsuccesstry > 1)
-      {
-        printf("  variance = %f\n", variance_x);
-        printf("  standard deviation = %f\n", std_dev_x);
-        printf("  standard error of mean = %f\n", std_error_mean_x);
-      }
-      printf("mean seconds until assign = %f\n", mean_x * seconds_per_flip);
-      
-      if (numsuccesstry > 1)
-      {
-        printf("  variance = %f\n", variance_x * seconds_per_flip * seconds_per_flip);
-        printf("  standard deviation = %f\n", std_dev_x * seconds_per_flip);
-        printf("  standard error of mean = %f\n", std_error_mean_x * seconds_per_flip);
-      }
-      printf("mean restarts until assign = %f\n", mean_r);
-*/
-      if (numsuccesstry > 1)
-      {
-        variance_r = (sum_r_squared / numsuccesstry) - (mean_r * mean_r);
-        variance_r = (variance_r * numsuccesstry)/(numsuccesstry - 1);       
-        std_dev_r = sqrt(variance_r);
-        std_error_mean_r = std_dev_r / sqrt((double)numsuccesstry);
-        //printf("  variance = %f\n", variance_r);
-        //printf("  standard deviation = %f\n", std_dev_r);
-        //printf("  standard error of mean = %f\n", std_error_mean_r);
-      }
-    }
-/*
-    if (numsuccesstry > 0)
-    {
-      printf("ASSIGNMENT ACHIEVING TARGET %i FOUND\n", targetcost);
-      if(printsolcnf)
-        for(i = 1;i < numatom+1; i++)
-          printf("v %i\n", atom[i] == 1 ? i : -i);
-    }
-    else
-      printf("ASSIGNMENT NOT FOUND\n");
-*/    
-    return 0;
-  }
- 
- private:
-    
-  // numBad is the reported number of unsat clauses
-  // Caller is responsible for deleting the contents of solutions
-  bool readResults(Array<int> truePreds, int numbad, const int& numGndPreds, 
-                   const bool&  includeUnsatSolutions,
-                   Array<Array<bool>*>& solutions, Array<int>& numBad) 
-  {
-    if (includeUnsatSolutions || numbad == 0) 
-    {
-      Array<bool>* solution = new Array<bool>(numGndPreds);
-      for (int i = 0; i < numGndPreds; i++)
-        solution->append(false);
-      
-      for (int i = 0; i < truePreds.size(); i++)  
-		(*solution)[truePreds[i]-1] = true;
-      
-      solutions.append(solution);
-      numBad.append(numbad);
-    }
-    return true;
-  }
-  
-  
-  
-  long super(int i)
-  {
-    long power;
-    int k;
-
-    if (i <= 0)
-    {
-      fprintf(stderr, "bad argument super(%d)\n", i);
-      exit(1);
-    }
-    /* let 2^k be the least power of 2 >= (i+1) */
-    k = 1;
-    power = 2;
-    while (power < (i+1))
-    {
-      k += 1;
-      power *= 2;
-    }
-    if (power == (i+1)) return (power/2);
-    return (super(i - (power/2) + 1));
-  }
-
-  void handle_interrupt(int sig)
-  {
-    if (abort_flag) exit(-1);
-    abort_flag = true;
-  }
-
-
-  void scanone(int argc, char *argv[], int i, int *varptr)
-  {
-    if (i >= argc || sscanf(argv[i],"%i",varptr) != 1)
-    {
-      fprintf(stderr, "Bad argument %s\n", i<argc ? argv[i] : argv[argc-1]);
-      exit(-1);
-    }
-  }
-
-  void init(int initoptions)
-  {
-    int i;          /* loop counter */
-    int j;          /* another loop counter */
-    int thetruelit = -1;
-
-    for(i = 0; i < numclause; i++)
-      numtruelit[i] = 0;
-    numfalse = 0;
-    costofnumfalse = 0;
-    eqhighest = 0;
-    numhighest = 0;
-
-    for(i = 1; i < numatom + 1; i++)
-    {
-      changed[i] = -BIG;
-      breakcost[i] = 0;
-    }
-
-      // For each block: select one to set to true
-    for (int i = 0; i < blocks_->size(); i++)
-    {
-      Array<int> block = (*blocks_)[i];
-      
-        // If evidence atom exists, then all others are false
-      if ((*blockEvidence_)[i])
-      {
-          // If 1st argument is -1, then all are set to false
-        setOthersInBlockToFalse(-1, i);
-        continue;
+        cout << "\nIn the beginning of try " << numtry << ": " << endl;
+        cout << "Number of clauses: " << state_->getNumClauses() << endl;
+        cout << "Number of false clauses: " << state_->getNumFalseClauses()
+             << endl;
+        cout << "Cost of false clauses: " << state_->getCostOfFalseClauses()
+             << endl;
+        cout << "Target cost: " << targetCost_ << endl;
       }
       
-      int chosen = random() % block.size();
-      atom[block[chosen] + 1] = true;
-      setOthersInBlockToFalse(chosen, i);
-    }
-      
-      // Random tv for all not in blocks
-    for(i = 1; i < numatom + 1; i++)
-    {
-      if (getBlock(i - 1) >= 0)
+      while (numFlips_ < maxSteps_ && numsuccesstry < numSolutions_)
       {
-        continue;
-      }
-      atom[i] = random() % 2;
-    }
+        numFlips_++;
+        flipAtom((this->*(pickcode[heuristic_]))());
+          // If in a block, then another atom was also chosen to flip
+        if (inBlock_)
+          flipAtom(flipInBlock_);
 
-    /* Initialize breakcost in the following: */
-    for(i = 0; i < numclause; i++)
-    {
-      for(j = 0; j < size[i]; j++)
-      {
-        if((clause[i][j] > 0) == atom[abs(clause[i][j])])
-        {
-          numtruelit[i]++;
-          thetruelit = clause[i][j];
-        }
-      }
-      
-        // Unsatisfied positive-weighted clauses
-      if(numtruelit[i] == 0 && cost[i] >= 0)
-      {
-        wherefalse[i] = numfalse;
-        falseclause[numfalse] = i;
-        ++numfalse;
-        costofnumfalse += cost[i];
-        if (highestcost == cost[i]) {eqhighest = true; numhighest++;}
-      }
-        // Satisfied negative-weighted clauses
-      else if(numtruelit[i] > 0 && cost[i] < 0)
-      {
-        wherefalse[i] = numfalse;
-        falseclause[numfalse] = i;
-        ++numfalse;
-        costofnumfalse += abs(cost[i]);
-        if (highestcost == abs(cost[i])) {eqhighest = true; numhighest++;}
-      }
-        // Pos. clause satisfied by exactly one literal: note breakcost for that lit
-      else if (numtruelit[i] == 1 && cost[i] >= 0)
-      {
-        breakcost[abs(thetruelit)] += cost[i];
-      }
-        // Neg. clause not satisfied: note breakcost for all lits
-      else if (numtruelit[i] == 0 && cost[i] < 0)
-      {
-        for(int j = 0; j < size[i]; j++)
-        {
-          breakcost[abs(clause[i][j])] += abs(cost[i]);
-        }
-      }
-    }
-  }
-
-  void print_false_clauses_cost(long int lowbad)
-  {
-    int i, j;
-    bool bad;
-    int lit, sign;
-
-    printf("Unsatisfied clauses:\n");
-    for (i = 0; i < numclause; i++)
-    {
-      bad = true;
-      for (j = 0; j < size[i]; j++)
-      {
-        lit = clause[i][j];
-        sign = lit > 0 ? 1 : 0;
-        if ( lowatom[abs(lit)] == sign )
-        {
-          bad = false;
-          break;
-        }
-      }
-      
-      if (bad)
-      {
-        printf("Cost %i ", cost[i]);
-        for (j = 0; j < size[i]; j++)
-        {
-          printf("%d ", clause[i][j]);
-        }
-        printf("0\n");
-      }
-    }
-    printf("End unsatisfied clauses\n");
-  }
-
-
-  void initprob(int atomCnt, const Array<Array<int>*> &clauseArray,
-                const Array<double>& wtArray)
-  {
-    int i;          /* loop counter */
-    int j;          /* another loop counter */
-    int *storeptr = NULL;
-    int freestore;
-    int lit;
-    
-    numatom = atomCnt;
-    numclause = clauseArray.size();
-    //cout<<"came in to read the clauses.. "<<endl;
-      
-    occurence = (int **) malloc(sizeof(int *)*(2*numatom+1));  
-    numoccurence = (int *) malloc(sizeof(int)*(2*numatom+1));
-    atom = (int *) malloc(sizeof(int)*(numatom+1));
-    lowatom = (int *) malloc(sizeof(int)*(numatom+1));
-    changed = (int *) malloc(sizeof(int)*(numatom+1)); 
-    breakcost = (int *) malloc(sizeof(int)*(numatom+1)); 
-
-    
-    clause = (int **) malloc(sizeof(int *)*(numclause+1));
-    cost = (int *) malloc(sizeof(int)*(numclause+1));
-    size = (int *) malloc(sizeof(int)*(numclause+1));
-    falseclause = (int *) malloc(sizeof(int)*(numclause+1));
-    lowfalse = (int *) malloc(sizeof(int)*(numclause+1));
-    wherefalse = (int *) malloc(sizeof(int)*(numclause+1));
-    numtruelit = (int *) malloc(sizeof(int)*(numclause+1));
-    freestore = 0;
-    numliterals = 0;
-
-    for(i = 0; i < 2*numatom + 1; i++)
-      numoccurence[i] = 0;
-    
-    for(i = 0; i < numclause; i++)
-    {
-      if (costexpected)
-      {
-          //cout<<"not assigning default cost. some problem.."<<endl;
-        cost[i] = (int)wtArray[i];
-      }
-      else
-      {
-          /*the default cost of a clause violation is unit 1*/
-        if (wtArray[i] >= 0)
-          cost[i] = 1;
-        else
-          cost[i] = -1;
-      }
-
-      size[i] = 0;
-      if (freestore < MAXLENGTH)
-      {
-        storeptr = (int *) malloc( sizeof(int) * BLOCKSIZE );
-        storePtrArray.append(storeptr);
-        freestore = BLOCKSIZE;
-        fprintf(stderr,"allocating memory...\n");
-      }
-      clause[i] = storeptr;
-
-      for(int litno = 0; litno < clauseArray[i]->size(); litno++)
-      {
-        size[i]++;
-        if(size[i] > MAXLENGTH)
-        {
-          printf("ERROR - clause too long\n");
-          exit(-1);
-        }
-          
-          //Convert to a representation which starts indexing from 1 (instead of 0).
-          //This operation is same as the one done while preparing CNF file (in maxwalksat.h)
-          //for use the by oringial maxwalksat code
-          //This is probably not the right place to do - should be
-          //fixed sometime.
-        int litId = WSUtil::getLiteral((*clauseArray[i])[litno]);
-        bool negated = WSUtil::isLiteralNegated((*clauseArray[i])[litno]);
-        if (negated) 
-          lit = -(litId+1);
-        else
-          lit = litId+1;
-          
-        *(storeptr++) = lit; /* clause[i][size[i]] = j; */
-        freestore--;
-        numliterals++;
-        numoccurence[lit+numatom]++;
-      }
-    }
-    
-    //cout<<"done with reading in clauses.. "<<endl;
-    if(size[0] == 0)
-    {
-      fprintf(stderr,"ERROR - incorrect problem format or extraneous characters\n");
-      exit(-1);
-    }
-
-    for(i = 0; i < 2*numatom + 1; i++)
-    {
-      if (freestore < numoccurence[i])
-      {
-        storeptr = (int *) malloc( sizeof(int) * BLOCKSIZE );
-        storePtrArray.append(storeptr);
-        freestore = BLOCKSIZE;
-        fprintf(stderr,"allocating memory...\n");
-      }
-      occurence[i] = storeptr;
-      freestore -= numoccurence[i];
-      storeptr += numoccurence[i];
-      numoccurence[i] = 0;
-    }
-
-    for(i = 0; i < numclause; i++)
-    {
-      for(j = 0; j < size[i]; j++)
-      {
-        occurence[clause[i][j]+numatom][numoccurence[clause[i][j]+numatom]] = i;
-        numoccurence[clause[i][j]+numatom]++;
-      }
-    }
-  }
-
-
-  void fix(int tofix)
-  {
-      // If neg. clause, then flip all true literals
-    if (cost[tofix] < 0)
-    {
-      if (numtruelit[tofix] > 0)
-      {
-        for(int i = 0; i < size[tofix]; i++)
-        {
-            //TODO: all atoms in block in this clause?
-          int atm = abs(clause[tofix][i]);
-            // true literal: flip it
-          if((clause[tofix][i] > 0) == atom[atm])
-          {
-              // Flip actual atom
-            flipatom(atm);
-              // Check if in block
-            int blockIdx = getBlock(atm - 1);
-            if(blockIdx >= 0)
-            {
-                //Dealing with atom in a block
-              Array<int> block = (*blocks_)[blockIdx];
-              int chosen = -1;
-    
-                // 1->0: choose to flip the other randomly
-              bool ok = false;
-              while(!ok)
-              {
-                chosen = random() % block.size();
-                if (block[chosen] + 1 != atm)
-                  ok = true;
-              }
-    
-              assert(chosen >= 0);
-              assert(atom[block[chosen] + 1] == 0);
-              flipatom(block[chosen] + 1);
-            }
-          }
-        }
-      }
-        // No true lits: already fixed
-      else
-      {
-        numnullflip++;
-        return;
-      }
-    }
-    else
-    {
-      int numbreak[MAXLENGTH];  // number of clauses changing
-                                // each atoms would make false
-      int i;          /* loop counter */
-      int choice;
-    
-      for(i = 0; i < size[tofix]; i++)
-      {
-        numbreak[i] = breakcost[abs(clause[tofix][i])];
-      }
+          // set in block back to false
+        inBlock_ = false;
+        flipInBlock_ = NOVALUE;
         
-      switch(heuristic)
-      {
-        case RANDOM:      
-          choice = pickrandom(numbreak,size[tofix],tofix);
-          break;
-        case PRODUCTSUM:  
-          choice = pickproductsum(numbreak,size[tofix],tofix);
-          break;
-        case RECIPROCAL:  
-          choice = pickreciprocal(numbreak,size[tofix],tofix);
-          break;
-        case ADDITIVE:    
-          choice = pickadditive(numbreak,size[tofix],tofix);
-          break;
-        case BEST:        
-          choice = pickbest(numbreak,size[tofix],tofix);
-          break;
-        case EXPONENTIAL: 
-          choice = pickexponential(numbreak,size[tofix],tofix);
-          break;
-        case TABU:        
-          choice = picktabu(numbreak,size[tofix],tofix);
-          break;
-        default:          
-          choice = pickbest(numbreak,size[tofix],tofix);
-      }
-
-      if (choice == NOVALUE)
-      {
-        numnullflip++;
-          // set in block back to false
-        inBlock = false;
-        flipInBlock = NOVALUE;
-      }
-      else
-      {
-        flipatom(abs(clause[tofix][choice]));
-        if (inBlock)
+        long double costOfFalseClauses = state_->getCostOfFalseClauses();
+        //long double lowCost = state_->getLowCost();
+          // If the cost of false clauses is lower than the low cost of all
+          // tries, then save this as the low state.
+        if (costOfFalseClauses < lowCost)
         {
-          flipatom(flipInBlock);
+          if (mwsdebug)
+          {
+            cout << "Cost of false clauses: " << costOfFalseClauses
+                 << " less than lowest cost: " << lowCost << endl;
+          }
+          lowCost = costOfFalseClauses;
+          if (!lazyLowState_)
+            state_->saveLowState();
+          else
+          {
+            varsFlippedSinceLowState_.clear();
+            lowStateInThisTry = true;
+          }
         }
-          // set in block back to false
-        inBlock = false;
-        flipInBlock = NOVALUE;
+        
+          // If succesful try
+          // Add 0.0001 to targetCost_ because of double precision error
+          // This needs to be fixed
+        if (costOfFalseClauses <= targetCost_ + 0.0001)
+          numsuccesstry++;
+      }
+      
+      if (lowStateInThisTry)
+        reconstructLowState();
+      state_->saveLowStateToDB();
+      
+      if (mwsdebug)
+      {
+        cout<< "In the end of try " << numtry << ": " << endl;
+        cout<< "Lowest num. of false clauses: " << state_->getLowBad() << endl;
+        cout<< "Lowest cost of false clauses: " << state_->getLowCost() << endl;
+        cout<< "Number of flips: " << numFlips_ << endl;
+        //cout<< "Active atoms " << state_->getNumActiveAtoms() << endl; 
       }
     }
+
+      // If keeping track of true clause groundings
+    if (trackClauseTrueCnts_)
+      state_->getNumClauseGndings(clauseTrueCnts_, true);    
+  }
+  
+  const int getHeuristic()
+  {
+    return heuristic_;
+  }
+  
+  void setHeuristic(const int& heuristic)
+  {
+    heuristic_ = heuristic;
   }
 
-
-  void flipatom(int toflip)
+ protected:
+  
+  /**
+   * Flips the truth value of an atom and marks this iteration as the
+   * last time it was flipped.
+   * 
+   * @param toFlip Index of atom to flip.
+   */
+  void flipAtom (int toFlip)
   {
-    int i, j;           /* loop counter */
-    int toenforce;      /* literal to enforce */
-    register int cli;
-    register int lit;
-    int numocc;
-    register int sz;
-    register int * litptr;
-    int * occptr;
+    //if (mwsdebug) cout << "Entering MaxWalkSat::flipAtom" << endl;
+    if (toFlip == NOVALUE)
+      return;
 
-    changed[toflip] = numflip;
-    if(atom[toflip] > 0)
-      toenforce = -toflip;
-    else
-      toenforce = toflip;
-    atom[toflip] = 1-atom[toflip];
-    
-    numocc = numoccurence[numatom-toenforce];
-    occptr = occurence[numatom-toenforce];
-    
-    
-    for(i = 0; i < numocc ;i++)
+      // Flip the atom in the state
+    state_->flipAtom(toFlip);
+      // Mark this flip as last time atom was changed if tabu is used
+    if (heuristic_ == TABU || heuristic_ == SS)
     {
-      cli = *(occptr++);
-
-       // Neg. clause
-      if (cost[cli] < 0)
-      {
-          // Became unsatisfied: Decrease num. of false clauses
-        if (--numtruelit[cli] == 0)
-        {
-          numfalse--;
-          costofnumfalse -= abs(cost[cli]);
-          falseclause[wherefalse[cli]] = falseclause[numfalse];
-          wherefalse[falseclause[numfalse]] = wherefalse[cli];
-          
-          if (abs(cost[cli]) == highestcost)
-            { numhighest--; if (numhighest == 0) eqhighest = false; }
-              
-            /* Increment all atoms' breakcount */
-          sz = size[cli];
-          litptr = clause[cli];
-          for(j = 0; j < sz; j++)
-          {
-            lit = *(litptr++);
-            breakcost[abs(lit)] += abs(cost[cli]);
-          }
-        }
-      }
-        // Pos. clause
-      else
-      {
-        if (--numtruelit[cli] == 0)
-        {
-          falseclause[numfalse] = cli;
-          wherefalse[cli] = numfalse;
-          numfalse++;
-          costofnumfalse += cost[cli];
-            // Decrement toflip's breakcost
-          breakcost[toflip] -= cost[cli];
-          if (cost[cli] == highestcost)
-              { eqhighest = 1; numhighest++; }
-        }
-        else if (numtruelit[cli] == 1)
-        {
-          // Find the lit in this clause that makes it true, and inc its breakcount
-          sz = size[cli];
-          litptr = clause[cli];
-          for (j = 0; j < sz; j++)
-          {
-            lit = *(litptr++);
-            if((lit > 0) == atom[abs(lit)])
-            {
-              breakcost[abs(lit)] += cost[cli];
-              break;
-            }
-          }
-        }    
-      }
+      changed_[toFlip] = numFlips_;
+      changed_.growToSize(state_->getNumAtoms(), -(tabuLength_ + 1));
     }
     
-    numocc = numoccurence[numatom+toenforce];
-    occptr = occurence[numatom+toenforce];
-    
-    for(i = 0; i < numocc; i++)
+    if (lazyLowState_)
     {
-      cli = *(occptr++);
-
-        // Neg. clause
-      if (cost[cli] < 0)
+        // Mark this variable as flipped since last low state. If already
+        // present, then it has been flipped back to its value in the low
+        // state and we can remove it.
+      if (varsFlippedSinceLowState_.find(toFlip) !=
+          varsFlippedSinceLowState_.end())
       {
-          // Became satisfied: increment num. of false clauses
-        if (++numtruelit[cli] == 1)
+        if (mwsdebug)
         {
-          wherefalse[cli] = numfalse;
-          falseclause[numfalse] = cli;
-          ++numfalse;
-          costofnumfalse += abs(cost[cli]);
-          if (highestcost == abs(cost[cli])) {eqhighest = true; numhighest++;}
+          //cout << "Atom " << toFlip << " has been flipped since low state, "
+          //     << "so removing it" << endl;
+        }
+        varsFlippedSinceLowState_.erase(toFlip);
+      }
+      else
+      {
+        if (mwsdebug)
+        {
+          //cout << "Atom " << toFlip << " not flipped since low state, "
+          //     << "so adding it" << endl;
+        }
+        varsFlippedSinceLowState_.insert(toFlip);
+      }
+    }
+    //if (mwsdebug) cout << "Leaving MaxWalkSat::flipAtom" << endl;
+  }
 
-            // Decrement all atoms' breakcount
-          sz = size[cli];
-          litptr = clause[cli];
-          for(j = 0; j < sz; j++)
+  /**
+   * Pick a random atom in a random unsatisfied pos. clause or a random
+   * true literal in a random satsified neg. clause to flip.
+   * 
+   * @return Index of atom picked.
+   */
+  int pickRandom()
+  {
+    //if (mwsdebug) cout << "Entering MaxWalkSat::pickRandom" << endl;
+    assert(!inBlock_);
+    int atomIdx = state_->getIndexOfAtomInRandomFalseClause();
+    assert(atomIdx > 0);
+
+      // If atom is in a block, then another one has to be picked
+    int blockIdx = state_->getBlockIndex(atomIdx - 1);
+    if (blockIdx >= 0)
+    {
+        // Atom is in a block
+        // If evidence atom exists or in block of size 1, then can not flip
+      if (state_->isBlockEvidence(blockIdx) ||
+          state_->getBlockSize(blockIdx) == 1)
+        return NOVALUE;
+      else
+      {
+          //Dealing with atom in a block
+        Array<int>& block = state_->getBlockArray(blockIdx);
+          // 0->1: choose atom in block which is already 1
+        if (state_->getValueOfAtom(atomIdx) == 0)
+        {
+          for (int i = 0; i < block.size(); i++)
           {
-            lit = *(litptr++);
-            breakcost[abs(lit)] -= abs(cost[cli]);
+            if (state_->getValueOfAtom(block[i] + 1) == 1)
+            {
+              inBlock_ = true;
+              flipInBlock_ = block[i] + 1;
+              return atomIdx;
+            }
           }
         }
-      }
-        // Pos. clause
-      else
-      {    
-        if (++numtruelit[cli] == 1)
+          // 1->0: choose to flip the other randomly
+          // TODO: choose to flip the other with best improvement
+        else
         {
-          numfalse--;
-          costofnumfalse -= cost[cli];
-          falseclause[wherefalse[cli]] = falseclause[numfalse];
-          wherefalse[falseclause[numfalse]] = wherefalse[cli];
-            // Increment toflip's breakcount
-          breakcost[toflip] += cost[cli];
-          if (cost[cli] == highestcost)
-            { numhighest--; if (numhighest==0) eqhighest = 0; }
-        }
-        else if (numtruelit[cli] == 2)
-        {
-            // Find the lit in this clause other than toflip that makes it true,
-            // and decrement its breakcount
-          sz = size[cli];
-          litptr = clause[cli];
-          for (j = 0; j < sz; j++)
+          bool ok = false;
+          while (!ok)
           {
-            lit = *(litptr++);
-            if( ((lit > 0) == atom[abs(lit)]) &&
-                (toflip != abs(lit)) )
+            int chosen = random() % block.size();
+            if (block[chosen] + 1 != atomIdx)
             {
-              breakcost[abs(lit)] -= cost[cli];
-              break;
+              inBlock_ = true;
+              flipInBlock_ = block[chosen] + 1;
+              return atomIdx;
             }
           }
         }
       }
     }
+    //if (mwsdebug) cout << "Leaving MaxWalkSat::pickRandom" << endl;
+    return atomIdx;
   }
 
-  int pickrandom(int *numbreak, int clausesize, int tofix)
-    /* returns a random number */
+  /**
+   * Pick the best atom (clauses made satisfied - clauses made unsatisfied)
+   * in a random unsatisfied clause.
+   * 
+   * @return Index of atom picked.
+   */
+  int pickBest()
   {
-    return(random()%clausesize);
-  }
+    //if (mwsdebug) cout << "Entering MaxWalkSat::pickBest" << endl;
+    assert(!inBlock_);
+      // Clause to fix picked at random    
+    int toFix = state_->getRandomFalseClauseIndex();
+    if (toFix == NOVALUE) return NOVALUE;
 
-  int pickproductsum(int *numbreak, int clausesize, int tofix)
-    /* weights each possibility by the */
-    /* product of the product and sum of everything else */
-  {
-    int i;                             /* a loop counter */
-    int weight[MAXLENGTH];             /* weights of each possibility */
-    int tochange;                      /* value to return */
-    int totalproduct = 1;              /* product of all numbreaks */
-    int totalsum = 0;                  /* sum of all numbreaks */
-
-    if(clausesize == 1)
-      return(0);
-
-    if((tochange = pickzero(numbreak,clausesize)) != NOVALUE)
-      return(tochange);
-
-    for(i = 0; i < clausesize; i++)
-    {
-      totalproduct *= numbreak[i];
-      totalsum += numbreak[i];
-    }
-
-    for(i = 0; i < clausesize; i++)
-    {
-      weight[i] = (totalproduct/numbreak[i])*
-                  (totalsum-numbreak[i]);
-    }
-
-    return(pickweight(weight,clausesize));
-  }
-
-  int pickreciprocal(int *numbreak,int clausesize, int tofix)
-    /* weights each possibility by its reciprocal*/
-  {
-    int i;                             /* a loop counter */
-    int weight[MAXLENGTH];             /* weights of each possibility */
-    int tochange;                      /* value to return */
-    int totalproduct = 1;              /* product of all numbreaks */
-
-    if(clausesize == 1)
-      return(0);
-
-    if((tochange = pickzero(numbreak,clausesize)) != NOVALUE)
-      return(tochange);
-
-    for(i = 0; i < clausesize; i++)
-      totalproduct *= numbreak[i];
-
-    for(i = 0; i < clausesize; i++)
-      weight[i] = (totalproduct/numbreak[i]);
-
-    return(pickweight(weight,clausesize));
-  }
-
-  int pickadditive(int *numbreak,int clausesize, int tofix)
-    /* weights each possibility by the sum of the others */
-  {
-    int i;                             /* a loop counter */
-    int weight[MAXLENGTH];             /* weights of each possibility */
-    int tochange;                      /* value to return */
-    int totalsum = 0;                  /* sum of all numbreaks */
-
-    if(clausesize == 1)
-      return(0);
-
-    if((tochange = pickzero(numbreak,clausesize)) != NOVALUE)
-      return(tochange);
-
-    for(i = 0; i < clausesize; i++)
-      totalsum += numbreak[i];
-
-    for(i = 0; i < clausesize; i++)
-      weight[i] = (totalsum-numbreak[i]);
-
-    return(pickweight(weight,clausesize));
-  }
-
-  int pickbest(int *numbreak, int clausesize, int tofix)
-  {
-    int i;          /* a loop counter */
-    int best[MAXLENGTH];    /* best possibility so far */
-    int numbest;        /* how many are tied for best */
-    int bestvalue;      /* best value so far */
-    register int var;
+    long double improvement;
 
     Array<int> canNotFlip;
       // If var in candidateBlockedVars is chosen, then
       // corresponding var in othersToFlip is flipped as well
     Array<int> candidateBlockedVars;
     Array<int> othersToFlip;
- 
-    numbest = 0;
-    bestvalue = BIG;
 
-    for (i = 0; i < clausesize; i++)
+    int clauseSize = state_->getClauseSize(toFix);
+    long double cost = state_->getClauseCost(toFix);
+      // Holds the best atoms so far
+    Array<int> best;
+      // How many are tied for best
+    register int numbest = 0;
+      // Best value so far
+    long double bestvalue = -LDBL_MAX;
+      // With prob. do a noisy pick
+    bool noisyPick = (numerator_ > 0 && random()%denominator_ < numerator_); 
+
+      // Look at each atom and pick best ones
+    for (int i = 0; i < clauseSize; i++)
     {
-      var = abs(clause[tofix][i]);
-      int otherToFlip = NOVALUE;
-      int blockIdx = getBlock(var - 1);
-      if (blockIdx == -1) // Atom not in a block
-        continue;
-      else // Atom is in a block
-      {
-          // If evidence atom exists or in block of size 1, then can not flip
-        if ((*blockEvidence_)[blockIdx] || (*blocks_)[blockIdx].size() == 1)
-        {
-          numbreak[i] = INT_MAX;
-          canNotFlip.append(var);
-        }
-        else
-        {
-          numbreak[i] = calculateNumbreak(var, otherToFlip);
-          candidateBlockedVars.append(var);
-          othersToFlip.append(otherToFlip);
-        }
-      }
+      register int lit = state_->getAtomInClause(i, toFix);
+        // Neg. clause: Only look at true literals
+      if (cost < 0 && !state_->isTrueLiteral(lit)) continue;
+        // var is the index of the atom
+      register int var = abs(lit);
 
-      if (numbreak[i] <= bestvalue)
+      improvement = calculateImprovement(var, canNotFlip,
+                                         candidateBlockedVars,
+                                         othersToFlip);
+
+      if (improvement >= bestvalue)
       { // Tied or better than previous best
-        if (numbreak[i] < bestvalue) numbest = 0;
-        bestvalue = numbreak[i];
-        best[numbest++] = i;
+        if (improvement > bestvalue)
+        {
+          numbest = 0;
+          best.clear();
+        }
+        bestvalue = improvement;
+        best.append(var);
+        numbest++;
       }
     }
 
+      // If only false literals in a neg. clause, then numbest is 0
+    if (numbest == 0) return NOVALUE;
       // Choose one of the best at random
       // (default if none of the following 2 cases occur)
-    int toflip = (numbest == 0) ? random()%clausesize : best[random()%numbest];
+    int toFlip = best[random()%numbest];
 
-      // 1. If at least 1 clause is broken by best,
+      // 1. If no improvement by best,
       // then with prob. choose a random atom
-    if (bestvalue > 0 && (random()%denominator < numerator))
+    if (bestvalue <= 0 && noisyPick)
     {
-        // allow random breaks of hard clauses
-      if (!hard || abs(cost[tofix]) >= highestcost)
-        toflip = random()%clausesize;
-        
-        // only do a random walk breaking non-hard clauses
-      numbest = 0;
-      for (i = 0; i < clausesize; i++)
-      {
-        if (numbreak[i] < highestcost)
-        {
-          best[numbest++] = i;
-        }
-      }
-      if (numbest==0) toflip = random()%clausesize;
+      if (cost > 0)
+        toFlip = abs(state_->getRandomAtomInClause(toFix));
+      else
+        toFlip = state_->getRandomTrueLitInClause(toFix);
     }
       // 2. Exactly one best atom
     else if (numbest == 1)
-      toflip = best[0];
+      toFlip = best[0];
 
       // If atom can not be flipped, then null flip
-    if (canNotFlip.contains(toflip)) toflip = NOVALUE;
+    if (canNotFlip.contains(toFlip)) toFlip = NOVALUE;
     else
-    { // If toflip is in block, then set other to flip
-      int idx = candidateBlockedVars.find(abs(clause[tofix][toflip]));
+    { // If toFlip is in block, then set other to flip
+      int idx = candidateBlockedVars.find(toFlip);
       if (idx >= 0)
       {
-        inBlock = true;
-        flipInBlock = othersToFlip[idx];
+        inBlock_ = true;
+        flipInBlock_ = othersToFlip[idx];
       }
     }
-    return toflip;
+
+    //if (mwsdebug) cout << "Leaving MaxWalkSat::pickBest" << endl;
+    return toFlip;
   }
 
-
-  int picktabu(int *numbreak,int clausesize, int tofix)
+  /**
+   * Pick an atom from a random unsatisfied clause based on the tabu heuristic.
+   * 
+   * @return Index of atom picked.
+   */
+  int pickTabu()
   {
-    int i;          /* a loop counter */
-    int best[MAXLENGTH];    /* best possibility so far */
-    int numbest;        /* how many are tied for best */
-    int bestvalue;      /* best value so far */
-
-    numbest = 0;
-    bestvalue = BIG;
-
-    if (numerator>0 && (random()%denominator < numerator))
+    //if (mwsdebug) cout << "Entering MaxWalkSat::pickTabu" << endl;
+    assert(!inBlock_);
+      // Clause to fix picked at random    
+    int toFix = state_->getRandomFalseClauseIndex();
+    if (toFix == NOVALUE)
     {
-      for (i = 0; i < clausesize; i++)
-      {
-        if ((tabu_length < numflip - changed[abs(clause[tofix][i])]) ||
-            numbreak[i]==0)
-        {
-          if (numbreak[i]==0) numbest=0;
-          best[numbest++] = i;
-        }
-      }
+      //if (mwsdebug) cout << "Leaving MaxWalkSat::pickTabu (NOVALUE)" << endl;      
+      return NOVALUE;
     }
-    else 
+
+    long double improvement;
+    Array<int> canNotFlip;
+      // If var in candidateBlockedVars is chosen, then
+      // corresponding var in othersToFlip is flipped as well
+    Array<int> candidateBlockedVars;
+    Array<int> othersToFlip;
+
+    int clauseSize = state_->getClauseSize(toFix);
+    long double cost = state_->getClauseCost(toFix);
+
+      // Holds the best atoms so far
+    Array<int> best;
+      // How many are tied for best
+    register int numbest = 0;
+      // Best value so far
+    long double bestvalue = -LDBL_MAX;
+
+      // With prob. do a noisy pick
+    bool noisyPick = (numerator_ > 0 && random()%denominator_ < numerator_); 
+
+    for (int i = 0; i < clauseSize; i++)
     {
-      for (i = 0; i < clausesize; i++)
-      {
-        if (numbreak[i]<=bestvalue && 
-            ((tabu_length < numflip - changed[abs(clause[tofix][i])]) ||
-            numbreak[i]==0))
+      register int lit = state_->getAtomInClause(i, toFix);
+        // Neg. clause: Only look at true literals
+      if (cost < 0 && !state_->isTrueLiteral(lit)) continue;
+        // var is the index of the atom
+      register int var = abs(lit);
+
+      improvement = calculateImprovement(var, canNotFlip, candidateBlockedVars,
+                                         othersToFlip);
+
+        // TABU: If pos. improvement, then always add it to best
+      if (improvement > 0 && improvement >= bestvalue)
+      { // Tied or better than previous best
+        if (improvement > bestvalue)
         {
-          if (numbreak[i]<bestvalue) numbest=0;
-          bestvalue = numbreak[i];
-          best[numbest++] = i;
+          numbest = 0;
+          best.clear();
+        }
+        bestvalue = improvement;
+        best.append(var);
+        numbest++;
+      }
+      else if (tabuLength_ < numFlips_ - changed_[var])
+      {
+        if (noisyPick && bestvalue <= 0)
+        { 
+          best.append(var);
+          numbest++;
+        }
+        else if (improvement >= bestvalue)
+        { // Tied or better than previous best
+          if (improvement > bestvalue)
+          {
+            numbest = 0;
+            best.clear();
+          }
+          bestvalue = improvement;
+          best.append(var);
+          numbest++;
         }
       }
     }
     
-    if (numbest == 0) return NOVALUE;
-    if (numbest == 1) return best[0];
-    return (best[random()%numbest]);
-  }
-
-  int pickexponential(int *numbreak,int clausesize, int tofix)
-  {
-    int i;                             /* a loop counter */
-    int weight[MAXLENGTH];             /* weights of each possibility */
-    int tochange;                      /* value to return */
-
-    if(clausesize == 1)
-      return(0);
-
-    if((tochange = pickzero(numbreak,clausesize)) != NOVALUE)
-      return(tochange);
-
-    for(i = 0; i < clausesize; i++)
-      weight[i] = 2*2*2*2*2*2*2*2*2*2*2*2*2*2;
-
-    for(i = 0; i < clausesize; i++)
+    if (numbest == 0) 
     {
-      weight[i] >>= numbreak[i]; /* weight[i] = weight[i]/(2^numbreak[i]) */
+      //if (mwsdebug) cout << "Leaving MaxWalkSat::pickTabu (NOVALUE)" << endl;
+      return NOVALUE;
     }
 
-    return(pickweight(weight,clausesize));
-  }
+    int toFlip = NOVALUE;
+      // Exactly one best atom
+    if (numbest == 1)
+      toFlip = best[0];
+    else
+      // Choose one of the best at random
+      toFlip = best[random()%numbest];
 
-  int pickzero(int *numbreak,int clausesize)
-  {
-    int i;                /* loop counter */
-    int numzero = 0;      /* number of zeros so far */
-    int select;           /* random number */
 
-    for(i = 0; i < clausesize; i++)
-    {
-      if(numbreak[i] == 0)
-      numzero++;
+      // If atom can not be flipped, then null flip
+    if (canNotFlip.contains(toFlip)) toFlip = NOVALUE;
+    else
+    { // If toflip is in block, then set other to flip
+      int idx = candidateBlockedVars.find(toFlip);
+      if (idx >= 0)
+      {
+        inBlock_ = true;
+        flipInBlock_ = othersToFlip[idx];
+      }
     }
 
-    if(numzero == 0)
-      return(NOVALUE);
-
-    select = random()%numzero;
-
-    for(i = 0; select >= 0; i++)
-    {
-      if(numbreak[i] == 0)
-        select--;
-    }
-
-    return(i-1);
+    //if (mwsdebug) cout << "Leaving MaxWalkSat::pickTabu" << endl;
+    return toFlip;
   }
 
-  int pickweight(int *weight, int clausesize)
+  /**
+   * Pick an atom according to the SampleSat heuristic. This means sometimes
+   * sim. annealing, sometimes MaxWalkSat.
+   * 
+   * @return Index of atom picked.
+   */
+  int pickSS()
   {
-    int i;                /* loop counter */
-    int total = 0;        /* sum of weights */
-    int select;           /* random number less than total */
-    int subtotal = 0;
+    //if (mwsdebug) cout << "Entering MaxWalkSat::pickSS" << endl;
+    assert(!inBlock_);
+    Array<int> canNotFlip;
+      // If var in candidateBlockedVars is chosen, then
+      // corresponding var in othersToFlip is flipped as well
+    Array<int> candidateBlockedVars;
+    Array<int> othersToFlip;
+    long double costOfFalseClauses = state_->getCostOfFalseClauses();
 
-    for(i = 0; i < clausesize; i++)
-      total += weight[i];
-
-    if(total == 0)
-      return(random()%clausesize);
-
-    select = random()%total;
-    for(i = 0; subtotal <= select; i++)
-      subtotal += weight[i];
-    return(i-1);
-  }
-
-  void countlowunsatcost(int * unsatcostptr, int * worstcostptr)
-  {
-    int i, j, lit, sign, unsatcost, worstcost;
-    bool bad;
-
-    unsatcost = 0;
-    worstcost = 0;
-    
-    for (i = 0; i < numclause; i++)
+      // If we have already reached a solution or if in an SA step,
+      // then perform SA
+      // Add 0.0001 to targetCost_ because of double precision error
+      // This needs to be fixed
+    if (costOfFalseClauses <= targetCost_ + 0.0001 ||
+        (random() % 100 < saRatio_ && !lateSa_))
     {
-        // Neg. clause
-      if (cost[i] < 0)
-        bad = false;
-        // Pos. clause
+        // Choose a random atom to flip
+      int toFlip = state_->getIndexOfRandomAtom();
+      if (toFlip == NOVALUE) return NOVALUE;
+      long double improvement = calculateImprovement(toFlip, canNotFlip,
+                                                     candidateBlockedVars,
+                                                     othersToFlip);
+
+        // If pos. or no improvement, then the atom will be flipped
+        // Or neg. improvement: According to temp. flip atom anyway
+      if ((improvement >= 0) ||
+          (random() <= exp(improvement/(saTemp_/100.0)) * RAND_MAX))
+      {
+          // If atom can not be flipped, then null flip
+        if (canNotFlip.contains(toFlip)) toFlip = NOVALUE;
+        else
+        { // If toflip is in block, then set other to flip
+          int idx = candidateBlockedVars.find(toFlip);
+          if (idx >= 0)
+          {
+            inBlock_ = true;
+            flipInBlock_ = othersToFlip[idx];
+          }
+        }
+        return toFlip;
+      }
       else
-        bad = true;
-
-      for (j = 0; j < size[i]; j++)
       {
-        lit = clause[i][j];
-        sign = lit > 0 ? 1 : 0;
-        if ( lowatom[abs(lit)] == sign )
-        {
-            // Neg. clause
-          if (cost[i] < 0)
-            bad = true;
-            // Pos. clause
-          else
-            bad = false;
-          break;
-        }
-      }
-      if (bad)
-      {
-        unsatcost += abs(cost[i]);
-        if (abs(cost[i]) > worstcost) worstcost = abs(cost[i]);
+        return NOVALUE;
       }
     }
-    
-    * unsatcostptr = unsatcost;
-    * worstcostptr = worstcost;
-    return;
-  }
-
-
-  double elapsed_seconds(void)
-  {
-    double answer;
-
-    static struct rusage prog_rusage;
-    static long prev_rusage_seconds = 0;
-    static long prev_rusage_micro_seconds = 0;
-
-    getrusage(0, &prog_rusage);
-    answer = (double)(prog_rusage.ru_utime.tv_sec - prev_rusage_seconds) +
-             ((double)(prog_rusage.ru_utime.tv_usec - prev_rusage_micro_seconds)) / 
-             1000000.0 ;
-    prev_rusage_seconds = prog_rusage.ru_utime.tv_sec ;
-    prev_rusage_micro_seconds = prog_rusage.ru_utime.tv_usec ;
-    return answer;
-  }
-
-    /* extract the true atoms in the best assignment */
-  void extract_low_assign(Array<int>& trueAtomArray)
-  {
-    trueAtomArray.clear();
-    for (int i = 1; i <= numatom; i++)
-    {
-      if (lowatom[i] > 0)
-      {
-        trueAtomArray.append(i);
-      }
-    }
-  }
-
-  void print_low_assign(long int lowbad)
-  {
-    int i, j;
-
-    printf("Begin assign with lowest # bad = %li (atoms assigned true)\n", lowbad);
-    j = 1;
-    for (i = 1; i <= numatom; i++)
-    {
-      if (lowatom[i] > 0)
-      {
-        printf(" %d", i);
-        if (j++ % 10 == 0) printf("\n");
-      }
-    }
-    if ((j-1) % 10 != 0) printf("\n");
-    printf("End assign\n");
-  }
-
-  void save_low_assign(void)
-  {
-    int i;
-
-    for (i = 1; i <= numatom; i++)
-      lowatom[i] = atom[i];
-  }
-
-  int selecthigh(int high)
-  {
-    int counter = 0;
-    int i = 0;
-    while ((i < numfalse) && (counter < high))
-    {
-      if (abs(cost[falseclause[i]]) == highestcost)
-        counter++;
-      i++;
-    }
-    /* fprintf(stderr, "The cost of the selected clause %i\n", cost[false[i-1]]);*/
-    return(falseclause[i-1]);
-  }
-  
-    // Sets the truth values of all atoms in the
-    // block blockIdx except for the one with index atomIdx
-  void setOthersInBlockToFalse(const int& atomIdx,
-                               const int& blockIdx)
-  {
-    Array<int> block = (*blocks_)[blockIdx];
-    for (int i = 0; i < block.size(); i++)
-    {
-      if (i != atomIdx)
-        atom[block[i] + 1] = 0;
-    }
-  }
-  
-    // returns the index of the block which the atom
-    // with index atomIdx is in. If not in any, returns -1
-  int getBlock(const int& atomIdx)
-  {
-    for (int i = 0; i < blocks_->size(); i++)
-    {
-      int blockIdx = (*blocks_)[i].find(atomIdx);
-      if (blockIdx >= 0)
-        return i;
-    }
-    return -1;
-  }
-  
-    // Calculates the breakcost by flipping atom
-    // and stores idx of other atom to flip in block in flipInBlock
-  int calculateNumbreak(const int& atomIdx, int& otherToFlip)
-  {
-    int blockIdx = getBlock(atomIdx - 1);
-    assert(blockIdx >= 0);
-
-      //Dealing with atom in a block
-    Array<int> block = (*blocks_)[blockIdx];
-    int chosen = -1;
-    
-      // 0->1: choose atom in block which is already 1
-    if (atom[atomIdx] == 0)
-    {
-      for (int i = 0; i < block.size(); i++)
-      {
-        if (atom[block[i] + 1] == 1)
-        {
-          chosen = i;
-          break;
-        }
-      }
-    }
-      // 1->0: choose to flip the other randomly
-      // TODO: choose to flip the other with best breakcost
+      // Not in a solution or SA step: perform normal MWS step
     else
     {
-      bool ok = false;
-      while(!ok)
+      return pickTabu();
+    }
+  }
+
+
+  /**
+   * Calculates the improvement (makecost - breakcost) by flipping an atom.
+   * If the atom is in a block, then its index is saved in candidateBlockedVars
+   * and the index of another atom chosen to be flipped in the block is
+   * appended to othersToFlip. If the atom is in a block with evidence, then
+   * its index is appended to canNotFlip.
+   * 
+   * @param atomIdx Index of atom for which the improvement is calculated.
+   * @param canNotFlip Holds indices of atoms which can not be flipped due
+   * to evidence in a block.
+   * @param candidateBlockedVars If dealing with an atom in a block, then its
+   * index is appended here.
+   * @param othersToFlip If dealing with an atom in a block, then the index of
+   * the other atom chosen to be flipped is appended here.
+   */
+  long double calculateImprovement(const int& atomIdx, Array<int>& canNotFlip,
+                                   Array<int>& candidateBlockedVars,
+                                   Array<int>& othersToFlip)
+  {
+    int blockIdx = state_->getBlockIndex(atomIdx - 1);
+    if (blockIdx == -1)
+    {
+        // Atom not in a block
+      return state_->getImprovementByFlipping(atomIdx);
+    }
+
+    else
+    {
+        // Atom is in a block
+        // If evidence atom exists or in block of size 1, then can not flip
+      if (state_->isBlockEvidence(blockIdx) ||
+          state_->getBlockSize(blockIdx) == 1)
       {
-        chosen = random() % block.size();
-        if (block[chosen] + 1 != atomIdx)
-          ok = true;
+        canNotFlip.append(atomIdx);
+        return -LDBL_MAX;
+      }
+      else
+      {
+          //Dealing with atom in a block
+        Array<int>& block = state_->getBlockArray(blockIdx);
+        int chosen = -1;
+        int otherToFlip = -1;
+
+          // 0->1: choose atom in block which is already 1
+        if (state_->getValueOfAtom(atomIdx) == 0)
+        {
+          if (mwsdebug)
+          {
+            cout << "0->1 atom " << atomIdx << endl;
+            for (int i = 0; i < block.size(); i++)
+            {
+              cout << "Atom in block " << block[i] + 1 << " ";
+              cout << state_->getValueOfAtom(block[i] + 1) << endl;
+            }
+          }
+          
+          for (int i = 0; i < block.size(); i++)
+          {
+            if (state_->getValueOfAtom(block[i] + 1) == 1)
+            {
+              chosen = i;
+              break;
+            }
+          }
+        }
+          // 1->0: choose to flip the other randomly
+          // TODO: choose to flip the other with best improvement
+        else
+        {
+          if (mwsdebug)
+          {
+            cout << "1->0 atom " << atomIdx << endl;
+            for (int i = 0; i < block.size(); i++)
+            {
+              cout << "Atom in block " << block[i] + 1 << " ";
+              cout << state_->getValueOfAtom(block[i] + 1) << endl;
+            }
+          }
+          bool ok = false;
+          while (!ok)
+          {
+            chosen = random() % block.size();
+            if (block[chosen] + 1 != atomIdx)
+              ok = true;
+          }
+        }
+    
+        assert(chosen >= 0);
+        candidateBlockedVars.append(atomIdx);
+        otherToFlip = block[chosen] + 1;
+        othersToFlip.append(otherToFlip);
+        return (state_->getImprovementByFlipping(atomIdx) +
+                state_->getImprovementByFlipping(otherToFlip));
+
       }
     }
-    
-    assert(chosen >= 0);
-    otherToFlip = block[chosen] + 1;
-    return breakcost[atomIdx] + breakcost[otherToFlip];    
   }
-  
+
+  /**
+   * Reconstructs the state with the lowest cost by flipping atoms back to
+   * their value in this state.
+   */
+  void reconstructLowState()
+  {
+    assert(lazyLowState_);
+    if (mwsdebug) cout << "Reconstructing low state ..." << endl;
+    hash_set<int>::const_iterator it = varsFlippedSinceLowState_.begin();
+    for (; it != varsFlippedSinceLowState_.end(); it++)
+    {
+      if (mwsdebug)
+      {
+        cout << "Flipping atom " << (*it) << endl;
+      }
+      state_->flipAtomValue(*it);
+    }
+    state_->saveLowState();
+    if (mwsdebug) cout << "Done reconstructing low state ..." << endl;
+  }
+
  private:
-          
-    /* Atoms start at 1 */
-    /* Not a is recorded as -1 * a */
-    /* One dimensional arrays are statically allocated. */
-    /* Two dimensional arrays are dynamically allocated in */
-    /* the second dimension only.  */
-    /* (Arrays are not entirely dynamically allocated, because */
-    /* doing so slows execution by 25% on SGI workstations.) */
-
-  int numatom;
-  int numclause;
-  int numliterals;
-
-  int ** clause;    /* clauses to be satisfied */
-                    /* indexed as clause[clause_num][literal_num] */
-  int * cost;       /* cost of each clause */
-  int * size;         /* length of each clause */
-  int * falseclause;          /* clauses which are false */
-  int * lowfalse;
-
-  int * wherefalse;       /* where each clause is listed in false */
-  int * numtruelit;       /* number of true literals in each clause */
-
-  int **occurence;    /* where each literal occurs */
-                    /* indexed as occurence[literal+numatom][occurence_num] */
-
-  int *numoccurence;  /* number of times each literal occurs */
-
-
-  int *atom;      /* value of each atom */ 
-  int *lowatom;
-
-  int *changed;       /* step at which atom was last flipped */
-
-  int *breakcost; /* the cost of clauses that introduces if var is flipped */
-
-  int numfalse;           /* number of false clauses */
-  int costofnumfalse;     /* cost associated with the number of false clauses */
-
-  bool costexpected;   /*indicate whether cost is expected from the input*/
-  bool abort_flag;
-
-  int heuristic;          /* heuristic to be used */
-  int numerator;          /* make random flip with numerator/denominator frequency */
-  int denominator;        
-  int tabu_length;        /* length of tabu list */
-
-  long int numflip;       /* number of changes so far */
-  long int numnullflip;       /*  number of times a clause was picked, but no  */
-                /*  variable from it was flipped  */
-
-  int highestcost;               /*The highest cost of a clause violation*/
-  int eqhighest;  /*Is there a clause violated with the highest cost*/
-  int numhighest;      /*Number of violated clauses with the highest cost*/
-
-  bool hard; /* if true never break a highest cost clause */
-
-  Array<int *> storePtrArray;
+ 
+    ////////// BEGIN: User parameters ///////////
+    // Heuristic to be used to pick an atom
+  int heuristic_;
+    // At least this many flips must occur before flipping the same atom
+  int tabuLength_;
   
-    // For block inference
-  Array<Array<int> >* blocks_;
-  Array<bool >* blockEvidence_;
-    
-    // Which other atom to flip in block
-  bool inBlock;
-  int flipInBlock;
-    
-};
+    // BEGIN: SampleSat parameters
+    // Percent of sim. annealing steps
+  int saRatio_;
+    // Sim. annealing temperature
+  int saTemp_;
+    // Run sim. annealing only at a plateur
+  bool lateSa_;
+    // END: SampleSat parameters
+    ////////// END: User parameters ///////////
 
+    // Function pointer holds which function is to be used to pick an atom
+    // = {pickRandom, pickBest, pickTabu, pickSS};
+  int (MaxWalkSat::*pickcode[15])(void);
+    // If true, never break a highest cost clause
+  bool hard_;
+
+    // Make random flip with numerator/denominator probability
+  int numerator_;
+  int denominator_;
+      
+    // Which other atom to flip in block
+  bool inBlock_;
+  int flipInBlock_;
+  
+    // If false, the naive way of saving low states (each time a low state is
+    // found, the whole state is saved) is used; otherwise, a list of variables
+    // flipped since the last low state is kept and the low state is
+    // reconstructed. This can be much faster for very large data sets.
+  bool lazyLowState_;
+    // List of variables flipped since last low state was found. This is used
+    // to reconstruct the low state when lazyLowState_ is set.
+  hash_set<int> varsFlippedSinceLowState_;
+};
 
 #endif

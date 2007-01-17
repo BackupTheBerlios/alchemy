@@ -8,7 +8,7 @@ All of the documentation and software included in the Alchemy (Beta Version)
 Software is copyrighted by Stanley Kok, Parag Singla, Matthew Richardson and 
 Pedro Domingos.
 
-Copyright [2004-05] Stanley Kok, Parag Singla, Matthew Richardson and 
+Copyright [2004-07] Stanley Kok, Parag Singla, Matthew Richardson and 
 Pedro Domingos. All rights reserved. 
 
 Contact: Pedro Domingos, University of Washington (pedrod@cs.washington.edu).

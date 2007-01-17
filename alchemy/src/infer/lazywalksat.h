@@ -89,7 +89,6 @@ class LazyWalksat
 
  bool hard; /* if true never break a highest cost clause */
 
- bool gnded; /* is the fully gnded given before hand or not */
  bool noApprox; /* If set to true, atoms are not deactivated when mem. is full */
 
  FreeStoreManager *clauseFSMgr;  //free store manager
@@ -105,6 +104,14 @@ class LazyWalksat
  Array<Array<int> *> newClauses;
  Array<int> newClauseWeights;
 
+    // Holds the initial set of active clauses for MC-SAT
+ Array<IntClause *> supersetClauses_;
+
+    // Holds atoms which have been fixed due to unit prop.
+ //Array<int> fixedAtoms_;
+ bool * fixedAtoms_;
+ int maxFixedAtoms;
+
  LWInfo *lwInfo;
 
 	// Max. amount of memory to use
@@ -115,6 +122,8 @@ class LazyWalksat
  bool haveDeactivated;
  	// Initial number of clauses
  int initClauseCount;
+    // Initial number of atoms
+ int initAtomCount;
 
 public:
 
@@ -124,7 +133,8 @@ public:
  
  /* perform the lazy samplesat inference */ 
  bool sample(const MaxWalksatParams* const & mwsParams,
- 			 const SampleSatParams& sampleSatParams);
+ 			 const SampleSatParams& sampleSatParams,
+             const bool& initial);
 
  /* perform the lazy walksat inference */ 
  void infer(const MaxWalksatParams* const & params,
@@ -134,7 +144,13 @@ public:
         	
  int getNumInitClauses();
  
+ int getNumInitAtoms();
+
  int getNumClauses();
+ 
+ void resetSampleSat();
+ 
+ void randomizeActiveAtoms();
  
 private:
 
@@ -204,6 +220,10 @@ private:
  int pickweight(int *weight,int clausesize);
 
  bool simAnnealing();
+ 
+ void undoFixedAtoms();
+ void initFixedAtoms(Array<Array<int> *> &clauses,
+                     Array<int> &clauseWeights);
 
  void print_false_clauses_cost(long int lowbad);
  void print_low_assign(long int lowbad);

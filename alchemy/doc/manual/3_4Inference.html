@@ -25,21 +25,21 @@ original version by:  Nikos Drakos, CBLU, University of Leeds
 
 <BODY >
 <!--Navigation Panel-->
-<A NAME="tex2html98"
+<A NAME="tex2html91"
   HREF="3_4_1Memory_efficient_infer.html">
 <IMG WIDTH="37" HEIGHT="24" ALIGN="BOTTOM" BORDER="0" ALT="next" SRC="next.png"></A> 
-<A NAME="tex2html96"
+<A NAME="tex2html89"
   HREF="3Quick_Start.html">
 <IMG WIDTH="26" HEIGHT="24" ALIGN="BOTTOM" BORDER="0" ALT="up" SRC="up.png"></A> 
-<A NAME="tex2html92"
+<A NAME="tex2html85"
   HREF="3_3Structure_Learning.html">
 <IMG WIDTH="63" HEIGHT="24" ALIGN="BOTTOM" BORDER="0" ALT="previous" SRC="prev.png"></A>   
 <BR>
-<B> Next:</B> <A NAME="tex2html99"
+<B> Next:</B> <A NAME="tex2html92"
   HREF="3_4_1Memory_efficient_infer.html">3.4.1 Memory-efficient inference</A>
-<B> Up:</B> <A NAME="tex2html97"
+<B> Up:</B> <A NAME="tex2html90"
   HREF="3Quick_Start.html">3 Quick Start</A>
-<B> Previous:</B> <A NAME="tex2html93"
+<B> Previous:</B> <A NAME="tex2html86"
   HREF="3_3Structure_Learning.html">3.3 Structure Learning</A>
 <BR>
 <BR>
@@ -69,7 +69,7 @@ soft clause weight.
 If neither weight nor period is specified for a unit formula with  
 variables followed by <TT>!</TT>, each of its CNF clauses is given 
 a default weight that is 1.5 times the maximum soft clause weight.
-(See Section&nbsp;<A HREF="6_2Parser.html#parserdir">6.2</A> on how to change the default weights.)
+(See the developer's manual on how to change the default weights.)
 
 <P>
 <TT>-e</TT> specifies the evidence <TT>.db</TT> file; a comma-separated list 
@@ -88,10 +88,29 @@ containing the query ground atoms you are interested in.
 (You may use both <TT>-q</TT> and <TT>-f</TT> together.)
 
 <P>
-By default, all first-order predicates are open world. 
-You can control the open/closed-world assumptions with the 
-<TT>-c</TT> and <TT>-o</TT> options. Type <TT>ALCHDIR/bin/infer</TT>
-without any parameters to see all available options.
+An evidence predicate is defined as a predicate of which the .db evidence
+file contains at least one grounding; all evidence predicates are
+closed-world by default. All non-evidence predicates are open-world by
+default. The user may specify that some evidence predicates are open-world
+by listing them with the -o option. Also, the user may specify that some
+non-evidence predicates are closed-world by listing them with the -c option.
+This effectively turns them into evidence predicates with all false groundings.
+If a ground atom is listed as a query atom on the command line or in
+the query file, or is specified as unknown in the evidence file,
+this overrides any closed-world defaults or options. If a
+first-order predicate is listed as a query predicate and the
+evidence file contains at least one of its groundings, the predicate
+is open-world. In other words, the openness of query predicates
+overrides the closedness of evidence ones. If a predicate is
+simultaneously listed as a query predicate and as closed-world with
+the -c option, or appears in both -c and -o lists, an error message
+is returned to the user. If a predicate is closed-world and some of
+its atoms are query atoms, the predicate is treated as closed-world
+except for the query atoms. If the user specifies an evidence
+predicate as closed with the -c option or a non-evidence one as open
+with -o, a warning message is returned, as these are the defaults.
+Type <TT>ALCHDIR/bin/infer</TT> without any parameters to see all
+available options.
 
 <P>
 Alchemy supports two basic types of inference:&nbsp;MCMC and MAP/MPE. The current
@@ -119,8 +138,8 @@ of the soft clause weights plus 10.
 The MAP inference engine used in Alchemy attempts to satisfy clauses with
 positive weights (just as in the original MaxWalkSat algorithm) and keep
 clauses with negative weights unsatisfied. As an extension to the MaxWalkSat
-algorithm, when a clause with a negative weights is chosen to fix, all
-atoms in that clause are set to false.
+algorithm, when a clause with a negative weight is chosen to fix, one true
+atom in that clause is chosen at random to be set to false.
 
 <P>
 <BR><HR>
@@ -128,32 +147,32 @@ atoms in that clause are set to false.
 <A NAME="CHILD_LINKS"><STRONG>Subsections</STRONG></A>
 
 <UL>
-<LI><A NAME="tex2html100"
+<LI><A NAME="tex2html93"
   HREF="3_4_1Memory_efficient_infer.html">3.4.1 Memory-efficient inference</A>
 </UL>
 <!--End of Table of Child-Links-->
 <HR>
 <!--Navigation Panel-->
-<A NAME="tex2html98"
+<A NAME="tex2html91"
   HREF="3_4_1Memory_efficient_infer.html">
 <IMG WIDTH="37" HEIGHT="24" ALIGN="BOTTOM" BORDER="0" ALT="next" SRC="next.png"></A> 
-<A NAME="tex2html96"
+<A NAME="tex2html89"
   HREF="3Quick_Start.html">
 <IMG WIDTH="26" HEIGHT="24" ALIGN="BOTTOM" BORDER="0" ALT="up" SRC="up.png"></A> 
-<A NAME="tex2html92"
+<A NAME="tex2html85"
   HREF="3_3Structure_Learning.html">
 <IMG WIDTH="63" HEIGHT="24" ALIGN="BOTTOM" BORDER="0" ALT="previous" SRC="prev.png"></A>   
 <BR>
-<B> Next:</B> <A NAME="tex2html99"
+<B> Next:</B> <A NAME="tex2html92"
   HREF="3_4_1Memory_efficient_infer.html">3.4.1 Memory-efficient inference</A>
-<B> Up:</B> <A NAME="tex2html97"
+<B> Up:</B> <A NAME="tex2html90"
   HREF="3Quick_Start.html">3 Quick Start</A>
-<B> Previous:</B> <A NAME="tex2html93"
+<B> Previous:</B> <A NAME="tex2html86"
   HREF="3_3Structure_Learning.html">3.3 Structure Learning</A>
 <!--End of Navigation Panel-->
 <ADDRESS>
 Marc Sumner
-2006-06-26
+2007-01-16
 </ADDRESS>
 </BODY>
 </HTML>

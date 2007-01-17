@@ -1,19 +1,119 @@
+/*
+ * All of the documentation and software included in the
+ * Alchemy Software is copyrighted by Stanley Kok, Parag
+ * Singla, Matthew Richardson, Pedro Domingos, Marc
+ * Sumner and Hoifung Poon.
+ * 
+ * Copyright [2004-07] Stanley Kok, Parag Singla, Matthew
+ * Richardson, Pedro Domingos, Marc Sumner and Hoifung
+ * Poon. All rights reserved.
+ * 
+ * Contact: Pedro Domingos, University of Washington
+ * (pedrod@cs.washington.edu).
+ * 
+ * Redistribution and use in source and binary forms, with
+ * or without modification, are permitted provided that
+ * the following conditions are met:
+ * 
+ * 1. Redistributions of source code must retain the above
+ * copyright notice, this list of conditions and the
+ * following disclaimer.
+ * 
+ * 2. Redistributions in binary form must reproduce the
+ * above copyright notice, this list of conditions and the
+ * following disclaimer in the documentation and/or other
+ * materials provided with the distribution.
+ * 
+ * 3. All advertising materials mentioning features or use
+ * of this software must display the following
+ * acknowledgment: "This product includes software
+ * developed by Stanley Kok, Parag Singla, Matthew
+ * Richardson, Pedro Domingos, Marc Sumner and Hoifung
+ * Poon in the Department of Computer Science and
+ * Engineering at the University of Washington".
+ * 
+ * 4. Your publications acknowledge the use or
+ * contribution made by the Software to your research
+ * using the following citation(s): 
+ * Stanley Kok, Parag Singla, Matthew Richardson and
+ * Pedro Domingos (2005). "The Alchemy System for
+ * Statistical Relational AI", Technical Report,
+ * Department of Computer Science and Engineering,
+ * University of Washington, Seattle, WA.
+ * http://www.cs.washington.edu/ai/alchemy.
+ * 
+ * 5. Neither the name of the University of Washington nor
+ * the names of its contributors may be used to endorse or
+ * promote products derived from this software without
+ * specific prior written permission.
+ * 
+ * THIS SOFTWARE IS PROVIDED BY THE UNIVERSITY OF WASHINGTON
+ * AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED
+ * WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+ * PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE UNIVERSITY
+ * OF WASHINGTON OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
+ * INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+ * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
+ * ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
+ * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * 
+ */
 #ifndef _INFER_H_OCT_30_2005
 #define _INFER_H_OCT_30_2005
+
+/**
+ * Collection of functions useful for performing inference.
+ */
 
 #include "util.h"
 #include "fol.h"
 #include "mrf.h"
 
-
+/**
+ * Creates query predicates from a string of predicates
+ * separated by a comma without a space. This method also
+ * serves to print out ground preds and their probs / truth
+ * values to a stream if printToFile is set to true.
+ * 
+ * @param queryPredsStr Comma-separated string of predicate
+ * names which is parsed.
+ * @param domain Domain from which predicates are generated.
+ * @param db Database containing truth values of the preds.
+ * @param queries Array being filled with groundings of preds
+ * specified in queryPredsStr (those with unknown values in db).
+ * @param knownQueries Array being filled with groundings of preds
+ * specified in queryPredsStr (those with known values in db).
+ * @param allPredGndingsAreQueries Boolean array indicating
+ * which predicates have all their gndings as queries
+ * (indexed by the predicate's id in domain)
+ * @param printToFile If true, atom, and their truth values,
+ * are printed to file, not collected in HashArray.
+ * @param out stream to which the groundings are printed when
+ * printToFile is set to true.
+ * @param amapPos If true, only positive atoms are printed out.
+ * Otherwise, all atoms with 0/1 are printed. Used in
+ * conjunction printToFile.
+ * @param trueQueries If specified, probabilities from the ground
+ * preds here are written to out. Used in conjunction with
+ * printToFile.
+ * 
+ * @return false, if a pred name or constant is not defined, or if
+ * a pred has the wrong number of terms; otherwise, true. 
+ */
 bool createComLineQueryPreds(const string& queryPredsStr,
                              const Domain* const & domain,
-                             Database* const & evidenceDB,
+                             Database* const & db,
                              GroundPredicateHashArray* const & queries,
                              GroundPredicateHashArray* const & knownQueries,
                              Array<int>* const & allPredGndingsAreQueries,
                              bool printToFile, ostream& out, bool amapPos,
-                             const GroundPredicateHashArray* const & trueQueries)
+                            const GroundPredicateHashArray* const & trueQueries,
+                             const Array<double>* const & trueProbs)
 {
   if (queryPredsStr.length() == 0) return true;
   string preds = Util::trim(queryPredsStr);
@@ -48,8 +148,13 @@ bool createComLineQueryPreds(const string& queryPredsStr,
     cur = 0;
 
       // get predicate name
-    if (!Util::substr(pred,cur,predName,"(")) {predName=pred;onlyPredName=true;}
+    if (!Util::substr(pred,cur,predName,"("))
+    {
+      predName = pred;
+      onlyPredName = true;
+    }
     
+      // Predicate must be in the domain
     ptemplate = domain->getPredicateTemplate(predName.c_str());
     if (ptemplate == NULL)
     {
@@ -60,7 +165,8 @@ bool createComLineQueryPreds(const string& queryPredsStr,
     }
     Predicate ppred(ptemplate);
 
-    if (!onlyPredName) // if the terms of the query predicate are also specified
+      // if the terms of the query predicate are also specified
+    if (!onlyPredName)
     {
         // get term name
       for (int i = 0; i < 2; i++)
@@ -69,7 +175,8 @@ bool createComLineQueryPreds(const string& queryPredsStr,
         else        delimit[0] = ')';
         while(Util::substr(pred, cur, term, delimit))
         {
-          if (isupper(term.at(0)) || term.at(0) == '"') // this is a constant
+            // this is a constant
+          if (isupper(term.at(0)) || term.at(0) == '"')
           {
             termId = domain->getConstantId(term.c_str());
             if (termId < 0) 
@@ -99,7 +206,7 @@ bool createComLineQueryPreds(const string& queryPredsStr,
         ppred.appendTerm(new Term(--varIdCnt, (void*)&ppred, true));
     }  
 
-
+      // Check if number of terms is correct
     if (ppred.getNumTerms() != ptemplate->getNumTerms())
     {
       cout << "ERROR: " << predName << " requires " << ptemplate->getNumTerms()
@@ -113,12 +220,12 @@ bool createComLineQueryPreds(const string& queryPredsStr,
     vtiArr = NULL;
     ppred.createVarsTypeIdArr(vtiArr);
 
-      // if a ground predicate was specified on command line
+      // If a ground predicate was specified on command line
     if (vtiArr->size() <= 1)
     {
       assert(ppred.isGrounded());
-      assert(!evidenceDB->isClosedWorld(ppred.getId()));
-      TruthValue tv = evidenceDB->getValue(&ppred);
+      assert(!db->isClosedWorld(ppred.getId()));
+      TruthValue tv = db->getValue(&ppred);
       GroundPredicate* gndPred = new GroundPredicate(&ppred);
       
         // If just printing to file, then all values must be known
@@ -138,16 +245,19 @@ bool createComLineQueryPreds(const string& queryPredsStr,
             double prob = 0.0;
             if (domain->getDB()->getEvidenceStatus(&ppred))
             {
-              prob = (tv == TRUE) ? 1.0 : 0.0;
+                // Don't print out evidence atoms
+              continue;
+              //prob = (tv == TRUE) ? 1.0 : 0.0;
             }
             else
             {
               int found = trueQueries->find(gndPred);
-              if (found >= 0) prob = (*trueQueries)[found]->getProbTrue();
+              if (found >= 0) prob = (*trueProbs)[found];
+              else
+                  // Uniform smoothing
+                prob = (prob*10000+1/2.0)/(10000+1.0);
+              
             }
-            // Uniform smoothing
-            //if (asmooth>0) prob = (prob*numSamples+asmooth/2.0)/(numSamples+asmooth);
-            prob = (prob*10000+1/2.0)/(10000+1.0);
             gndPred->print(out, domain); out << " " << prob << endl;
           }
           else
@@ -168,16 +278,16 @@ bool createComLineQueryPreds(const string& queryPredsStr,
           }
           delete gndPred;
         }
-        else // Building queries
+        else // Building queries for HashArray
         {
-          if (tv == TRUE) gndPred->setProbTrue(1);
-          else            gndPred->setProbTrue(0);
+          //if (tv == TRUE) gndPred->setProbTrue(1);
+          //else            gndPred->setProbTrue(0);
 
           if (knownQueries->append(gndPred) < 0) delete gndPred;  
         }
       }      
     }
-    else
+    else // Variables need to be grounded
     {
       ArraysAccessor<int> acc;
       for (int i = 1; i < vtiArr->size(); i++)
@@ -198,11 +308,10 @@ bool createComLineQueryPreds(const string& queryPredsStr,
             terms[k]->setId(constIds[j]);
         }
 
-        //at this point the predicate is grounded
-      
-        assert(!evidenceDB->isClosedWorld(ppred.getId()));
+        // at this point the predicate is grounded
+        assert(!db->isClosedWorld(ppred.getId()));
 
-        TruthValue tv = evidenceDB->getValue(&ppred);        
+        TruthValue tv = db->getValue(&ppred);        
         GroundPredicate* gndPred = new GroundPredicate(&ppred);
 
     	  // If just printing to file, then all values must be known
@@ -222,16 +331,20 @@ bool createComLineQueryPreds(const string& queryPredsStr,
               double prob = 0.0;
               if (domain->getDB()->getEvidenceStatus(&ppred))
               {
-                prob = (tv == TRUE) ? 1.0 : 0.0;
+                  // Don't print out evidence atoms
+                continue;
+                //prob = (tv == TRUE) ? 1.0 : 0.0;
               }
               else
               {
                 int found = trueQueries->find(gndPred);
-                if (found >= 0) prob = (*trueQueries)[found]->getProbTrue();
+                if (found >= 0) prob = (*trueProbs)[found];
+                else
+                    // Uniform smoothing
+                  prob = (prob*10000+1/2.0)/(10000+1.0);
               }
                 // Uniform smoothing
-                //if (asmooth>0) prob = (prob*numSamples+asmooth/2.0)/(numSamples+asmooth);
-              prob = (prob*10000+1/2.0)/(10000+1.0);
+              //prob = (prob*10000+1/2.0)/(10000+1.0);
               gndPred->print(out, domain); out << " " << prob << endl;
             }
             else
@@ -254,8 +367,8 @@ bool createComLineQueryPreds(const string& queryPredsStr,
           }
           else // Building queries
           {
-          	if (tv == TRUE) gndPred->setProbTrue(1);
-          	else            gndPred->setProbTrue(0);
+          	//if (tv == TRUE) gndPred->setProbTrue(1);
+          	//else            gndPred->setProbTrue(0);
           	if (knownQueries->append(gndPred) < 0) delete gndPred;  
           }
         }        
@@ -274,19 +387,33 @@ bool createComLineQueryPreds(const string& queryPredsStr,
   return ret;
 }
 
+/**
+ * Calls createComLineQueryPreds (see above) with trueQueries set to NULL
+ * for backwards compatibility.
+ */
 bool createComLineQueryPreds(const string& queryPredsStr,
                              const Domain* const & domain,
-                             Database* const & evidenceDB,
+                             Database* const & db,
                              GroundPredicateHashArray* const & queries,
                              GroundPredicateHashArray* const & knownQueries,
                              Array<int>* const & allPredGndingsAreQueries)
 {
-  return createComLineQueryPreds(queryPredsStr, domain, evidenceDB,
-                             	 queries, knownQueries, allPredGndingsAreQueries,
-                             	 false, cout, false, NULL);
+  return createComLineQueryPreds(queryPredsStr, domain, db,
+                             	 queries, knownQueries,
+                                 allPredGndingsAreQueries,
+                             	 false, cout, false, NULL, NULL);
 }
 
-  // note that preds is a copy
+/**
+ * Extracts predicate names specified in a string and in a file
+ * and stores them in a HashArray. Note that preds is a copy.
+ * 
+ * @param preds string of comma-separated predicate names to be parsed
+ * @param queryFile name of file containing predicate names
+ * @param predNames Stores the parsed predicate names
+ * 
+ * @return false, if queryFile can not be opened; otherwise, true.
+ */
 bool extractPredNames(string preds, const string* queryFile, 
                       StringHashArray& predNames)
 { 
@@ -356,11 +483,10 @@ bool extractPredNames(string preds, const string* queryFile,
   return true;
 }
 
-
-typedef hash_map<string, const Array<const char*>*, HashString, EqualString> 
-StringToStrArrayMap;
-
-
+/**
+ * Returns the first character of the truth value
+ * TRUE, FALSE or UKNOWN
+ */
 char getTruthValueFirstChar(const TruthValue& tv)
 {
   if (tv == TRUE)    return 'T';
@@ -371,7 +497,9 @@ char getTruthValueFirstChar(const TruthValue& tv)
   return '#'; //avoid compilation warning
 }
 
-
+/**
+ * Sets the seed for the srand() function according to time of day.
+ */
 void setsrand()
 {
   struct timeval tv;
@@ -385,8 +513,7 @@ void setsrand()
   //copy srcFile to dstFile, & append '#include "dbFiles"' to latter
 void copyFileAndAppendDbFile(const string& srcFile, string& dstFile, 
                              const Array<string>& dbFilesArr,
-                             const Array<string>& constFilesArr,
-                             const Array<string>& funcFilesArr)
+                             const Array<string>& constFilesArr)
 {
   ofstream out(dstFile.c_str());
   ifstream in(srcFile.c_str());
@@ -400,9 +527,6 @@ void copyFileAndAppendDbFile(const string& srcFile, string& dstFile,
   out << endl;
   for (int i = 0; i < constFilesArr.size(); i++) 
     out << "#include \"" << constFilesArr[i] << "\"" << endl;
-  out << endl;
-  for (int i = 0; i < funcFilesArr.size(); i++)  
-    out << "#include \"" <<  funcFilesArr[i]  << "\"" << endl;
   out << endl;
   for (int i = 0; i < dbFilesArr.size(); i++)    
     out << "#include \"" << dbFilesArr[i] << "\"" << endl;
@@ -424,13 +548,42 @@ bool checkQueryPredsNotInClosedWorldPreds(const StringHashArray& qpredNames,
   return ok;
 }
 
-
-bool createQueryFilePreds(const string& queryFile, const Domain* const & domain,
-                          Database* const & evidenceDB,
+/**
+ * Creates query predicates from a file of predicates
+ * separated by newline character. This method also
+ * serves to print out ground preds and their probs / truth
+ * values to a stream if printToFile is set to true.
+ * 
+ * @param queryFile Location of file containing predicate
+ * names which is parsed.
+ * @param domain Domain from which predicates are generated.
+ * @param db Database containing truth values of the preds.
+ * @param queries Array being filled with groundings of preds
+ * specified in queryPredsStr (those with unknown values in db).
+ * @param knownQueries Array being filled with groundings of preds
+ * specified in queryPredsStr (those with known values in db).
+ * @param printToFile If true, atom, and their truth values,
+ * are printed to file, not collected in HashArray.
+ * @param out stream to which the groundings are printed when
+ * printToFile is set to true.
+ * @param amapPos If true, only positive atoms are printed out.
+ * Otherwise, all atoms with 0/1 are printed. Used in
+ * conjunction printToFile.
+ * @param trueQueries If specified, probabilities from the ground
+ * preds here are written to out. Used in conjunction with
+ * printToFile.
+ * 
+ * @return false, if a pred name or constant is not defined, or if
+ * a pred has the wrong number of terms; otherwise, true. 
+ */
+bool createQueryFilePreds(const string& queryFile,
+                          const Domain* const & domain,
+                          Database* const & db,
                           GroundPredicateHashArray* const &queries,
                           GroundPredicateHashArray* const &knownQueries,
                           bool printToFile, ostream& out, bool amapPos,
-                          const GroundPredicateHashArray* const &trueQueries)
+                          const GroundPredicateHashArray* const &trueQueries,
+                          const Array<double>* const & trueProbs)
 {
   if (queryFile.length() == 0) return true;
 
@@ -472,7 +625,7 @@ bool createQueryFilePreds(const string& queryFile, const Domain* const & domain,
       constIds.append(constId);
       if (constId < 0)
       {
-        cout << "ERROR: Cannot find " << constant << "in database on line " 
+        cout << "ERROR: Cannot find " << constant << " in database on line " 
              << line << " of query file " << queryFile << endl;
         ret = false;
       }
@@ -492,7 +645,7 @@ bool createQueryFilePreds(const string& queryFile, const Domain* const & domain,
     constIds.append(constId);
     if (constId < 0)
     {
-      cout << "ERROR: Cannot find " << constant << "in database on line " 
+      cout << "ERROR: Cannot find " << constant << " in database on line " 
            << line << " of query file " << queryFile << endl;
       ret = false;
     }
@@ -526,9 +679,9 @@ bool createQueryFilePreds(const string& queryFile, const Domain* const & domain,
     }
     if (!ret) continue;
 
-    assert(!evidenceDB->isClosedWorld(predId));
+    assert(!db->isClosedWorld(predId));
 
-    TruthValue tv = evidenceDB->getValue(&pred);
+    TruthValue tv = db->getValue(&pred);
     GroundPredicate* gndPred = new GroundPredicate(&pred);
     
     // If just printing to file, then all values must be known
@@ -549,16 +702,18 @@ bool createQueryFilePreds(const string& queryFile, const Domain* const & domain,
           double prob = 0.0;
           if (domain->getDB()->getEvidenceStatus(&pred))
           {
-            prob = (tv == TRUE) ? 1.0 : 0.0;
+              // Don't print out evidence atoms
+            continue;
+            //prob = (tv == TRUE) ? 1.0 : 0.0;
           }
           else
           {
             int found = trueQueries->find(gndPred);
-            if (found >= 0) prob = (*trueQueries)[found]->getProbTrue();
+            if (found >= 0) prob = (*trueProbs)[found];
+            else
+                // Uniform smoothing
+              prob = (prob*10000+1/2.0)/(10000+1.0);            
           }
-            // Uniform smoothing
-            //if (asmooth>0) prob = (prob*numSamples+asmooth/2.0)/(numSamples+asmooth);
-          prob = (prob*10000+1/2.0)/(10000+1.0);
           gndPred->print(out, domain); out << " " << prob << endl;
         }
         else
@@ -581,8 +736,8 @@ bool createQueryFilePreds(const string& queryFile, const Domain* const & domain,
       }
       else // Building queries
       {
-        if (tv == TRUE) gndPred->setProbTrue(1);
-      	else            gndPred->setProbTrue(0);
+        //if (tv == TRUE) gndPred->setProbTrue(1);
+      	//else            gndPred->setProbTrue(0);
       	if (knownQueries->append(gndPred) < 0) delete gndPred;
       }
     }
@@ -592,80 +747,92 @@ bool createQueryFilePreds(const string& queryFile, const Domain* const & domain,
   return ret;
 }
 
+/**
+ * Calls createQueryFilePreds (see above) with trueQueries set to NULL
+ * for backwards compatibility.
+ */
 bool createQueryFilePreds(const string& queryFile, const Domain* const & domain,
-                          Database* const & evidenceDB,
+                          Database* const & db,
                           GroundPredicateHashArray* const &queries,
                           GroundPredicateHashArray* const &knownQueries)
 {
-  return createQueryFilePreds(queryFile, domain, evidenceDB, queries,
-                          	  knownQueries, false, cout, false, NULL);
+  return createQueryFilePreds(queryFile, domain, db, queries, knownQueries,
+                              false, cout, false, NULL, NULL);
 }
 
-void readPredValuesAndSetToUnknown( const StringHashArray& predNames,
-		                             Domain *domain,
-									 Array<Predicate *> &queryPreds,
-									 Array<TruthValue> &queryPredValues,
-									 bool isQueryEvidence)
- {
-    Array<Predicate*> ppreds;
-
-    //cout << endl << "Getting the counts for the domain " << i << endl;
-    queryPreds.clear();
-    queryPredValues.clear();
-    for(int predno = 0; predno < predNames.size(); predno++) 
-    {
-      ppreds.clear();
-      int predid = domain->getPredicateId(predNames[predno].c_str());
-      Predicate::createAllGroundings(predid, domain, ppreds);
-       	//cout<<"size of gnd for pred " << predid << " = "<<ppreds.size()<<endl;
-	  for(int gpredno=0;gpredno<ppreds.size();gpredno++)
-	  {
-		Predicate *pred = ppreds[gpredno];
-		TruthValue tv = domain->getDB()->getValue(pred);
-		if(tv == UNKNOWN)
-		  domain->getDB()->setValue(pred,FALSE);
-		 
-		// if first order query pred grounndings are allowed to be evidence
-		// - we assume all the predicates not in db to be false
-		// evidence - need a better way code this.
-		if(isQueryEvidence && tv == UNKNOWN)
-		  delete pred;
-		else
-		  queryPreds.append(pred);
-	  }
-	}
-	  //set all the query preds to unknown, reading in the TRUE/FALSE status 
-	  //for verification at a later time
-	domain->getDB()->setValuesToUnknown(&queryPreds, &queryPredValues);
- }
-
-
-void setPredsToGivenValues( const StringHashArray& predNames,
-		                             Domain *domain,
-									 Array<TruthValue> &gpredValues)
+void readPredValuesAndSetToUnknown(const StringHashArray& predNames,
+                                   Domain *domain,
+                                   Array<Predicate *> &queryPreds,
+                                   Array<TruthValue> &queryPredValues,
+                                   bool isQueryEvidence)
 {
-    Array<Predicate*> gpreds;
-    Array<Predicate*> ppreds;
-    Array<TruthValue> tmpValues;
+  Array<Predicate*> ppreds;
 
     //cout << endl << "Getting the counts for the domain " << i << endl;
-    gpreds.clear();
-    tmpValues.clear();
-    for(int predno = 0; predno < predNames.size(); predno++) 
+  queryPreds.clear();
+  queryPredValues.clear();
+  for (int predno = 0; predno < predNames.size(); predno++) 
+  {
+    ppreds.clear();
+    int predid = domain->getPredicateId(predNames[predno].c_str());
+    Predicate::createAllGroundings(predid, domain, ppreds);
+    for (int gpredno = 0; gpredno < ppreds.size(); gpredno++)
     {
-       ppreds.clear();
-       int predid = domain->getPredicateId(predNames[predno].c_str());
-       Predicate::createAllGroundings(predid, domain, ppreds);
-       //cout<<"size of gnd for pred " << predid << " = "<<ppreds.size()<<endl;
-       gpreds.append(ppreds);
+      Predicate *pred = ppreds[gpredno];
+      TruthValue tv = domain->getDB()->getValue(pred);
+      if (tv == UNKNOWN)
+        domain->getDB()->setValue(pred,FALSE);
+          
+        // if first order query pred groundings are allowed to be evidence
+        // - we assume all the predicates not in db to be false
+        // evidence - need a better way code this.
+      if (isQueryEvidence && tv == UNKNOWN)
+        delete pred;
+      else
+        queryPreds.append(pred);
     }
-     
-     
-	domain->getDB()->setValuesToGivenValues(&gpreds, &gpredValues);
-      
-	for(int gpredno = 0; gpredno < gpreds.size(); gpredno++) 
-      delete gpreds[gpredno];
- }
+  }
+    //set all the query preds to unknown, reading in the TRUE/FALSE status
+    //for verification at a later time
+  domain->getDB()->setValuesToUnknown(&queryPreds, &queryPredValues);
+}
 
+/**
+ * Sets the truth values of all groundings the specified predicates
+ * to the specified values.
+ * 
+ * @param predNames HashArray of predicate names whose groundings
+ * are to be set.
+ * @param domain Domain in which the truth values are set.
+ * @param gpredValues Array of truth values to which the
+ * groundings are set.
+ */
+void setPredsToGivenValues(const StringHashArray& predNames, Domain *domain,
+                           Array<TruthValue> &gpredValues)
+{
+  Array<Predicate*> gpreds;
+  Array<Predicate*> ppreds;
+  Array<TruthValue> tmpValues;
+    
+    //cout << endl << "Getting the counts for the domain " << i << endl;
+  gpreds.clear();
+  tmpValues.clear();
+  for (int predno = 0; predno < predNames.size(); predno++)
+  {
+    ppreds.clear();
+    int predid = domain->getPredicateId(predNames[predno].c_str());
+    Predicate::createAllGroundings(predid, domain, ppreds);
+      //cout<<"size of gnd for pred " << predid << " = "<<ppreds.size()<<endl;
+    gpreds.append(ppreds);
+  }
+  
+  domain->getDB()->setValuesToGivenValues(&gpreds, &gpredValues);
+  for (int gpredno = 0; gpredno < gpreds.size(); gpredno++)
+    delete gpreds[gpredno];
+}
+
+  // Typedefs
+typedef hash_map<string, const Array<const char*>*, HashString, EqualString> 
+StringToStrArrayMap;
 
 #endif

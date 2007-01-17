@@ -1,3 +1,68 @@
+/*
+ * All of the documentation and software included in the
+ * Alchemy Software is copyrighted by Stanley Kok, Parag
+ * Singla, Matthew Richardson, Pedro Domingos, Marc
+ * Sumner and Hoifung Poon.
+ * 
+ * Copyright [2004-07] Stanley Kok, Parag Singla, Matthew
+ * Richardson, Pedro Domingos, Marc Sumner and Hoifung
+ * Poon. All rights reserved.
+ * 
+ * Contact: Pedro Domingos, University of Washington
+ * (pedrod@cs.washington.edu).
+ * 
+ * Redistribution and use in source and binary forms, with
+ * or without modification, are permitted provided that
+ * the following conditions are met:
+ * 
+ * 1. Redistributions of source code must retain the above
+ * copyright notice, this list of conditions and the
+ * following disclaimer.
+ * 
+ * 2. Redistributions in binary form must reproduce the
+ * above copyright notice, this list of conditions and the
+ * following disclaimer in the documentation and/or other
+ * materials provided with the distribution.
+ * 
+ * 3. All advertising materials mentioning features or use
+ * of this software must display the following
+ * acknowledgment: "This product includes software
+ * developed by Stanley Kok, Parag Singla, Matthew
+ * Richardson, Pedro Domingos, Marc Sumner and Hoifung
+ * Poon in the Department of Computer Science and
+ * Engineering at the University of Washington".
+ * 
+ * 4. Your publications acknowledge the use or
+ * contribution made by the Software to your research
+ * using the following citation(s): 
+ * Stanley Kok, Parag Singla, Matthew Richardson and
+ * Pedro Domingos (2005). "The Alchemy System for
+ * Statistical Relational AI", Technical Report,
+ * Department of Computer Science and Engineering,
+ * University of Washington, Seattle, WA.
+ * http://www.cs.washington.edu/ai/alchemy.
+ * 
+ * 5. Neither the name of the University of Washington nor
+ * the names of its contributors may be used to endorse or
+ * promote products derived from this software without
+ * specific prior written permission.
+ * 
+ * THIS SOFTWARE IS PROVIDED BY THE UNIVERSITY OF WASHINGTON
+ * AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED
+ * WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+ * PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE UNIVERSITY
+ * OF WASHINGTON OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
+ * INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+ * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
+ * ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
+ * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * 
+ */
 #ifndef LOGPSEUDOLIKELIHOOD_H_AUG_18_2005
 #define LOGPSEUDOLIKELIHOOD_H_AUG_18_2005
 
@@ -123,7 +188,8 @@ class PseudoLogLikelihood
 
     for (int i = 0; i < gndPredClauseIndexesAndCountsArr_->size(); i++)
     {
-      Array<Array<Array<Array<IndexAndCount*>*>*>*>* gndPredClauseIndexesAndCounts 
+      Array<Array<Array<Array<IndexAndCount*>*>*>*>*
+      gndPredClauseIndexesAndCounts
         = (*gndPredClauseIndexesAndCountsArr_)[i];
 
       int numPreds = gndPredClauseIndexesAndCounts->size();
@@ -131,14 +197,17 @@ class PseudoLogLikelihood
       {
         if ( (*gndPredClauseIndexesAndCounts)[p] )
         {
-          Array<Array<Array<IndexAndCount*>*>*>* gndingsToClauseIndexesAndCounts 
+          Array<Array<Array<IndexAndCount*>*>*>* gndingsToClauseIndexesAndCounts
             = (*gndPredClauseIndexesAndCounts)[p];
           int numGnds = gndingsToClauseIndexesAndCounts->size();
           for (int g = 0; g < numGnds; g++) // for each grounding
           {
-            for (int h = 0; h < (*gndingsToClauseIndexesAndCounts)[g]->size(); h++)
+            for (int h = 0; h < (*gndingsToClauseIndexesAndCounts)[g]->size(); 
+                 h++)
             {
-              for (int j = 0; j < (*(*gndingsToClauseIndexesAndCounts)[g])[h]->size(); j++)
+              for (int j = 0;
+                   j < (*(*gndingsToClauseIndexesAndCounts)[g])[h]->size();
+                   j++)
               {
                 delete (*(*(*gndingsToClauseIndexesAndCounts)[g])[h])[j];
               }
@@ -174,7 +243,8 @@ class PseudoLogLikelihood
   {
     for (int i = 0; i < gndPredClauseIndexesAndCountsArr_->size(); i++)
     {
-      Array<Array<Array<Array<IndexAndCount*>*>*>*>* gndPredClauseIndexesAndCounts 
+      Array<Array<Array<Array<IndexAndCount*>*>*>*>*
+      gndPredClauseIndexesAndCounts 
         = (*gndPredClauseIndexesAndCountsArr_)[i];
       
       int numPreds = gndPredClauseIndexesAndCounts->size();
@@ -183,7 +253,7 @@ class PseudoLogLikelihood
 
         if ((*gndPredClauseIndexesAndCounts)[p])
         {
-          Array<Array<Array<IndexAndCount*>*>*>* gndingsToClauseIndexesAndCounts 
+          Array<Array<Array<IndexAndCount*>*>*>* gndingsToClauseIndexesAndCounts
             = (*gndPredClauseIndexesAndCounts)[p];
           int numGnds = gndingsToClauseIndexesAndCounts->size();
           for (int g = 0; g < numGnds; g++) // for each grounding
@@ -208,7 +278,9 @@ class PseudoLogLikelihood
                     Array<Array<Array<CacheCount*>*>*>* const & cache,
                     const int& d)
   {
-    Array<Array<Array<Array<IndexAndCount*>*>*>*>* gndPredClauseIndexesAndCounts;
+    Array<Array<Array<Array<IndexAndCount*>*>*>*>*
+    gndPredClauseIndexesAndCounts;
+
     Array<IndexAndCount*>* gArr;
     CacheCount* cc;
     assert(cache->size() == domains_->size());
@@ -411,7 +483,8 @@ class PseudoLogLikelihood
     bool ret = true;
     for (int d = 0; d < domains_->size(); d++)
     {
-      Array<Array<Array<Array<IndexAndCount*>*>*>*>* gndPredClauseIndexesAndCounts
+      Array<Array<Array<Array<IndexAndCount*>*>*>*>*
+      gndPredClauseIndexesAndCounts
         = (*gndPredClauseIndexesAndCountsArr_)[d];
 
       int numPreds = gndPredClauseIndexesAndCounts->size();
@@ -451,9 +524,11 @@ class PseudoLogLikelihood
     for (int d = 0; d < domains_->size(); d++)
     {
       cout << "domainIdx: " << d << endl;
-      cout << "gndPredClauseIndexesAndCounts[predIdx][gndingIdx][combIdx][i]" << endl;
+      cout << "gndPredClauseIndexesAndCounts[predIdx][gndingIdx][combIdx][i]"
+           << endl;
 
-      Array<Array<Array<Array<IndexAndCount*>*>*>*>* gndPredClauseIndexesAndCounts
+      Array<Array<Array<Array<IndexAndCount*>*>*>*>*
+      gndPredClauseIndexesAndCounts
         = (*gndPredClauseIndexesAndCountsArr_)[d];
 
       int numPreds = gndPredClauseIndexesAndCounts->size();
@@ -489,7 +564,7 @@ class PseudoLogLikelihood
           
             for (int i = 0; i < numClauseIdx; i++)
             {
-              cout << "gndPredClauseIndexesAndCounts[" << p << "][" << g << "][" 
+              cout << "gndPredClauseIndexesAndCounts[" << p << "][" << g << "]["
                    << c << "][" << i << "] (clauseIndex,count) = "
                    << *((*combos)[i]->index)
                    << ", " << (*combos)[i]->count 
@@ -726,8 +801,8 @@ class PseudoLogLikelihood
   } //computeCountsRemoveCountsHelper()
 
     
-  void computePerPredPllAndGrad(const Array<Array<Array<IndexAndCount*>*>*>*const& 
-                                gndingsToClauseIndexesAndCounts,
+  void computePerPredPllAndGrad(const Array<Array<Array<IndexAndCount*>*>*>*
+                                const& gndingsToClauseIndexesAndCounts,
                                 const int& g, const double* const & wt, 
                                 long double& perPredPll, 
                                 long double * const & perPredGrad)
@@ -805,7 +880,7 @@ class PseudoLogLikelihood
                                        long double* const & perPredGrad,
                                        const int& arrSize,
                                        const double* const & wt,
-                                       const Array<Array<Array<IndexAndCount*>*>*>*
+                                    const Array<Array<Array<IndexAndCount*>*>*>*
                                        const& gndingsToClauseIndexesAndCounts)
   {
     tmpPerPredPll = 0;
@@ -945,7 +1020,8 @@ class PseudoLogLikelihood
     int blockIdx = (*domains_)[domainIdx]->getBlock(gndPred);
     if (blockIdx >= 0)
     {
-      const Array<Predicate*>* block = (*domains_)[domainIdx]->getPredBlock(blockIdx);
+      const Array<Predicate*>* block =
+        (*domains_)[domainIdx]->getPredBlock(blockIdx);
       numCombInBlock = block->size() - 1;
     }
       
@@ -1009,16 +1085,18 @@ class PseudoLogLikelihood
         continue;
       }
 
-      double cnt = ((Clause*)clause)->countDiffNumTrueGroundings(&gndPred, domain, db,
-                                                                 DB_HAS_UNKNOWN_PREDS,
-                                                                 sampleClauses, c);
+      double cnt =
+        ((Clause*)clause)->countDiffNumTrueGroundings(&gndPred, domain, db,
+                                                      DB_HAS_UNKNOWN_PREDS,
+                                                      sampleClauses, c);
 //cout << "Count " << cnt << endl;
         //ignore clauses if the difference in counts is zero
       if (cnt != 0)
       {
 //cout << "Appending " << cnt << " " << *clauseIdxInMLN << endl;
         gArr->append(new IndexAndCount(clauseIdxInMLN, cnt));
-        if (undoInfos) undoInfos->append(new UndoInfo(gArr, NULL, -1, domainIdx));
+        if (undoInfos)
+          undoInfos->append(new UndoInfo(gArr, NULL, -1, domainIdx));
 
         if (cache) 
         {

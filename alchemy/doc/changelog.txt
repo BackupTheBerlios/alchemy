@@ -1,3 +1,17 @@
+Jan 16, 2007
+-------------
+
+* Improvement of speed of Lazy MC-SAT algorithm
+* Improvement of modularity of the state of variables and inference
+algorithms
+* Plug-n-play inference in VotedPerceptron implemented 
+* EM algorithm for weight learning implemented
+* Developer's manual started
+* Auto-generated API included
+* MWS can reconstruct low state at the end of inference instead of 
+saving it each time
+* Various bug fixes
+
 July 7, 2006
 -------------
 * Bug fix in infer/mrf.h (method prepareMaxWalksatData)

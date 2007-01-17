@@ -9,6 +9,7 @@
 #include "lwutil.h"
 #include "intclause.h"
 #include "mln.h"
+#include "timer.h"
 
 class LWInfo
 {
@@ -42,15 +43,12 @@ LWInfo(MLN *mln, Domain *domain)
 
   for(int i = 0; i < predHashArray_.size(); i++)
 	delete predHashArray_[i];
-  for(int i = 0; i < fixedAtoms_.size(); i++)
-    delete fixedAtoms_[i];
 
-    // mln_ is a copy made in makePositiveWeights()
+    // mln_ is a copy made in copyMLN()
   delete mln_;
 
   if (prevDB_) delete prevDB_;
 
-//cout << "Dead clauses " << deadClauses_.size() << endl;
   for(int i = 0; i < deadClauses_.size(); i++)
   {
   	deadClauses_[i]->deleteIntPredicates();
@@ -65,6 +63,7 @@ inline int getVarCount() { return predHashArray_.size(); }
  */
 inline void copyMLN()
 {
+
   MLN* posmln = new MLN();
   int clauseCnt = mln_->getNumClauses();
 
@@ -72,6 +71,7 @@ inline void copyMLN()
   for (int i = 0; i < clauseCnt; i++)
   {
   	Clause* clause = (Clause *) mln_->getClause(i);
+    if (clause->getWt() == 0) continue;
 	int numPreds = clause->getNumPredicates();
 
       // Add clause to mln copy
@@ -145,6 +145,7 @@ inline void setHardClauseWeight()
 
 	LWInfo::HARD_WT = (sumSoftWts + 10.0)*LWInfo::WSCALE;
   }
+  //cout << "Set hard weight to " << LWInfo::HARD_WT << endl;
 }
 
 /*
@@ -164,18 +165,14 @@ inline void removeSoftClauses()
   }  
 }
 
-
 inline void reset()
 { 
   for(int i = 0; i < predHashArray_.size(); i++)
   {
 	delete predHashArray_[i];
   }
-  for(int i = 0; i < fixedAtoms_.size(); i++)
-    delete fixedAtoms_[i];
 
   predHashArray_.clear();
-  fixedAtoms_.clear();
   predArray_.clear();
 }
 
@@ -197,6 +194,12 @@ inline void setActive(int atom)
   domain_->getDB()->setActiveStatus(predArray_[atom], true);
 }
 
+/* set the given atom as inactive */
+inline void setInactive(int atom)
+{
+  domain_->getDB()->setActiveStatus(predArray_[atom], false);
+}
+
 void updatePredArray()
 {
   int startindex = 0;
@@ -208,10 +211,137 @@ void updatePredArray()
     predArray_[i+1] = predHashArray_[i];
 }
 
-/* add clauses */
+  // Gets the set of all possible initial active clauses
+void getSupersetClauses(Array<IntClause *> &supersetClauses)
+{
+    // Randomizer
+  int seed;
+  struct timeval tv;
+  struct timezone tzp;
+  gettimeofday(&tv,&tzp);
+  seed = (unsigned int)((( tv.tv_sec & 0177 ) * 1000000) + tv.tv_usec);
+  srandom(seed);
+  
+  Clause *fclause;
+  IntClause *intClause;
+  int clauseCnt;
+  IntClauseHashArray clauseHashArray;
+
+  Array<IntClause *>* intClauses = new Array<IntClause *>; 
+  
+  clauseCnt = mln_->getNumClauses();
+
+  int clauseno = 0;
+  while(clauseno < clauseCnt)
+  {
+    fclause = (Clause *) mln_->getClause(clauseno);
+    
+    double wt = fclause->getWt();
+    intClauses->clear();
+    bool ignoreActivePreds = false;
+    fclause->getActiveClauses(NULL, domain_, intClauses,
+                              &predHashArray_, ignoreActivePreds);
+    updatePredArray();
+
+    for (int i = 0; i < intClauses->size(); i++)
+    {
+      intClause = (*intClauses)[i];
+
+      int pos = clauseHashArray.find(intClause);
+      if(pos >= 0)
+      {
+        clauseHashArray[pos]->addWt(wt);
+        intClause->deleteIntPredicates();
+        delete intClause;
+        continue;
+      }
+           
+      intClause->setWt(wt);
+      clauseHashArray.append(intClause);
+    }
+    clauseno++;
+  } //while(clauseno < clauseCnt)
+      
+  for(int i = 0; i < clauseHashArray.size(); i++)
+  {
+    intClause = clauseHashArray[i];
+    supersetClauses.append(intClause);
+  }
+  delete intClauses;
+}
+
+
+  // Perform clause selection on the superset of initial active
+  // clauses and convert weights
+void selectClauses(const Array<IntClause *> &supersetClauses,
+                   Array<Array<int> *> &walksatClauses,
+                   Array<int> &walksatClauseWts)
+{
+  assert(sampleSat_);
+  
+    // Randomizer
+  int seed;
+  struct timeval tv;
+  struct timezone tzp;
+  gettimeofday(&tv,&tzp);
+  seed = (unsigned int)((( tv.tv_sec & 0177 ) * 1000000) + tv.tv_usec);
+  srandom(seed);
+
+  for(int i = 0; i < deadClauses_.size(); i++)
+  {
+    deadClauses_[i]->deleteIntPredicates();
+    delete deadClauses_[i];
+  }
+  deadClauses_.clearAndCompress();
+
+    // Look at each clause in the superset and do clause
+    // selection and convert weight
+  for (int i = 0; i < supersetClauses.size(); i++)
+  {
+    assert(prevDB_);
+    IntClause* intClause = supersetClauses[i];
+    double wt = intClause->getWt();
+    if (wt == 0) continue;
+
+      // Pos. clause not satisfied in prev. iteration: don't activate
+      // Neg. clause satisfied in prev. iteration: don't activate
+    bool sat = intClause->isSatisfied(&predHashArray_, prevDB_);
+    if ((wt > 0 && !sat) ||
+        (wt < 0 && sat))
+    {
+      continue;
+    }
+
+      // With prob. exp(-wt) don't ever activate it
+    double threshold =
+      intClause->isHardClause() ? RAND_MAX : RAND_MAX*(1-exp(-abs(wt)));
+
+    if (random() > threshold)
+    {
+      deadClauses_.append(new IntClause(*intClause));
+      continue;
+    }
+
+      // If we're here, then clause has been selected
+    Array<int>* litClause = (Array<int> *)intClause->getIntPredicates();
+    walksatClauses.append(new Array<int>(*litClause));
+    if (wt >= 0) walksatClauseWts.append(1);
+    else walksatClauseWts.append(-1);
+  }
+}
+
+
+/** 
+ * Get clauses and weights activated by the predicate inputPred,
+ * if active is true. If false, inactive clauses (and their weights)
+ * containing inputPred are retrieved.
+ * If inputPred is NULL, then all active (or inactive) clauses and
+ * their weights are retrieved.
+ */
 void getWalksatClauses(Predicate *inputPred,
 			    	   Array<Array<int> *> &walksatClauses,
-				       Array<int> &walksatClauseWts)
+				       Array<int> &walksatClauseWts,
+                       bool const & active)
 {
     // Randomizer
   int seed;
@@ -250,20 +380,22 @@ void getWalksatClauses(Predicate *inputPred,
 	else
 	  fclause = (Clause *) mln_->getClause(clauseno);
 	
-      // Unit clauses are handled with unit prop.
-    //if (fclause->getNumPredicates() == 1)
-    //{
-      //clauseno++;
-      //continue;
-    //}
-    
 	double wt = fclause->getWt();
     intClauses->clear();
 	bool ignoreActivePreds = false;
-	fclause->getActiveClauses(inputPred, domain_, intClauses,
-							  &predHashArray_, ignoreActivePreds);
-    updatePredArray();
 
+    if (active)
+    {
+	  fclause->getActiveClauses(inputPred, domain_, intClauses,
+	                            &predHashArray_, ignoreActivePreds);
+    }
+    else
+    {
+      fclause->getInactiveClauses(inputPred, domain_, intClauses,
+                                  &predHashArray_);
+    }
+    updatePredArray();
+cout << "intClauses size " << intClauses->size() << endl;
 	for (int i = 0; i < intClauses->size(); i++)
     {
       intClause = (*intClauses)[i];
@@ -273,8 +405,8 @@ void getWalksatClauses(Predicate *inputPred,
 	  {
 		assert(prevDB_);
 
-	  	  // Pos. clause: not satisfied in prev. iteration: don't activate
-          // Neg. clause: satisfied in prev. iteration: don't activate
+	  	  // Pos. clause not satisfied in prev. iteration: don't activate
+          // Neg. clause satisfied in prev. iteration: don't activate
         bool sat = intClause->isSatisfied(&predHashArray_, prevDB_);
 	  	if ((wt >= 0 && !sat) ||
             (wt < 0 && sat))
@@ -314,10 +446,8 @@ void getWalksatClauses(Predicate *inputPred,
            
 	  intClause->setWt(wt);
 	  clauseHashArray.append(intClause);
-
 	}
-	clauseno++;
-	    
+	clauseno++;	
   } //while(clauseno < clauseCnt)
 	  
   Array<int>* litClause;
@@ -334,7 +464,10 @@ void getWalksatClauses(Predicate *inputPred,
     }
 	else
 	{
-	  walksatClauseWts.append((int)(weight*LWInfo::WSCALE+0.5));
+      if (weight >= 0)
+        walksatClauseWts.append((int)(weight*LWInfo::WSCALE + 0.5));
+      else
+        walksatClauseWts.append((int)(weight*LWInfo::WSCALE - 0.5));
 	}
 	
     delete intClause;
@@ -347,13 +480,13 @@ void getWalksatClauses(Predicate *inputPred,
  * allClauses array */
 void getWalksatClauses(Array<Array<int> *> &allClauses, Array<int> &allClauseWeights)
 {
-  getWalksatClauses(NULL,allClauses,allClauseWeights);
+  getWalksatClauses(NULL, allClauses, allClauseWeights, true);
 }
 
 /* Get all the clauses which become active by flipping this atom */
 void getWalksatClausesWhenFlipped(int atom,            
 								  Array<Array<int> *> &walksatClauses,
-		  						  Array<int> &walksatClauseWts)
+                                  Array<int> &walksatClauseWts)
 {
   Predicate *pred = predArray_[atom];
   TruthValue oldval = domain_->getDB()->getValue(pred);
@@ -406,9 +539,10 @@ void getWalksatClausesWhenFlipped(int atom,
   }
     // Set new value of actual atom
   domain_->getDB()->setValue(pred, val);
-  getWalksatClauses(pred, walksatClauses, walksatClauseWts);
+
+  getWalksatClauses(pred, walksatClauses, walksatClauseWts, true);
   if (inBlock_)
-    getWalksatClauses(otherPred, walksatClauses, walksatClauseWts);
+    getWalksatClauses(otherPred, walksatClauses, walksatClauseWts, true);
     
     // Set old value of atom and other in block
   domain_->getDB()->setValue(pred,oldval);
@@ -429,10 +563,24 @@ void getWalksatClausesWhenFlipped(int atom,
 }
 
 /* Get the cost of all the clauses which become unsatisfied by flipping this atom */
-int getUnSatCostPerPred(Predicate* pred)
+int getUnSatCostPerPred(Predicate* pred,
+                        Array<Array<int> *> &walksatClauses,
+                        Array<int> &walksatClauseWts)
 {
+    // Randomizer
+  int seed;
+  struct timeval tv;
+  struct timezone tzp;
+  gettimeofday(&tv,&tzp);
+  seed = (unsigned int)((( tv.tv_sec & 0177 ) * 1000000) + tv.tv_usec);
+  srandom(seed);
+  
   int unSatCost = 0;
   Clause *clause;
+  IntClause *intClause;
+  IntClauseHashArray clauseHashArray;
+
+  Array<IntClause *>* intClauses = new Array<IntClause *>; 
 
   const Array<IndexClause*>* indclauses;
   int predid = pred->getId(); 
@@ -441,48 +589,133 @@ int getUnSatCostPerPred(Predicate* pred)
   for(int j = 0; j < indclauses->size(); j++)
   {      
     clause = (Clause *) (*indclauses)[j]->clause;
-    
-      // Unit clauses are handled with unit prop.
-    //if (clause->getNumPredicates() == 1)
-      //continue;
+/*    
+    double weight = clause->getWt()*LWInfo::WSCALE;
+    //int wt = abs((int)(clause->getWt()*LWInfo::WSCALE+0.5));
+    int wt;
 
-    int wt = abs((int)(clause->getWt()*LWInfo::WSCALE+0.5));
-      // Samplesat: all weights are 1
-    if (sampleSat_) wt = 1;
-    if(wt < WEIGHT_EPSILON)
+      // Samplesat: all weights are 1 or -1
+    if (sampleSat_)
+    {
+      if (weight >= 0)
+        wt = 1;
+      else
+        wt = -1;
+    }
+    else
+    {
+      if (weight >= 0)
+        wt = (int)(weight + 0.5);
+      else
+        wt = (int)(weight - 0.5);
+    }
+*/
+    double wt = clause->getWt();
+    intClauses->clear();
+
+    if(abs(wt) < WEIGHT_EPSILON)
       continue;
       
-    IntClause *intClause;
-    Array<IntClause *> *intClauses = new Array<IntClause *>; 
-    
     bool ignoreActivePreds = true;
     clause->getActiveClauses(pred, domain_, intClauses,
                              &predHashArray_, ignoreActivePreds);
     updatePredArray();
-    for (int i = 0; i < intClauses->size(); i++) 
+    
+    for (int i = 0; i < intClauses->size(); i++)
     {
-      bool addWeight = true;
       intClause = (*intClauses)[i];
-        // If using samplesat, do clause selection
 
+        // If using samplesat, then do clause selection
       if (sampleSat_)
       {
-          // Dead clause: don't add weight
-          // Pos. clause: not satisfied in prev. iteration: don't activate
-          // Neg. clause: satisfied in prev. iteration: don't activate
+        assert(prevDB_);
+
+//cout << i << " wt " << wt << endl;
+
+          // Pos. clause not satisfied in prev. iteration: don't activate
+          // Neg. clause satisfied in prev. iteration: don't activate
         bool sat = intClause->isSatisfied(&predHashArray_, prevDB_);
-        if ((deadClauses_.contains(intClause)) ||
-            (wt >= 0 && !sat) ||
+        if ((wt >= 0 && !sat) ||
             (wt < 0 && sat))
-          addWeight = false;
+        {
+          intClause->deleteIntPredicates();
+          delete intClause;
+          continue;
+        }
+
+          // In dead clauses: don't activate
+        if (deadClauses_.contains(intClause))
+        {
+          intClause->deleteIntPredicates();
+          delete intClause;
+          continue;
+        }
+
+          // With prob. exp(-wt) don't ever activate it
+        double threshold =
+          clause->isHardClause() ? RAND_MAX : RAND_MAX*(1-exp(-abs(wt)));
+
+        if (random() > threshold)
+        {
+          deadClauses_.append(intClause);
+          continue;
+        }
       }
 
-      intClause->deleteIntPredicates();
-      delete intClause;
-      if (addWeight) unSatCost += wt;
+      int pos = clauseHashArray.find(intClause);
+      if(pos >= 0)
+      {
+        clauseHashArray[pos]->addWt(wt);
+        intClause->deleteIntPredicates();
+        delete intClause;
+        continue;
+      }
+
+//cout << "Hard wt. " << LWInfo::HARD_WT << endl;           
+//cout << i << " wt2 " << wt << endl;
+      if (wt == LWInfo::HARD_WT) intClause->setWtToHardWt();
+      else intClause->setWt(wt);
+      clauseHashArray.append(intClause);
+//cout << i << " intClause->setWt " << intClause->getWt() << endl;
     }
-    delete intClauses;
+    
   }
+  
+  Array<int>* litClause;
+  for(int i = 0; i < clauseHashArray.size(); i++)
+  {
+    intClause = clauseHashArray[i];
+//cout << i << " intClause->getWt() " << intClause->getWt() << endl;
+    int weight = (int)(intClause->getWt());
+    litClause = (Array<int> *)intClause->getIntPredicates();
+    walksatClauses.append(litClause);
+    if (sampleSat_)
+    {
+      if (weight >= 0) walksatClauseWts.append(1);
+      else walksatClauseWts.append(-1);
+      unSatCost += 1;
+    }
+    else
+    {
+      if (weight >= 0)
+      {
+        walksatClauseWts.append((int)(weight*LWInfo::WSCALE + 0.5));
+        unSatCost += (int)(weight*LWInfo::WSCALE + 0.5);
+      }
+      else
+      {
+        walksatClauseWts.append((int)(weight*LWInfo::WSCALE - 0.5));
+        unSatCost += (int)(weight*LWInfo::WSCALE - 0.5);
+      }
+    }
+
+    //walksatClauseWts.append(weight);
+//cout << i << " Weight " << weight << endl;
+    //unSatCost += abs(weight);
+    delete intClause;
+  }
+  delete intClauses;
+  
   return unSatCost;
 }
 
@@ -490,7 +723,9 @@ int getUnSatCostPerPred(Predicate* pred)
  * Get the cost of all the clauses which become unsatisfied by flipping this atom,
  * taking blocks into account
  */
-int getUnSatCostWhenFlipped(int atom)
+int getUnSatCostWhenFlipped(int atom,
+                            Array<Array<int> *> &walksatClauses,
+                            Array<int> &walksatClauseWts)
 {	 
   int unSatCost = 0;
   TruthValue val;
@@ -546,9 +781,9 @@ int getUnSatCostWhenFlipped(int atom)
   domain_->getDB()->setValue(pred, val);
 
     // Get unsat cost of pred and other pred
-  unSatCost += getUnSatCostPerPred(pred);
+  unSatCost += getUnSatCostPerPred(pred, walksatClauses, walksatClauseWts);
   if (inBlock)
-    unSatCost += getUnSatCostPerPred(otherPred);
+    unSatCost += getUnSatCostPerPred(otherPred, walksatClauses, walksatClauseWts);
     
     // Set old value of atom and other in block
   domain_->getDB()->setValue(pred,oldval);
@@ -589,6 +824,16 @@ bool getVarVal(int atom)
   bool val;
   (domain_->getDB()->getValue(ipred) == TRUE)? val = true : val = false;
   return val;
+}
+
+/* sets the value (true/false) of the particular variable */
+void setVarVal(int atom, bool val)
+{
+  Predicate *ipred = predArray_[atom];
+  if (val)
+    domain_->getDB()->setValue(ipred, TRUE);
+  else
+    domain_->getDB()->setValue(ipred, FALSE);
 }
 
 Predicate* getVar(int atom)
@@ -649,81 +894,18 @@ void setPrevDB()
   prevDB_ = new Database((*domain_->getDB()));
 }
 
-/* 
- * Fixes atoms occurring in unit clauses.
- * Unit clauses produced by neg. weights are considered as well.
- */
-void initFixedAtoms()
-{
-    // Randomizer
-  int seed;
-  struct timeval tv;
-  struct timezone tzp;
-  gettimeofday(&tv,&tzp);
-  seed = (unsigned int)((( tv.tv_sec & 0177 ) * 1000000) + tv.tv_usec);
-  srandom(seed);
-  
-    // prevDB_ must be set (assignment from previous iteration)
-  assert(prevDB_);
-  int clauseCnt = mln_->getNumClauses();
-
-    // For each clause, fix truth value if unit clause
-  for (int i = 0; i < clauseCnt; i++)
-  {
-    Clause* clause = (Clause *) mln_->getClause(i);
-    int numPreds = clause->getNumPredicates();
-    double wt = clause->getWt();
-
-      // unit clause and pos. weight: fix each grounding which is satisfied
-    if (numPreds == 1)
-    {
-      Array<Predicate*> gpreds;
-      Predicate* pred = (Predicate*)clause->getPredicate(0);
-      pred->createAllGroundings(domain_, &gpreds, NULL);
-
-      for (int j = 0; j < gpreds.size(); j++)
-      {
-        Predicate* gpred = gpreds[j];
-          // If evidence, then don't worry about it
-        if (domain_->getDB()->getEvidenceStatus(gpred))
-        {
-          delete gpred;
-          continue;
-        }
-        
-          // Neg. weight: flip the sense
-        if (wt < 0) gpred->invertSense();
-        
-        TruthValue tv = prevDB_->getValue(gpred);
-        if (prevDB_->sameTruthValueAndSense(tv, pred->getSense()))
-        {
-            // With prob. 1-exp(-wt) add unit clause to fixed atoms
-          double threshold =
-            clause->isHardClause() ? RAND_MAX : RAND_MAX*(1-exp(-abs(wt)));
-          if (random() <= threshold)
-          {
-            fixedAtoms_.append(gpred);
-            continue;
-          }
-        }
-        delete gpred;
-      }
-    }
-  }
-//cout << "Fixed atoms: " << fixedAtoms_.size() << endl;
-}
-
 int getNumDBAtoms()
 {
   return numDBAtoms_;
 }
 
 /*
- * Activates a random atom not already in memory and gets the
- * clauses activated by doing this.
+ * Attempts to activate a random atom not already in memory and gets the
+ * clauses activated by doing this. Returns true if successful, otherwise false.
  */
-void activateRandomAtom(Array<Array<int> *> &walksatClauses,
-                        Array<int> &walksatClauseWts)
+bool activateRandomAtom(Array<Array<int> *> &walksatClauses,
+                        Array<int> &walksatClauseWts,
+                        int& toflip)
 {
     // Randomizer
   int seed;
@@ -733,24 +915,25 @@ void activateRandomAtom(Array<Array<int> *> &walksatClauses,
   seed = (unsigned int)((( tv.tv_sec & 0177 ) * 1000000) + tv.tv_usec);
   srandom(seed);
 
-  if (getVarCount() >= numDBAtoms_)
-  {
-    cout << "Something went wrong in lwinfo:activateRandomAtom" << endl;
-    cout << "predArray: " << predArray_.size() << ", numDBAtoms_: " << numDBAtoms_ << endl;
-    exit(-1);
-  }
-  
   Predicate* pred;
-  for (;;)
-  {
-    pred = domain_->getNonEvidenceAtom(random() % numDBAtoms_);
-    if (!predHashArray_.contains(pred)) break;
-    delete pred;
-  }
+  pred = domain_->getNonEvidenceAtom(random() % numDBAtoms_);
 
-  domain_->getDB()->setActiveStatus(pred, true);
-  predHashArray_.append(pred);
-  getWalksatClauses(pred, walksatClauses, walksatClauseWts);
+  int pos = -1;
+  if ((pos = predHashArray_.find(pred)) == -1)
+  {
+    domain_->getDB()->setActiveStatus(pred, true);
+    predHashArray_.append(pred);
+    updatePredArray();
+    toflip = predHashArray_.size();
+    getWalksatClauses(pred, walksatClauses, walksatClauseWts, true);
+    return true;
+  }
+  else
+  {
+    delete pred;
+    toflip = pos + 1;
+    return false;
+  }
 }
 
 /* If atom is in block, then another atom is chosen to flip and activated */
@@ -816,7 +999,7 @@ void chooseOtherToFlip(int atom,
     // Set new value of actual atom
   domain_->getDB()->setValue(pred, val);
   if (inBlock_)
-    getWalksatClauses(otherPred, walksatClauses, walksatClauseWts);
+    getWalksatClauses(otherPred, walksatClauses, walksatClauseWts, true);
     
     // Set old value of atom and other in block
   domain_->getDB()->setValue(pred,oldval);
@@ -929,6 +1112,102 @@ void setOtherAtom(const int val)
   otherAtom_ = val;
 }
 
+  // Set evidence status of given atom to given value
+void setEvidence(const int atom, const bool val)
+{
+  domain_->getDB()->setEvidenceStatus(predArray_[atom], val);
+}
+
+  // Get evidence status of given atom
+bool getEvidence(const int atom)
+{
+  return domain_->getDB()->getEvidenceStatus(predArray_[atom]);
+}
+
+void incrementNumDBAtoms()
+{
+  numDBAtoms_++;
+}
+
+void decrementNumDBAtoms()
+{
+  numDBAtoms_--;
+}
+
+void printIntClauses(Array<IntClause *> clauses)
+{
+  for (int i = 0; i < clauses.size(); i++)
+  {
+    clauses[i]->printWithWtAndStrVar(cout, domain_, &predHashArray_);
+    cout << endl;
+  }
+}
+
+
+/* 
+ * Fixes atoms using unit propagation on non-active clauses.
+ * Fixed atoms are stored in fixedAtoms_ and set as evidence in the DB.
+ */
+void propagateFixedAtoms(Array<Array<int> *> &clauses,
+                         Array<int> &clauseWeights,
+                         bool* fixedAtoms,
+                         int maxFixedAtoms)
+{
+  Array<Array<int> *> tmpClauses;
+  Array<int> tmpClauseWeights;
+    
+    //TEMP: count fixed atoms
+  int count = 0;
+  for (int i = 0; i < maxFixedAtoms; i++)
+  {
+    if (fixedAtoms[i]) count++;
+  }
+  cout << "Fixed atoms before propagating: " << count << endl;
+  
+    // Look at all non-active clauses containing a fixed atom
+  for (int i = 0; i < maxFixedAtoms; i++)
+  {
+    if (fixedAtoms[i])
+    {
+        // Get all non-active clauses containing it,
+        // filtering out dead clauses
+      getWalksatClauses(predArray_[i], tmpClauses, tmpClauseWeights, false);
+cout << "Atom " << i << endl;
+cout << "Clauses " << tmpClauses.size() << endl;
+
+        // clauses now contains potential clauses of all length
+        // want to look at only unit clauses
+      for (int j = 0; j < tmpClauses.size(); j++)
+      {
+          // Unit clause
+        if (tmpClauses[j]->size() == 1)
+        {
+          clauses.append(tmpClauses[j]);
+          clauseWeights.append(clauseWeights[j]);
+          fixedAtoms[(*tmpClauses[j])[0]] = true;
+        }
+        else // Not unit clause
+        {
+          delete tmpClauses[j];
+        }
+      }
+    }
+    tmpClauses.clear();
+    tmpClauseWeights.clear();
+  }
+  
+      //TEMP: count fixed atoms
+  count = 0;
+  for (int i = 0; i < maxFixedAtoms; i++)
+  {
+    if (fixedAtoms[i]) count++;
+  }
+  cout << "Fixed atoms after propagating: " << count << endl;
+  
+  exit(0);
+}
+
+
 public:
 	//Weight of hard clauses
   static double HARD_WT;
@@ -943,9 +1222,6 @@ private:
   Array<Predicate *> predArray_;
   PredicateHashArray predHashArray_;
 
-    // Ground atoms which are fixed due to unit propagation
-  PredicateHashArray fixedAtoms_;
-    
   Array<Array<int> *> predToClauseIds_;
 
 	// Set to true when performing sample sat

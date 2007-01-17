@@ -2,7 +2,7 @@
 #include "lazywalksat.h"
 #include "lwutil.h"
 #include "lwinfo.h"
-
+#include "timer.h"
 
 LazyWalksat::LazyWalksat(LWInfo *lwInfo, int memLimit)
 {
@@ -16,9 +16,7 @@ LazyWalksat::LazyWalksat(LWInfo *lwInfo, int memLimit)
   clauseFSMgr = new FreeStoreManager(BLOCKSIZE);
    
   costexpected = true;   
-  hard = 0; 
-  gnded = false;
-  //gnded = true;
+  hard = 0;
   noApprox = false;
 
   this->lwInfo = lwInfo;
@@ -34,8 +32,15 @@ LazyWalksat::LazyWalksat(LWInfo *lwInfo, int memLimit)
   //currently allocated memory (in terms of number of items
   //that can be stored). This is a pointer and hence no memory has
   // been allocated yet
-   clausemem = 0;
-   atommem = 0;
+  clausemem = 0;
+  atommem = 0;
+
+  //fixedAtoms_.growToSize(lwInfo->getNumDBAtoms() + 1, false);
+  maxFixedAtoms = lwInfo->getNumDBAtoms() + 1;
+  fixedAtoms_ = new bool[maxFixedAtoms];
+  for (int i = 0; i < maxFixedAtoms; i++)
+    fixedAtoms_[i] = false;
+  
 }
 
 LazyWalksat::~LazyWalksat()
@@ -59,12 +64,36 @@ LazyWalksat::~LazyWalksat()
   allClauses.clear();
   allClauseWeights.clear();
   
+  for(int i = 0; i < supersetClauses_.size(); i++)
+  {
+    supersetClauses_[i]->deleteIntPredicates();
+    delete supersetClauses_[i];
+  }
+  supersetClauses_.clear();
+
+  delete [] fixedAtoms_;
 }
 
+/* Retrieves initial active atoms and randomizes them*/
+void LazyWalksat::randomizeActiveAtoms()
+{
+  lwInfo->getWalksatClauses(newClauses, newClauseWeights);
+  for(int i = 0; i < newClauses.size(); i++)
+    delete newClauses[i];
+
+  newClauses.clear();
+  newClauseWeights.clear();
+
+  for(int i = 1; i < lwInfo->getVarCount() + 1; i++)
+  {
+    lwInfo->setVarVal(i, random()%2);
+  }
+}
 
 /* Lazy version of SampleSat */
 bool LazyWalksat::sample(const MaxWalksatParams* const & mwsParams,
-						 const SampleSatParams& sampleSatParams)
+						 const SampleSatParams& sampleSatParams,
+                         const bool& initial)
 {
 	// -- samplesat params
   saRatio = sampleSatParams.saRatio;
@@ -79,7 +108,17 @@ bool LazyWalksat::sample(const MaxWalksatParams* const & mwsParams,
   Array<Array<bool>*> solutions;
   Array<int> numBad;
   infer(mwsParams, numsol, includeUnsatSolutions,
-  		solutions, numBad, true);
+  		solutions, numBad, initial);
+
+  for(int i = 0; i < newClauses.size(); i++)
+    delete newClauses[i];
+  newClauses.clear();
+  newClauseWeights.clear();
+
+  for(int i = 0; i < allClauses.size(); i++)
+    delete allClauses[i];
+  allClauses.clear();
+  allClauseWeights.clear();
 
   int solutionsSize = solutions.size();  
   	// Delete solutions array
@@ -94,21 +133,20 @@ bool LazyWalksat::sample(const MaxWalksatParams* const & mwsParams,
 }
 
 
+/* Lazy version of MaxWalkSat */
 void LazyWalksat::infer(const MaxWalksatParams* const & params,
  						const int& numSolutions, const bool&  includeUnsatSolutions,
         		        Array<Array<bool>*>& solutions, Array<int>& numBad,
         		        const bool& initial)
 {
-  int k;			/* loop counter */
+//cout << "Inside lazywalksat::infer" << endl;
   int base_cutoff = 100000;
   bool printonlysol = false;
   bool printfalse = false;
   bool printlow = true;
-  bool superlinear = false;
-  //int printtrace = 1000;
-  int printtrace = 0;
+  int printtrace = 1000;
+  //int printtrace = 0;
   long int totalflip = 0;	/* total number of flips in all tries so far */
-  long int totalsuccessflip = 0; /* total number of flips in all tries which succeeded so far */
   int numtry = 0;		/* total attempts at solutions */
   int numsuccesstry = 0;	/* total found solutions */
   int numsol = numSolutions;     /* stop after this many tries succeeds */
@@ -121,20 +159,7 @@ void LazyWalksat::infer(const MaxWalksatParams* const & params,
     
   long int lowbad;		/* lowest number of bad clauses during try */
   long int lowcost;		/* lowest cost of bad clauses during try */
-  long x;
-  long integer_sum_x = 0;
-  double sum_x = 0.0;
-  double sum_x_squared = 0.0;
-  double mean_x = -1;
-  double second_moment_x;
-  double variance_x  = -1;
-  double std_dev_x = -1;
-  double std_error_mean_x = -1;
   double seconds_per_flip;
-  int r;
-  int sum_r = 0;
-  double sum_r_squared = 0.0;
-  double mean_r = -1;
 
   int worst_cost, computed_cost;
 
@@ -152,7 +177,9 @@ void LazyWalksat::infer(const MaxWalksatParams* const & params,
 
   int cutoff = params->maxSteps;
   int numrun = params->tries;
-  if (params->lazyGnded) gnded = true;
+
+    // No. of runs must be at least as big as no. of solutions
+  if (numrun < numsol) numrun = numsol;
   if (params->lazyNoApprox) noApprox = true;
   
   base_cutoff = cutoff;
@@ -181,15 +208,70 @@ void LazyWalksat::infer(const MaxWalksatParams* const & params,
   setuptime = 0;
   expertime = 0;
   elapsed_seconds();
-  if (initial) init();
+  
+  if (initial)
+  {
+    init();
+  }
+  else if (lwInfo->getSampleSat())
+  {
+    newClauses.clear();
+    newClauseWeights.clear();
+/*
+for (int i = 0; i < supersetClauses_.size(); i++)
+{
+  cout << "Superset " ;
+  supersetClauses_[i]->print(cout);
+  cout << endl;
+}
+*/
+      // Deactivate atoms activated in last MC-SAT step
+    resetSampleSat();
+      // Do MC-SAT clause selection
+    lwInfo->selectClauses(supersetClauses_, newClauses,
+                          newClauseWeights);
+      // Unit propagation on active clauses
+    initFixedAtoms(newClauses, newClauseWeights);
+    lwInfo->propagateFixedAtoms(newClauses, newClauseWeights,
+                                fixedAtoms_, maxFixedAtoms);
+    
+    clauseFSMgr->releaseAllStorePtr();
+    atomFSMgr->releaseAllStorePtr();
+ 
+    deleteClauseMemory();
+    deleteAtomMemory();
+          
+    delete clauseFSMgr;
+    delete atomFSMgr;
+
+    clauseStorePtr = NULL;
+    clauseFreeStore = 0;
+   
+    atomStorePtr = NULL;
+    atomFreeStore = 0;
+   
+    atomFSMgr = new FreeStoreManager(BLOCKSIZE);
+    clauseFSMgr = new FreeStoreManager(BLOCKSIZE);
+   
+    numatom = 0;
+    numclause = 0;
+    numliterals = 0;
+    numfalse = 0;
+    costofnumfalse = 0;
+  
+      //adding the clauses
+    bool initial = true;
+    addNewClauses(initial);
+  }
+  
   setuptime =  elapsed_seconds();
 	
   abort_flag = false;
   numnullflip = 0;
-  x = 0; r = 0;
   lowcost = BIG;
-	
-  for(k = 0; k < numrun; k++)
+
+  
+  for (int k = 0; k < numrun; k++)
   {
 	initrun();
 	lowbad = numfalse; 
@@ -197,7 +279,7 @@ void LazyWalksat::infer(const MaxWalksatParams* const & params,
 	save_low_assign();
 	numflip = 0;
         
-    if (superlinear) cutoff = base_cutoff * super(r+1);
+    //if (superlinear) cutoff = base_cutoff * super(r+1);
 
     if (printtrace)
     {
@@ -211,9 +293,10 @@ void LazyWalksat::infer(const MaxWalksatParams* const & params,
             
       cout<<"costofnumfalse \t  numfalse \t numflip \t numclause"<<endl;
     }
-      
-	while((numflip < cutoff) && (costofnumfalse > targetcost))
-	{	
+
+	while((numflip < cutoff) /* && (costofnumfalse > targetcost) */)
+    {
+      if (numclause == 0) break;
 	  if (printtrace && (numflip % printtrace == 0))
 	  {
 		printf("%10i \t %10i \t %10li \t %10i\n",
@@ -247,40 +330,22 @@ void LazyWalksat::infer(const MaxWalksatParams* const & params,
         }
       }
 
-	  if (costofnumfalse < lowcost)
+	  if (costofnumfalse <= lowcost)
 	  {
 		lowcost = costofnumfalse;
 		lowbad = numfalse;
 		save_low_assign();
 	  }
+      
+      if (costofnumfalse <= targetcost)
+        break;
 	}
 	  
 	numtry++;
 	totalflip += numflip;
-	x += numflip;
-	r++;
 	if(costofnumfalse <= targetcost)
 	{
 	  numsuccesstry++;
-	  totalsuccessflip += numflip;
-	  integer_sum_x += x;
-	  sum_x = (double) integer_sum_x;
-	  sum_x_squared += ((double)x)*((double)x);
-	  mean_x = sum_x / numsuccesstry;
-	  if (numsuccesstry > 1)
-	  {
-		second_moment_x = sum_x_squared / numsuccesstry;
-		variance_x = second_moment_x - (mean_x * mean_x);
-		/* Adjustment for small small sample size */
-		variance_x = (variance_x * numsuccesstry)/(numsuccesstry - 1);
-		std_dev_x = sqrt(variance_x);
-		std_error_mean_x = std_dev_x / sqrt((double)numsuccesstry);
-	  }
-	  sum_r += r;
-	  mean_r = ((double)sum_r)/numsuccesstry;
-	  sum_r_squared += ((double)r)*((double)r);
-	  x = 0;
-	  r = 0;
 	}
 
 	countlowunsatcost(&computed_cost, &worst_cost);
@@ -310,12 +375,18 @@ void LazyWalksat::infer(const MaxWalksatParams* const & params,
 	fflush(stdout);
   }
 
-  //now, set the db values to the best values observed
+    // Now, set the db values to the best values observed
   lwInfo->setVarVals(lowatom);
 
+    // Set evidence from unit prop. back to non-evidence
+  if (lwInfo->getSampleSat())
+    undoFixedAtoms();
+  
   expertime += elapsed_seconds();
   totaltime = setuptime + expertime;
   seconds_per_flip = expertime / totalflip;
+  
+  
   return;
 }
 
@@ -324,77 +395,155 @@ int LazyWalksat::getNumInitClauses()
   return initClauseCount;
 }
 
+int LazyWalksat::getNumInitAtoms()
+{
+  return initAtomCount;
+}
+
 int LazyWalksat::getNumClauses()
 {
   return numclause;
 }
+
+/**
+ * Sets all active atoms not in the base set to inactive and false
+ * and removes all activated clauses from memory. This method should
+ * be called between steps of SampleSat.
+ */
+void LazyWalksat::resetSampleSat()
+{ 
+    // Set all subsequently activated atoms to inactive and false
+  for(int atom = basenumatom + 1; atom <= numatom; atom++)
+  {
+    lwInfo->setVarVal(atom, false);
+    lwInfo->setInactive(atom);
+  }
+
+    // Remove all activated clauses
+  for(int i = allClauses.size() - 1; i >= 0; i++)
+  {
+    delete allClauses[i];
+    allClauses.removeLastItem();
+    allClauseWeights.removeLastItem();
+  }
+  allClauses.shrinkToSize(initClauseCount);
+  numclause = 0;
+}
+
 
 /*******************************************************************************/
 /****************************** PRIVATE FUNCTIONS ****************************/
 /*******************************************************************************/
 
 
-/* initialize a particular run */
+/**
+  * Initialize LazySat. Initial set of active atoms is computed and stored.
+  * For lazy MC-SAT: Builds the superset of active clauses, from which clause
+  * selection and unit propagation will occur in each iteration.
+  * For LazySat: Builds the initial set of active clauses.
+  */
 void LazyWalksat::init()
 {
+  Timer timer;
+  double begSec = timer.time(); 
     //should be input by user ideally
     //highestcost=1;
   highestcost = BIG;
-    
+  
   numclause = 0;
   numatom = 0;
   numliterals = 0;
-//  cout<<"inside init (lazywalksat.cpp) "<<endl;
+  //cout<<"inside init (lazywalksat.cpp) "<<endl;
 
-  for(int i = 0; i < newClauses.size(); i++)
-    delete newClauses[i];
-  newClauses.clear();
-  newClauseWeights.clear();
-  lwInfo->getWalksatClauses(newClauses, newClauseWeights);
+    // If SampleSat, we want to get the superset of initial clauses
+  bool sample = lwInfo->getSampleSat();
   
   for(int i = 0; i < newClauses.size(); i++)
     delete newClauses[i];
-	
-  basenumatom = lwInfo->getVarCount();
-  //cout<<"Number of Baseatoms = "<<basenumatom<<endl;
-    
-  int defaultCnt = newClauses.size();
-  int defaultCost = 0;
-  initClauseCount = defaultCnt;
-  for(int i = 0; i < defaultCnt; i++)
-	defaultCost += newClauseWeights[i];
-
-	//cout<<endl;
-	//cout<<"Default => Cost\t"<<"******\t"<<" Clause Cnt\t"<<endl;
-	//cout<<"           "<<defaultCost<<"\t"<<"******\t"<<defaultCnt<<"\t"<<endl<<endl;
-	
   newClauses.clear();
   newClauseWeights.clear();
-	
-  if(gnded)
-	lwInfo->setAllActive();
+
+  int defaultCnt = 0;
+  double defaultCost = 0;
+    //getting the initial set of active atoms
+  if (sample)
+  {
+    lwInfo->getSupersetClauses(supersetClauses_);
+
+    defaultCnt = supersetClauses_.size();
+    for(int i = 0; i < defaultCnt; i++)
+      defaultCost += supersetClauses_[i]->getWt();
+
+    for(int i = 0; i < supersetClauses_.size(); i++)
+    {
+      supersetClauses_[i]->deleteIntPredicates();
+      delete supersetClauses_[i];
+    }
+
+    supersetClauses_.clear();
+  }
   else
   {
-	for(int i = 1; i < basenumatom + 1; i++) 
-	  lwInfo->setActive(i);
+    lwInfo->getWalksatClauses(newClauses, newClauseWeights);  
+    for(int i = 0; i < newClauses.size(); i++)
+      delete newClauses[i];
+
+    defaultCnt = newClauses.size();
+    for(int i = 0; i < defaultCnt; i++)
+      defaultCost += newClauseWeights[i];
+
+    newClauses.clear();
+    newClauseWeights.clear();
   }
+
+  cout<<endl;
+  cout<<"Default => Cost\t"<<"******\t"<<" Clause Cnt\t"<<endl;
+  cout<<"           "<<defaultCost<<"\t"<<"******\t"<<defaultCnt<<"\t"<<endl<<endl;
+
+  basenumatom = lwInfo->getVarCount();
+  cout << "Number of Baseatoms = " << basenumatom << endl;
+
+  for(int i = 1; i < basenumatom + 1; i++) 
+	lwInfo->setActive(i);
   
-	//getting the initial set of clausees
-  lwInfo->getWalksatClauses(newClauses, newClauseWeights);
+	//getting the initial set of active clauses
+  if (sample)
+  {
+    lwInfo->getSupersetClauses(supersetClauses_);
+      // Do clause selection on superset and convert weights
+
+cout << "Superset:" << endl;
+lwInfo->printIntClauses(supersetClauses_);
+
+    lwInfo->selectClauses(supersetClauses_, newClauses,
+                          newClauseWeights);
+    initFixedAtoms(newClauses, newClauseWeights);
+    lwInfo->propagateFixedAtoms(newClauses, newClauseWeights,
+                                fixedAtoms_, maxFixedAtoms);
+    
+  }
+  else
+    lwInfo->getWalksatClauses(newClauses, newClauseWeights);
 	
 	//adding the clauses
   bool initial = true;
   addNewClauses(initial);
 
-//cout << "Initial clauses to satisfy: " << allClauses.size() << endl;
-//  cout<<"done with constructing the initial network!"<<endl;
+  initAtomCount = lwInfo->getVarCount();
+  initClauseCount = allClauses.size();
+
+  cout << "Atoms in memory: " << initAtomCount << endl;
+  cout << "Initial active clauses: " << initClauseCount << endl;
+
+  cout << "time taken for init = "; Timer::printTime(cout, timer.time()-begSec);
+  cout << endl;
 }
 
 
 /* initialize a particular run */
 void LazyWalksat::initrun()
 {
-//  cout<<"****** inside initrun *****"<<endl;
+  //cout<<"****** inside initrun *****"<<endl;
   int newval; 
   numfalse = 0;
   costofnumfalse = 0;
@@ -407,50 +556,68 @@ void LazyWalksat::initrun()
   {
 	changed[i] = -BIG;
 	breakcost[i] = 0;
-    
-    if(i <= basenumatom && !lwInfo->inBlock(i))
-      newval = random()%2;
-    else
-      newval = initatom[i];
 
-	if(atom[i] != newval)
-	{
-	  lwInfo->flipVar(i);
-	  atom[i] = newval;
-	}
+    if (fixedAtoms_[i])
+    {
+      newval = lwInfo->getVarVal(i);
+    }
+    else
+    {
+      if (i <= basenumatom && !lwInfo->inBlock(i))
+        newval = random()%2;
+      else
+        newval = initatom[i];
+    }
+
+    if (atom[i] != newval)
+    {
+      lwInfo->flipVar(i);
+      atom[i] = newval;
+    }
   }
   initializeBreakCost(0);
-//  cout<<"****** leaving initrun *****"<<endl;
+  //cout<<"****** leaving initrun *****"<<endl;
+  
 }
 
 /* Fixes false clause (index of clause is tofix) */
 void LazyWalksat::fix(int tofix)
 {
+  Timer timer;
+  //double begSec = timer.time();
+  double interimSec;
+  //cout << "Fixing clause ";
     // If neg. clause, then flip all true literals
   if (cost[tofix] < 0)
   {
+    //cout << "(neg.)" << endl;
     if (numtruelit[tofix] > 0)
     {
-      for(int i = 0; i < size[tofix]; i++)
+      for (int i = 0; i < size[tofix]; i++)
       {
         int atm = abs(clause[tofix][i]);
           // true literal
         if((clause[tofix][i] > 0) == atom[atm])
         {
-            // If atm has been deactivated or in block with evidence,
-            // then do not flip it
+          //cout << "\tTrue lit. " << i << ": ";
+            // If atm has been deactivated or in block with evidence
+            // or fixed, then do not flip it
           if ((haveDeactivated && lwInfo->isDeactivated(atm)) ||
-              (lwInfo->inBlockWithEvidence(atm))) 
+              (lwInfo->inBlockWithEvidence(atm)))
             continue;
         
-          if(!gnded && !lwInfo->isActive(atm))
+          if(!lwInfo->isActive(atm))
           {
+            interimSec = timer.time();
+            
               // If atom is in a block, this is noted here in lwInfo
             lwInfo->getWalksatClausesWhenFlipped(atm, newClauses, newClauseWeights);
          
             bool initial = false;
             addNewClauses(initial);
             lwInfo->setActive(atm);
+            
+            //cout << "time taken for non-active = "; Timer::printTime(cout, timer.time()-interimSec);
           }
           else
           {
@@ -471,15 +638,16 @@ void LazyWalksat::fix(int tofix)
           {
             flipatom(lwInfo->getOtherAtom());
           }          
-          if(!gnded)
-          {
-            lwInfo->flipVar(atm);
-            if (lwInfo->getInBlock())
-              lwInfo->flipVar(lwInfo->getOtherAtom());
-          }
+
+          lwInfo->flipVar(atm);
+          if (lwInfo->getInBlock())
+            lwInfo->flipVar(lwInfo->getOtherAtom());
+
             // Set back inBlock and other atom
           lwInfo->setInBlock(false);
           lwInfo->setOtherAtom(-1);
+
+          //cout << endl;
         }
       }
     }
@@ -492,6 +660,7 @@ void LazyWalksat::fix(int tofix)
     // Pos. clause: choose an atom to flip
   else
   {
+    //cout << "(pos.)" << endl;
     int numbreak[MAXLENGTH];    /* number of clauses changing */
                                 /* each atoms would make false */
     int i;                      /* loop counter */
@@ -499,9 +668,10 @@ void LazyWalksat::fix(int tofix)
 
     for(i = 0; i < size[tofix]; i++)
     {
-      int atm = abs(clause[tofix][i]);	 
+      //cout << "\tLit. " << i << ": ";
+      int atm = abs(clause[tofix][i]);
 	
-        // If atm has been deactivated or in block with evidence,
+        // If atm has been deactivated or in block with evidence or fixed,
         // then give it a very high weight (do not want to flip)
 	  if ((haveDeactivated && lwInfo->isDeactivated(atm)) ||
           (lwInfo->inBlockWithEvidence(atm))) 
@@ -513,14 +683,21 @@ void LazyWalksat::fix(int tofix)
 	  //interfacing with external world - if this atom is not active,
 	  //need to get the cost of clauses which would become unsatisfied
 	  //by flipping it. 
-      if(!gnded && !lwInfo->isActive(atm))
+      if(!lwInfo->isActive(atm))
       {
-        numbreak[i] = lwInfo->getUnSatCostWhenFlipped(atm);
+        interimSec = timer.time(); 
+        
+        numbreak[i] = lwInfo->getUnSatCostWhenFlipped(atm, newClauses, newClauseWeights);
+        bool initial = false;
+        addNewClauses(initial);
+        lwInfo->setActive(atm);
+        //cout << "time taken for non-active (1) = "; Timer::printTime(cout, timer.time()-interimSec);
       }
       else
       {
         numbreak[i] = breakcost[atm];
       }
+      //cout << endl;
     }
 	
     switch(heuristic)
@@ -538,7 +715,13 @@ void LazyWalksat::fix(int tofix)
         choice = pickadditive(numbreak,size[tofix],tofix);
         break;
       case BEST:
+        interimSec = timer.time();
+        
         choice = pickbest(numbreak,size[tofix],tofix);
+        
+        //cout << "pickbest choice " << choice << endl;
+        //cout << "\ttime taken for pickbest = "; Timer::printTime(cout, timer.time()-interimSec);
+        //cout << endl;
         break;
       case EXPONENTIAL: 
         choice = pickexponential(numbreak,size[tofix],tofix);
@@ -556,23 +739,28 @@ void LazyWalksat::fix(int tofix)
     {
       int atm = abs(clause[tofix][choice]);
 
-        // If chosen atom is deactivated or in block with evidence,
+        // If chosen atom is deactivated or in block with evidence or fixed,
         // then continue to next flip (do not want to flip)
       if ((haveDeactivated && lwInfo->isDeactivated(atm)) ||
-          (lwInfo->inBlockWithEvidence(atm))) 
+          (lwInfo->inBlockWithEvidence(atm)))
       {
         numnullflip++;
         return;
       }
     
-      if(!gnded && !lwInfo->isActive(atm))
+      if(!lwInfo->isActive(atm))
       {
+        interimSec = timer.time(); 
+        
           // If atom is in a block, this is noted here in lwInfo
         lwInfo->getWalksatClausesWhenFlipped(atm, newClauses, newClauseWeights);
 		 
         bool initial = false;
         addNewClauses(initial);
         lwInfo->setActive(atm);
+        
+        //cout << "\ttime taken for non-active (2) = "; Timer::printTime(cout, timer.time()-interimSec);
+        //cout << endl;
       }
       else
       {
@@ -594,18 +782,19 @@ void LazyWalksat::fix(int tofix)
         flipatom(lwInfo->getOtherAtom());
       }
           
-      if(!gnded)
-      {
-        lwInfo->flipVar(atm);
-        if (lwInfo->getInBlock())
-          lwInfo->flipVar(lwInfo->getOtherAtom());
-      }
+      lwInfo->flipVar(atm);
+      if (lwInfo->getInBlock())
+        lwInfo->flipVar(lwInfo->getOtherAtom());
+
         // Set back inBlock and other atom
       lwInfo->setInBlock(false);
       lwInfo->setOtherAtom(-1);
     }
   }
+  //cout << "time taken for total flip = "; Timer::printTime(cout, timer.time()-begSec);
+  //cout << endl;
 }
+
 
 void LazyWalksat::addNewClauses(bool initial)
 {
@@ -624,7 +813,7 @@ void LazyWalksat::addNewClauses(bool initial)
   // store the old number of clauses 
   int oldnumclause = numclause;
   int oldnumatom = numatom;
-	
+
   numatom = lwInfo->getVarCount();
   numclause = allClauses.size();
 	
@@ -635,12 +824,8 @@ void LazyWalksat::addNewClauses(bool initial)
   /* allocate clause memory */
   if(clausemem < numclause )
   {
-	//if gnded, we know before hand what all clauses we need to work on.
-	//therefore, there is no need to allocate extra memory
-	if(gnded) 
-	  allocateClauseMemory(numclause);
 	//if memory is getting tight, then can not allocate 2 times
-	else if (2*numclause > clauseLimit)
+	if (2*numclause > clauseLimit)
 	  allocateClauseMemory(clauseLimit);
 	else
 	  allocateClauseMemory(2*numclause);
@@ -649,12 +834,7 @@ void LazyWalksat::addNewClauses(bool initial)
   /* allocate atom memory */
   if(atommem < numatom)
   {
-	//if gnded, we know before hand what all atoms we need to work on.
-	//therefore, there is no need to allocate extra memory
-	if(gnded) 
-	  allocateAtomMemory(numatom);
-	else
-	  allocateAtomMemory(2*numatom);
+    allocateAtomMemory(2*numatom);
   }
 
   //initialize various structues for atoms
@@ -766,6 +946,7 @@ void LazyWalksat::addNewClauses(bool initial)
   }
   if(!initial)
     initializeBreakCost(oldnumclause);
+//cout<<"done adding new clauses.."<<endl;
 }
 
 // Deactivate atoms/clauses when memory is tight
@@ -794,9 +975,7 @@ void LazyWalksat::trimClauses()
   	  }
   	}
 
-//cout << "sorting" << endl;
 	costs.quicksort();
-//cout << "sorted" << endl;
 
   	int sumOfDeactivated = 0;
   	int numOfDeactivated = 0;
@@ -861,6 +1040,7 @@ void LazyWalksat::trimClauses()
 /* Initialize breakcost in the following: */
 void LazyWalksat::initializeBreakCost(int startclause)
 {
+//cout << "initbreakcost" << endl;
   int thetruelit = -1;
   for(int i = startclause; i < numclause; i++)
   {
@@ -907,6 +1087,7 @@ void LazyWalksat::initializeBreakCost(int startclause)
       }
     }
   }
+//cout << "done initbreakcost" << endl;
 }
 	 
 
@@ -1009,7 +1190,7 @@ void LazyWalksat::deleteClauseMemory()
   delete [] wherefalse;
   delete [] numtruelit;
   
-  clausemem = 0;	
+  clausemem = 0;
 }
 
 void LazyWalksat::deleteAtomMemory()
@@ -1027,7 +1208,7 @@ void LazyWalksat::deleteAtomMemory()
   delete [] lowatom;
   delete [] changed;
   delete [] breakcost;
-    
+
   atommem = 0;
 }
 
@@ -1379,8 +1560,7 @@ void LazyWalksat::print_low_assign(long int lowbad)
 
 void LazyWalksat::save_low_assign(void)
 {
-  int i;
-  for (i = 1; i <= numatom; i++)
+  for (int i = 1; i <= numatom; i++)
     lowatom[i] = atom[i];
 }
 
@@ -1525,7 +1705,7 @@ int LazyWalksat::pickbest(int *numbreak, int clausesize, int tofix)
     
   if (numbest == 1) return best[0];
     
-    //STAN: Added this to avoid a crash when numbest is 0 in (random()%numbest)
+    //Added this to avoid a crash when numbest is 0 in (random()%numbest)
   if (numbest == 0) { return(random()%clausesize); }
 	
   return(best[random()%numbest]);
@@ -1636,30 +1816,25 @@ int LazyWalksat::pickweight(int *weight,int clausesize)
 /* Simulated Annealing */
 bool LazyWalksat::simAnnealing()
 {
+    // No non-evidence atoms left
+  if (lwInfo->getNumDBAtoms() == 0)
+  {
+    numnullflip++;
+    return true;
+  }
     // index of atom chosen to flip
-  int toflip;
+  int toflip = -1;
     // cost change caused by flipping this atom
   int change;
 
   if (numfalse == 0 || (random() % 100 < saRatio && !latesa))
   {
-    int totalAtoms = lwInfo->getNumDBAtoms();
-    int memoryAtoms = lwInfo->getVarCount();
-    toflip = random() % totalAtoms;
-    
-      // If chosen atom is not in memory
-    if (toflip >= memoryAtoms)
-    {
-      toflip = memoryAtoms;
-      lwInfo->activateRandomAtom(newClauses, newClauseWeights);
-      bool initial = false;
+    bool initial = false;
+      // Activate random non-evid. atom
+    if (lwInfo->activateRandomAtom(newClauses, newClauseWeights, toflip))
       addNewClauses(initial);
-    }
-      // Add 1 because atom indices start at 1
-    ++toflip;
-
-      // If chosen atom is deactivated or in block with evidence,
-      // then continue to next flip
+      // If chosen atom is deactivated or in block with evidence
+      // or fixed, then continue to next flip
     if ((haveDeactivated && lwInfo->isDeactivated(toflip)) ||
         (lwInfo->inBlockWithEvidence(toflip)))
     {
@@ -1670,9 +1845,12 @@ bool LazyWalksat::simAnnealing()
       //interfacing with external world - if this atom is not active,
       //need to get the cost of clauses which would become unsatisfied
       //by flipping it. 
-    if(!gnded && !lwInfo->isActive(toflip))
+    if(!lwInfo->isActive(toflip))
     {
-      change = -lwInfo->getUnSatCostWhenFlipped(toflip);
+      change = -lwInfo->getUnSatCostWhenFlipped(toflip, newClauses, newClauseWeights);
+      bool initial = false;
+      addNewClauses(initial);
+      lwInfo->setActive(toflip);
     }
     else
     {
@@ -1684,8 +1862,7 @@ bool LazyWalksat::simAnnealing()
     if (change >= 0 ||
         random() <= exp(change / (temperature / 100.0)) * RAND_MAX)
     {
-    
-      if(!gnded && !lwInfo->isActive(toflip))
+      if(!lwInfo->isActive(toflip))
       {
         lwInfo->getWalksatClausesWhenFlipped(toflip, newClauses, newClauseWeights);
          
@@ -1713,12 +1890,10 @@ bool LazyWalksat::simAnnealing()
         flipatom(lwInfo->getOtherAtom());
       }
           
-      if(!gnded)
-      {
-        lwInfo->flipVar(toflip);
-        if (lwInfo->getInBlock())
-          lwInfo->flipVar(lwInfo->getOtherAtom());
-      }
+      lwInfo->flipVar(toflip);
+      if (lwInfo->getInBlock())
+        lwInfo->flipVar(lwInfo->getOtherAtom());
+
         // Set back inBlock and other atom
       lwInfo->setInBlock(false);
       lwInfo->setOtherAtom(-1);
@@ -1729,4 +1904,169 @@ bool LazyWalksat::simAnnealing()
   }
   else
     return false;
+}
+
+void LazyWalksat::undoFixedAtoms()
+{
+  //Timer timer;
+  //double begSec = timer.time(); 
+
+  for (int i = 1; i < maxFixedAtoms; i++)
+  {
+    if (fixedAtoms_[i])
+    {
+      lwInfo->setEvidence(i, false);
+      lwInfo->incrementNumDBAtoms();
+      fixedAtoms_[i] = false;
+    }
+  }
+
+  //cout << "time taken for clearing fixed atoms = "; Timer::printTime(cout, timer.time()-begSec);
+  //cout << endl;
+}
+
+/* 
+ * Fixes atoms using unit propagation on active clauses.
+ * Fixed atoms are stored in fixedAtoms_ and set as evidence in the DB.
+ */
+void LazyWalksat::initFixedAtoms(Array<Array<int> *> &clauses,
+                                 Array<int> &clauseWeights)
+{
+  //cout << "Clauses before UP: " << clauses.size() << endl;
+  //cout << "Clauseweights before UP: " << clauseWeights.size() << endl;
+  //cout << "Performing unit propagation ..." << endl;
+  //Timer timer;
+  //double begSec = timer.time(); 
+
+  bool done = false;
+  while (!done)
+  {
+    done = true;
+      // For each clause, fix truth value if unit clause
+      // after trimming evidence
+    for (int i = 0; i < clauses.size(); i++)
+    {
+      Array<int>* clause = clauses[i];
+
+        // All atoms could have been removed in prev. iteration
+      if (clause->size() < 1)
+      {
+        //delete clauses[i];
+        //clauses[i] = NULL;
+        delete clauses.removeItemFastDisorder(i);
+        clauseWeights.removeItemFastDisorder(i);
+        i--;
+        continue;
+      }
+
+        // Neg. clauses: all atoms fixed to false
+      if (clauseWeights[i] < 0)
+      {
+        for (int j = 0; j < clause->size(); j++)
+        {
+          int atm = (*clause)[j];
+            // If not already fixed, fix it
+          if (!fixedAtoms_[abs(atm)])
+          {
+            lwInfo->setInactive(abs(atm));
+            lwInfo->setEvidence(abs(atm), true);
+            lwInfo->decrementNumDBAtoms();
+            done = false;
+            fixedAtoms_[abs(atm)] = true;
+              // Neg. clause, neg. atom: set to true
+            if (atm < 0)
+            {
+              lwInfo->setVarVal(abs(atm), true);
+            }
+              // Neg. clause, pos. atom: set to false
+            else if (atm > 0)
+            {
+              lwInfo->setVarVal(abs(atm), false);
+            }
+          }
+        }
+        
+        delete clauses.removeItemFastDisorder(i);
+        clauseWeights.removeItemFastDisorder(i);
+        i--;
+        continue;
+      }
+
+        // Unit clause
+      if (clause->size() == 1)
+      {
+        int atm = (*clause)[0];
+
+          // If not already fixed, fix it
+        if (!fixedAtoms_[abs(atm)])
+        {
+          lwInfo->setInactive(abs(atm));
+          lwInfo->setEvidence(abs(atm), true);
+          lwInfo->decrementNumDBAtoms();
+          done = false;
+          //fixedAtoms_.append(abs(atm));
+          fixedAtoms_[abs(atm)] = true;
+            // Pos. clause, pos. atom: set to true
+            // Neg. clause, neg. atom: set to true
+          if ((clauseWeights[i] > 0 && atm > 0) ||
+              (clauseWeights[i] < 0 && atm < 0))
+          {
+            lwInfo->setVarVal(abs(atm), true);
+          }
+            // Pos. clause, neg. atom: set to false
+            // Neg. clause, pos. atom: set to false
+          else if ((clauseWeights[i] > 0 && atm < 0) ||
+                   (clauseWeights[i] < 0 && atm > 0))
+          {
+            lwInfo->setVarVal(abs(atm), false);          
+          }
+        }
+        
+        delete clauses.removeItemFastDisorder(i);
+        clauseWeights.removeItemFastDisorder(i);
+        i--;
+//cout << "time taken for fixing unit clause = "; Timer::printTime(cout, timer.time()-begSec);
+//cout << endl;
+        continue;
+      }
+      
+        // Clause with 2+ atoms: try to trim evidence
+      for (int j = 0; j < clause->size(); j++)
+      {
+        int atm = (*clause)[j];
+        if (lwInfo->getEvidence(abs(atm)))
+        {
+          bool sense = (atm > 0);
+          TruthValue tv = lwInfo->getVarVal(abs(atm)) ? TRUE : FALSE;
+            // True evidence
+          if (Database::sameTruthValueAndSense(tv, sense))
+          {
+              // Pos. clause: clause is satisfied and is removed
+              // Neg. clause: clause can not be satisfied: remove it
+            delete clauses.removeItemFastDisorder(i);
+            clauseWeights.removeItemFastDisorder(i);
+            i--;
+            break;
+          }
+            // False evidence: remove atom from clause
+          else
+          {          
+            clause->removeItemFastDisorder(j);
+            j--;
+            done = false;
+          }
+        }
+//cout << "time taken for trimming evidence = "; Timer::printTime(cout, timer.time()-begSec);
+//cout << endl;
+        
+      }
+    }
+  }
+//cout << "time taken for UP = "; Timer::printTime(cout, timer.time()-begSec);
+//cout << endl;
+
+  //cout << "Clauses after UP: " << clauses.size() << endl;
+  //cout << "Clauseweights after UP: " << clauseWeights.size() << endl;
+  //cout << "Fixed atoms: " << fixedAtoms_.size() << endl;
+  //cout << "Num. DB atoms: " << lwInfo->getNumDBAtoms() << endl;
 }

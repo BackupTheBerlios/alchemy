@@ -109,12 +109,12 @@ $noresave{$key} = "$nosave";
 # labels from external_latex_labels array.
 
 
-$key = q/logicdir/;
-$external_latex_labels{$key} = q|6.3|; 
+$key = q/qstart/;
+$external_latex_labels{$key} = q|3|; 
 $noresave{$key} = "$nosave";
 
-$key = q/parserdir/;
-$external_latex_labels{$key} = q|6.2|; 
+$key = q/predfunc/;
+$external_latex_labels{$key} = q|5|; 
 $noresave{$key} = "$nosave";
 
 $key = q/intro/;
@@ -125,36 +125,8 @@ $key = q/install/;
 $external_latex_labels{$key} = q|2|; 
 $noresave{$key} = "$nosave";
 
-$key = q/utildir/;
-$external_latex_labels{$key} = q|6.1|; 
-$noresave{$key} = "$nosave";
-
-$key = q/learnstructdir/;
-$external_latex_labels{$key} = q|6.5|; 
-$noresave{$key} = "$nosave";
-
-$key = q/learnwtsdir/;
-$external_latex_labels{$key} = q|6.4|; 
-$noresave{$key} = "$nosave";
-
-$key = q/qstart/;
-$external_latex_labels{$key} = q|3|; 
-$noresave{$key} = "$nosave";
-
-$key = q/predfunc/;
-$external_latex_labels{$key} = q|5|; 
-$noresave{$key} = "$nosave";
-
-$key = q/inferdir/;
-$external_latex_labels{$key} = q|6.6|; 
-$noresave{$key} = "$nosave";
-
 $key = q/syntax/;
 $external_latex_labels{$key} = q|4|; 
-$noresave{$key} = "$nosave";
-
-$key = q/code/;
-$external_latex_labels{$key} = q|6|; 
 $noresave{$key} = "$nosave";
 
 1;

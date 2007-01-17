@@ -1,3 +1,69 @@
+/*
+ * All of the documentation and software included in the
+ * Alchemy Software is copyrighted by Stanley Kok, Parag
+ * Singla, Matthew Richardson, Pedro Domingos, Marc
+ * Sumner and Hoifung Poon.
+ * 
+ * Copyright [2004-07] Stanley Kok, Parag Singla, Matthew
+ * Richardson, Pedro Domingos, Marc Sumner and Hoifung
+ * Poon. All rights reserved.
+ * 
+ * Contact: Pedro Domingos, University of Washington
+ * (pedrod@cs.washington.edu).
+ * 
+ * Redistribution and use in source and binary forms, with
+ * or without modification, are permitted provided that
+ * the following conditions are met:
+ * 
+ * 1. Redistributions of source code must retain the above
+ * copyright notice, this list of conditions and the
+ * following disclaimer.
+ * 
+ * 2. Redistributions in binary form must reproduce the
+ * above copyright notice, this list of conditions and the
+ * following disclaimer in the documentation and/or other
+ * materials provided with the distribution.
+ * 
+ * 3. All advertising materials mentioning features or use
+ * of this software must display the following
+ * acknowledgment: "This product includes software
+ * developed by Stanley Kok, Parag Singla, Matthew
+ * Richardson, Pedro Domingos, Marc Sumner and Hoifung
+ * Poon in the Department of Computer Science and
+ * Engineering at the University of Washington".
+ * 
+ * 4. Your publications acknowledge the use or
+ * contribution made by the Software to your research
+ * using the following citation(s): 
+ * Stanley Kok, Parag Singla, Matthew Richardson and
+ * Pedro Domingos (2005). "The Alchemy System for
+ * Statistical Relational AI", Technical Report,
+ * Department of Computer Science and Engineering,
+ * University of Washington, Seattle, WA.
+ * http://www.cs.washington.edu/ai/alchemy.
+ * 
+ * 5. Neither the name of the University of Washington nor
+ * the names of its contributors may be used to endorse or
+ * promote products derived from this software without
+ * specific prior written permission.
+ * 
+ * THIS SOFTWARE IS PROVIDED BY THE UNIVERSITY OF WASHINGTON
+ * AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED
+ * WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+ * PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE UNIVERSITY
+ * OF WASHINGTON OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
+ * INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+ * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
+ * ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
+ * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * 
+ */
+
 /************************************
  * Near-Uniform Sampler
  * Adapted for MC-SAT
@@ -5,8 +71,8 @@
  	WalkSAT v45 by Kautz
 	SampleSat by Wei et.al.
  ************************************/
-
 #include "samplesat.h"
+#include "timer.h"
 
 char* heuristic_names[] = { "random", "best", "tabu", "sa"};
 
@@ -98,6 +164,7 @@ SampleSat::SampleSat(const SampleSatParams & params, int numGndPreds, int maxCla
   printlow = false;
   printhist = false;
   printtrace = 0;
+  //printtrace = 1000;
   trace_assign = false;
 
   outfile[0] = 0;
@@ -196,11 +263,18 @@ bool SampleSat::sample(bool*& assignments, int numClauses,
 
   initVars();		// initialize variables	
     
+  Timer timer;
+  double begSec = timer.time();
+  
   if (!initprob())
   {
 	return false;
   }
+  //cout << "time taken for UP = "; Timer::printTime(cout, timer.time()-begSec);
+  //cout << endl;
 
+//cout << "Numatom after UP: " << numatom << endl;
+//cout << "Numclause after UP: " << numclause << endl;
     // -- if no curr sat, randomly flip
   if (numclause == 0)
   {
@@ -247,6 +321,8 @@ bool SampleSat::sample(bool*& assignments, int numClauses,
 
   initRandom();	// random restart each time
 
+  begSec = timer.time(); 
+  
   while (numsuccesstry < numsol && numtry < numrun*numsol)
   {
 	numtry++;
@@ -278,6 +354,9 @@ bool SampleSat::sample(bool*& assignments, int numClauses,
 	  // if (numfalse > target) initRandom();
 
   }
+
+  //cout << "time taken for flipping = "; Timer::printTime(cout, timer.time()-begSec);
+  //cout << endl;
   
   if (numsuccesstry > 0)
   {
@@ -294,7 +373,7 @@ bool SampleSat::sample(bool*& assignments, int numClauses,
 // Init w. Unit propagation
 bool SampleSat::initprob()
 {
-	//cout << "=== initProb w. unit prop: query clauses=" << numclause << endl;
+  //cout << "=== initProb w. unit prop: query clauses=" << numclause << endl;
   int i;
   int lit;
 
@@ -355,8 +434,8 @@ bool SampleSat::initprob()
 	  }
     }
   }
-	//cout << "\tnumunit=" << numunit <<endl;
-	//cout << "\tafter unit propagation: numfixedatom="<<numfixedatom<<" : numsat="<<numsat<<endl;
+  //cout << "\tnumunit=" << numunit <<endl;
+  //cout << "\tafter unit propagation: numfixedatom="<<numfixedatom<<" : numsat="<<numsat<<endl;
 
 	// delegate to subproblem w backbone removed
   numliterals = 0;
@@ -614,11 +693,11 @@ int SampleSat::picksa(void)
 {
   int change;
   int toflip;
-		
+
   if (numfalse == 0 || (random() % 100 < saRatio && !latesa))
   {
 	toflip = random()%numatom + 1;
-    
+
     int blockIdx = getBlock(toflip - 1);
     if (blockIdx == -1)
       change = makecount[toflip] - breakcount[toflip];

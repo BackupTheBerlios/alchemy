@@ -1,3 +1,68 @@
+/*
+ * All of the documentation and software included in the
+ * Alchemy Software is copyrighted by Stanley Kok, Parag
+ * Singla, Matthew Richardson, Pedro Domingos, Marc
+ * Sumner and Hoifung Poon.
+ * 
+ * Copyright [2004-07] Stanley Kok, Parag Singla, Matthew
+ * Richardson, Pedro Domingos, Marc Sumner and Hoifung
+ * Poon. All rights reserved.
+ * 
+ * Contact: Pedro Domingos, University of Washington
+ * (pedrod@cs.washington.edu).
+ * 
+ * Redistribution and use in source and binary forms, with
+ * or without modification, are permitted provided that
+ * the following conditions are met:
+ * 
+ * 1. Redistributions of source code must retain the above
+ * copyright notice, this list of conditions and the
+ * following disclaimer.
+ * 
+ * 2. Redistributions in binary form must reproduce the
+ * above copyright notice, this list of conditions and the
+ * following disclaimer in the documentation and/or other
+ * materials provided with the distribution.
+ * 
+ * 3. All advertising materials mentioning features or use
+ * of this software must display the following
+ * acknowledgment: "This product includes software
+ * developed by Stanley Kok, Parag Singla, Matthew
+ * Richardson, Pedro Domingos, Marc Sumner and Hoifung
+ * Poon in the Department of Computer Science and
+ * Engineering at the University of Washington".
+ * 
+ * 4. Your publications acknowledge the use or
+ * contribution made by the Software to your research
+ * using the following citation(s): 
+ * Stanley Kok, Parag Singla, Matthew Richardson and
+ * Pedro Domingos (2005). "The Alchemy System for
+ * Statistical Relational AI", Technical Report,
+ * Department of Computer Science and Engineering,
+ * University of Washington, Seattle, WA.
+ * http://www.cs.washington.edu/ai/alchemy.
+ * 
+ * 5. Neither the name of the University of Washington nor
+ * the names of its contributors may be used to endorse or
+ * promote products derived from this software without
+ * specific prior written permission.
+ * 
+ * THIS SOFTWARE IS PROVIDED BY THE UNIVERSITY OF WASHINGTON
+ * AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED
+ * WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+ * PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE UNIVERSITY
+ * OF WASHINGTON OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
+ * INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+ * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
+ * ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
+ * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * 
+ */
 %{
 #define YYSTYPE int
 #define YYDEBUG 1
@@ -491,7 +556,7 @@ predicate_declaration:
 //  if (folDbg >= 2) printf("predicate_declaration: ZZ_VARIABLE\n");
 ZZ_VARIABLE 
 {
-  const char* predName= zztokenList.removeLast();
+  const char* predName = zztokenList.removeLast();
 
   if (folDbg >= 1) printf("ZZ_PREDICATE pc_%s ", predName);  
     //predicate has not been declared a function
@@ -720,7 +785,6 @@ constants_in_groundings ')'
     }
     delete zzpred;
   }
-  
   zzpred = NULL;
 }
 
@@ -773,10 +837,10 @@ ZZ_FUNCTION
   zzaddConstantToPredFunc(constString);
 
   zztmpReturnNum = false;
-  delete [] zztmpReturnConstant;
+  free(zztmpReturnConstant);
   delete [] funcName;
-  delete [] predName;
-  delete [] constString;
+  free(predName);
+  free(constString);
 }
 '(' 
 { 
@@ -1230,8 +1294,8 @@ atomic_sentence:
           }
         }
       }
+	  free(zzinfixPredName);
       zzinfixPredName = NULL;
-	  delete [] zzinfixPredName;
 	}
 
     zzcheckPredNumTerm(zzpred);
@@ -1445,8 +1509,8 @@ atomic_sentence:
 	  zzfuncConjStr.clear();
 	}
 	zzfunc = NULL;
-	zzinfixPredName = NULL;
-	delete [] zzinfixPredName;
+	free(zzinfixPredName);
+    zzinfixPredName = NULL;
   }
 ;
 
@@ -1592,23 +1656,39 @@ term:
     zzcheckFuncNumTerm(zzfunc);
     zzassert(zzpred != NULL, "expecting zzpred != NULL");
 
-	// replace function
+	   // replace function
 	 
-	// Append Term funcVar<zzfuncVarCounter> to predicate where
-	// function appears and set flag to add conjunction
+	   // Append Term funcVar<zzfuncVarCounter> to predicate where
+	   // function appears and set flag to add conjunction
 
-	// 1. Make new variable
+	   // 1. Make new variable
     char* varName;
-    char funcVarCounterString[10];
-    int funcVarCounterLength =
-      sprintf(funcVarCounterString, "%d", zzfuncVarCounter);
-    varName = (char *)malloc((strlen(ZZ_FUNCVAR_PREFIX) +
+    string newVarName;
+    
+      // Check if function mapping already occurs in formula
+    ZZFuncToFuncVarMap::iterator mit;
+    if ((mit = zzfuncToFuncVarMap.find(zzfunc)) != zzfuncToFuncVarMap.end())
+    {
+      newVarName = (*mit).second;
+      varName = (char *)malloc((strlen(newVarName.c_str()) + 1) * sizeof(char));
+      strcpy(varName, newVarName.c_str());
+    }
+    else
+    {
+      char funcVarCounterString[10];
+      int funcVarCounterLength =
+        sprintf(funcVarCounterString, "%d", zzfuncVarCounter);
+      varName = (char *)malloc((strlen(ZZ_FUNCVAR_PREFIX) +
   								funcVarCounterLength + 1)*sizeof(char));
-  	strcpy(varName, ZZ_FUNCVAR_PREFIX);
- 	strcat(varName, funcVarCounterString);
-    ++zzfdnumVars;
-    ++zzfuncVarCounter;
-    string newVarName = zzgetNewVarName(varName);
+      strcpy(varName, ZZ_FUNCVAR_PREFIX);
+      strcat(varName, funcVarCounterString);
+      ++zzfdnumVars;
+      ++zzfuncVarCounter;
+      newVarName = zzgetNewVarName(varName);
+      
+      Function* func = new Function(*zzfunc);
+      zzfuncToFuncVarMap[func] = newVarName;
+    }
       
    	bool rightNumTerms = true;
    	bool rightType = true;
@@ -1753,10 +1833,11 @@ term:
 	  zzfunc = NULL;
         	
     }
-    delete [] varName;
-	delete [] predName;
+    free(varName);
+	free(predName);
 	//zzformulaStr.append(")");
 
+    delete zzpred;
 	zzpred = prevPred;
   }
 |
@@ -1948,11 +2029,11 @@ function_term: // ZZ_FUNCTION '(' terms ')' | term internal_function_sign term
           	  zzappendWithUnderscore(predName, zzintFuncTypeCounter++);
         zzintFuncList.push_back(ZZUnknownIntFuncInfo(unknownIntFuncName, varNames));
         //funclo->replace(zzinfixFuncName, unknownIntFuncName.c_str());
-		delete [] predName;
-		delete [] varName;
+		free(predName);
+		free(varName);
       }
+	  free(zzinfixFuncName);
       zzinfixFuncName = NULL;
-	  delete [] zzinfixFuncName;
 	}
   	
     zzconsumeToken(zztokenList, ")");
@@ -2051,11 +2132,11 @@ function_term: // ZZ_FUNCTION '(' terms ')' | term internal_function_sign term
        	  zzappendWithUnderscore(predName, zzintFuncTypeCounter++);
       zzintFuncList.push_back(ZZUnknownIntFuncInfo(unknownIntFuncName, varNames));
         //funclo->replace(zzinfixFuncName, unknownIntFuncName.c_str());
-	  delete [] predName;
-	  delete [] varName;
+	  free(predName);
+	  free(varName);
     }
+	free(zzinfixFuncName);
     zzinfixFuncName = NULL;
-	delete [] zzinfixFuncName;
 
     zzconsumeToken(zztokenList, ")");
     if (folDbg >= 1) printf(") ");

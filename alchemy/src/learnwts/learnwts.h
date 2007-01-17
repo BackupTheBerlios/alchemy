@@ -1,3 +1,68 @@
+/*
+ * All of the documentation and software included in the
+ * Alchemy Software is copyrighted by Stanley Kok, Parag
+ * Singla, Matthew Richardson, Pedro Domingos, Marc
+ * Sumner and Hoifung Poon.
+ * 
+ * Copyright [2004-07] Stanley Kok, Parag Singla, Matthew
+ * Richardson, Pedro Domingos, Marc Sumner and Hoifung
+ * Poon. All rights reserved.
+ * 
+ * Contact: Pedro Domingos, University of Washington
+ * (pedrod@cs.washington.edu).
+ * 
+ * Redistribution and use in source and binary forms, with
+ * or without modification, are permitted provided that
+ * the following conditions are met:
+ * 
+ * 1. Redistributions of source code must retain the above
+ * copyright notice, this list of conditions and the
+ * following disclaimer.
+ * 
+ * 2. Redistributions in binary form must reproduce the
+ * above copyright notice, this list of conditions and the
+ * following disclaimer in the documentation and/or other
+ * materials provided with the distribution.
+ * 
+ * 3. All advertising materials mentioning features or use
+ * of this software must display the following
+ * acknowledgment: "This product includes software
+ * developed by Stanley Kok, Parag Singla, Matthew
+ * Richardson, Pedro Domingos, Marc Sumner and Hoifung
+ * Poon in the Department of Computer Science and
+ * Engineering at the University of Washington".
+ * 
+ * 4. Your publications acknowledge the use or
+ * contribution made by the Software to your research
+ * using the following citation(s): 
+ * Stanley Kok, Parag Singla, Matthew Richardson and
+ * Pedro Domingos (2005). "The Alchemy System for
+ * Statistical Relational AI", Technical Report,
+ * Department of Computer Science and Engineering,
+ * University of Washington, Seattle, WA.
+ * http://www.cs.washington.edu/ai/alchemy.
+ * 
+ * 5. Neither the name of the University of Washington nor
+ * the names of its contributors may be used to endorse or
+ * promote products derived from this software without
+ * specific prior written permission.
+ * 
+ * THIS SOFTWARE IS PROVIDED BY THE UNIVERSITY OF WASHINGTON
+ * AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED
+ * WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+ * PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE UNIVERSITY
+ * OF WASHINGTON OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
+ * INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+ * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
+ * ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
+ * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * 
+ */
 #ifndef LEARNWTS_H_NOV_23_2005
 #define LEARNWTS_H_NOV_23_2005
 
@@ -12,6 +77,13 @@
 extern const char* ZZ_TMP_FILE_POSTFIX; //defined in fol.y
 const bool DOMAINS_SHARE_DATA_STRUCT = true;
 
+/**
+ * Extracts file names from a list of files separated by a comma with
+ * no space.
+ * 
+ * @param namesStr List of files from which the names are extracted
+ * @param namesArray Array which contains the file names after extraction
+ */
 void extractFileNames(const char* const & namesStr, Array<string>& namesArray)
 {
   if (namesStr == NULL) return;
@@ -32,13 +104,46 @@ void extractFileNames(const char* const & namesStr, Array<string>& namesArray)
   }
 }
 
+/**
+ * Extracts a string of arguments separated by white space.
+ * 
+ * @param argsStr List of arguments being extracted
+ * @param argc Number of arguments extracted
+ * @param argv Array which contains the arguments after extraction
+ */
+void extractArgs(const char* const & argsStr, int& argc, char** argv)
+{
+  argc = 0;
+  if (argsStr == NULL) return;
+  string s(argsStr);
+  s = Util::trim(s);
+  if (s.length() == 0) return;
+  s.append(" ");
+  string::size_type cur = 0;
+  string::size_type blank;
+  string arg;
+
+  while (true)
+  {
+    blank = s.find(" ", cur);
+    if (blank == string::npos) return;
+    arg = s.substr(cur, blank-cur);
+    arg = Util::trim(arg);
+    memset(argv[argc], '\0', 30);
+    arg.copy(argv[argc], arg.length());
+    argc++;
+    cur = blank + 1;
+  }
+}
 
 void createDomainAndMLN(Array<Domain*>& domains, Array<MLN*>& mlns,
                         const string& inMLNFile, ostringstream& constFiles,
-                        ostringstream& funcFiles, ostringstream& dbFiles,
+                        ostringstream& dbFiles,
                         const StringHashArray* const & nonEvidPredNames,
                         const bool& addUnitClauses, const double& priorMean,
-                        const bool& checkPlusTypes, const bool& mwsLazy)
+                        const bool& checkPlusTypes, const bool& mwsLazy,
+                        const bool& allPredsExceptQueriesAreCW,
+                        const StringHashArray* const & owPredNames)
 {
   string::size_type bslash = inMLNFile.rfind("/");
   string tmp = (bslash == string::npos) ? 
@@ -55,7 +160,7 @@ void createDomainAndMLN(Array<Domain*>& domains, Array<MLN*>& mlns,
   while(getline(in, buffer)) out << buffer << endl;
   in.close();
 
-  out << constFiles.str() << endl << funcFiles.str() << endl 
+  out << constFiles.str() << endl 
       << dbFiles.str() << endl;
   out.close();
   
@@ -63,14 +168,15 @@ void createDomainAndMLN(Array<Domain*>& domains, Array<MLN*>& mlns,
   Domain* domain = new Domain;
   MLN* mln = new MLN();
   
-  bool allPredsExceptQueriesAreCW = true;
+    // Unknown evidence atoms are filled in by EM
+  //bool allPredsExceptQueriesAreCW = true;
   bool warnAboutDupGndPreds = true;
   bool mustHaveWtOrFullStop = false;
   bool flipWtsOfFlippedClause = false;
   Domain* domain0 = (checkPlusTypes) ? domains[0] : NULL;
 
   bool ok = runYYParser(mln, domain, tmpInMLN, allPredsExceptQueriesAreCW, 
-                        NULL, nonEvidPredNames, addUnitClauses, 
+                        owPredNames, nonEvidPredNames, addUnitClauses, 
                         warnAboutDupGndPreds, priorMean, mustHaveWtOrFullStop,
                         domain0, mwsLazy, flipWtsOfFlippedClause);
 
@@ -85,42 +191,41 @@ void createDomainsAndMLNs(Array<Domain*>& domains, Array<MLN*>& mlns,
                           const bool& multipleDatabases,
                           const string& inMLNFile,
                           const Array<string>& constFilesArr,
-                          const Array<string>& funcFilesArr,
                           const Array<string>& dbFilesArr,
                           const StringHashArray* const & nonEvidPredNames,
                           const bool& addUnitClauses, const double& priorMean,
-                          const bool& mwsLazy)
+                          const bool& mwsLazy,
+                          const bool& allPredsExceptQueriesAreCW,
+                          const StringHashArray* const & owPredNames)
 {
   if (!multipleDatabases)
   {
-    ostringstream constFilesStream, funcFilesStream, dbFilesStream;
+    ostringstream constFilesStream, dbFilesStream;
     for (int i = 0; i < constFilesArr.size(); i++) 
       constFilesStream << "#include \"" << constFilesArr[i] << "\"" << endl;
-    for (int i = 0; i < funcFilesArr.size(); i++) 
-      funcFilesStream << "#include \"" << funcFilesArr[i] << "\"" << endl;
     for (int i = 0; i < dbFilesArr.size(); i++)    
       dbFilesStream << "#include \"" << dbFilesArr[i] << "\"" << endl;
     createDomainAndMLN(domains, mlns, inMLNFile, constFilesStream, 
-                       funcFilesStream, dbFilesStream, nonEvidPredNames,
-                       addUnitClauses, priorMean, false, mwsLazy);
+                       dbFilesStream, nonEvidPredNames,
+                       addUnitClauses, priorMean, false, mwsLazy,
+                       allPredsExceptQueriesAreCW, owPredNames);
   }
   else
   {   //if multiple databases
     for (int i = 0; i < dbFilesArr.size(); i++) // for each domain
     {
       cout << "parsing MLN and creating domain " << i << "..." << endl;
-      ostringstream constFilesStream, funcFilesStream, dbFilesStream;
+      ostringstream constFilesStream, dbFilesStream;
       if (constFilesArr.size() > 0)
         constFilesStream << "#include \"" << constFilesArr[i] << "\"" << endl;
-      if (funcFilesArr.size() > 0)
-        funcFilesStream << "#include \"" << funcFilesArr[i] << "\"" << endl;
       dbFilesStream    << "#include \"" << dbFilesArr[i]    << "\"" << endl;
       
       bool checkPlusTypes = (i > 0);
 
       createDomainAndMLN(domains, mlns, inMLNFile, constFilesStream,
-                         funcFilesStream, dbFilesStream, nonEvidPredNames,
-                         addUnitClauses, priorMean, checkPlusTypes, mwsLazy);
+                         dbFilesStream, nonEvidPredNames,
+                         addUnitClauses, priorMean, checkPlusTypes, mwsLazy,
+                         allPredsExceptQueriesAreCW, owPredNames);
 
         // let the domains share data structures
       if (DOMAINS_SHARE_DATA_STRUCT && i > 0)
@@ -162,20 +267,6 @@ void createDomainsAndMLNs(Array<Domain*>& domains, Array<MLN*>& mlns,
   //  assert(mlns[i]->getNumClauses() == numClauses);
   //numClauses = 0; //avoid compilation warning
 }
-
-
-double getTimeSec(const bool& discLearn, Timer& timer)
-{
-  if (discLearn)
-  {
-      //using wall clock time since MaxWalksat is an external executable/process
-    struct timeval tv; struct timezone tzp;
-    gettimeofday(&tv,&tzp);
-    return tv.tv_sec;
-  }
-  return timer.time();
-}
-
 
 void assignWtsAndOutputMLN(ostream& out, Array<MLN*>& mlns, 
                            Array<Domain*>& domains, const Array<double>& wts, 
@@ -220,7 +311,7 @@ void assignWtsAndOutputMLN(ostream& out, Array<MLN*>& mlns,
   {
     MLN* mln = mlns[i];
     const ClauseHashArray* clauses = mln->getClauses();
-    for (int i= 0; i < clauses->size(); i++) 
+    for (int i = 0; i < clauses->size(); i++) 
       (*clauses)[i]->setWt(wts[i+1]);
   }
 

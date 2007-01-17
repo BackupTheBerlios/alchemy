@@ -1,3 +1,68 @@
+/*
+ * All of the documentation and software included in the
+ * Alchemy Software is copyrighted by Stanley Kok, Parag
+ * Singla, Matthew Richardson, Pedro Domingos, Marc
+ * Sumner and Hoifung Poon.
+ * 
+ * Copyright [2004-07] Stanley Kok, Parag Singla, Matthew
+ * Richardson, Pedro Domingos, Marc Sumner and Hoifung
+ * Poon. All rights reserved.
+ * 
+ * Contact: Pedro Domingos, University of Washington
+ * (pedrod@cs.washington.edu).
+ * 
+ * Redistribution and use in source and binary forms, with
+ * or without modification, are permitted provided that
+ * the following conditions are met:
+ * 
+ * 1. Redistributions of source code must retain the above
+ * copyright notice, this list of conditions and the
+ * following disclaimer.
+ * 
+ * 2. Redistributions in binary form must reproduce the
+ * above copyright notice, this list of conditions and the
+ * following disclaimer in the documentation and/or other
+ * materials provided with the distribution.
+ * 
+ * 3. All advertising materials mentioning features or use
+ * of this software must display the following
+ * acknowledgment: "This product includes software
+ * developed by Stanley Kok, Parag Singla, Matthew
+ * Richardson, Pedro Domingos, Marc Sumner and Hoifung
+ * Poon in the Department of Computer Science and
+ * Engineering at the University of Washington".
+ * 
+ * 4. Your publications acknowledge the use or
+ * contribution made by the Software to your research
+ * using the following citation(s): 
+ * Stanley Kok, Parag Singla, Matthew Richardson and
+ * Pedro Domingos (2005). "The Alchemy System for
+ * Statistical Relational AI", Technical Report,
+ * Department of Computer Science and Engineering,
+ * University of Washington, Seattle, WA.
+ * http://www.cs.washington.edu/ai/alchemy.
+ * 
+ * 5. Neither the name of the University of Washington nor
+ * the names of its contributors may be used to endorse or
+ * promote products derived from this software without
+ * specific prior written permission.
+ * 
+ * THIS SOFTWARE IS PROVIDED BY THE UNIVERSITY OF WASHINGTON
+ * AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED
+ * WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+ * PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE UNIVERSITY
+ * OF WASHINGTON OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
+ * INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+ * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
+ * ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
+ * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * 
+ */
 #ifndef GROUNDPREDICATE_H_JUN_26_2005
 #define GROUNDPREDICATE_H_JUN_26_2005
 
@@ -10,9 +75,10 @@ class GroundPredicate
 {
  public:
   GroundPredicate(Predicate* const & pred)
-    : gndClauses_(new Array<GroundClause*>),gndClauseSet_(new GroundClauseSet),
-      senseInGndClauses_(new Array<bool>), truthValues_(NULL), 
-      wtsWhenFalse_(NULL), wtsWhenTrue_(NULL) , numTrue_(0)
+    : negGndClauses_(new Array<GroundClause*>),
+      posGndClauses_(new Array<GroundClause*>),
+      gndClauseSet_(new GroundClauseSet),
+      truthValue_(false), wtWhenFalse_(0), wtWhenTrue_(0)
   {
     assert(pred->isGrounded());
     int numTerms = pred->getNumTerms();    
@@ -30,23 +96,35 @@ class GroundPredicate
   }
 
   
-  ~GroundPredicate() 
+  ~GroundPredicate()
   { 
     if (intArrRep_)    delete intArrRep_; 
-    if (truthValues_)  delete truthValues_;
-    if (wtsWhenFalse_) delete wtsWhenFalse_;
-    if (wtsWhenTrue_)  delete wtsWhenTrue_;
     if (gndClauseSet_) delete gndClauseSet_;
-    delete gndClauses_;
-    delete senseInGndClauses_;
+    delete negGndClauses_;
+    delete posGndClauses_;
   }
 
 
   void deleteGndClauseSet() 
   { if (gndClauseSet_) delete gndClauseSet_; gndClauseSet_ = NULL; }
 
+  /**
+   * Removes the ground clauses from this ground predicate. The gndClauseSet_
+   * is deleted and the gndClauses_ Array is reset.
+   */
+  void removeGndClauses() 
+  {
+    deleteGndClauseSet();
+    delete negGndClauses_;
+    delete posGndClauses_;
+    negGndClauses_ = new Array<GroundClause*>;
+    posGndClauses_ = new Array<GroundClause*>;
+  }
 
-    // the caller is responsible for deleting the returned Predicate*
+  /**
+   * Creates a Predicate* equivalent to this GroundPredicate.
+   * The caller is responsible for deleting the returned Predicate*.
+   */
   Predicate* createEquivalentPredicate(const Domain* const & domain)
   {
     const PredicateTemplate* pt = domain->getPredicateTemplate(getId());
@@ -57,65 +135,30 @@ class GroundPredicate
     return pred;
   }
 
-
-  void initTruthValues(const int& numChains)
-  {
-    if (truthValues_) delete truthValues_;
-    truthValues_ = new Array<bool>;
-    truthValues_->growToSize(numChains, false);
-  }  
-
-
-  void initTruthValuesAndWts(const int& numChains)
-  {
-    initTruthValues(numChains);
-    if (wtsWhenFalse_) delete wtsWhenFalse_;
-    wtsWhenFalse_ = new Array<double>;
-    wtsWhenFalse_->growToSize(numChains, 0);
-    if (wtsWhenTrue_) delete wtsWhenTrue_;
-    wtsWhenTrue_ = new Array<double>;
-    wtsWhenTrue_->growToSize(numChains, 0);
-  }
-
-
   unsigned int getId() const { return (*intArrRep_)[0]; }
   unsigned int getTermId(const int& idx) const { return (*intArrRep_)[idx+1]; }
   unsigned int getNumTerms() const { return intArrRep_->size() - 1; }
 
-  const Array<bool>* getTruthValues() const { return truthValues_; }
-  bool getTruthValue(const int& c) const { return (*truthValues_)[c]; }
-  void setTruthValue(const int& c, const bool& tv) { (*truthValues_)[c] = tv; }
+  bool getTruthValue() const { return truthValue_; }
+  void setTruthValue(const bool& tv) { truthValue_ = tv; }
 
-  const Array<double>* getWtsWhenFalse() const { return wtsWhenFalse_; }
-  double getWtWhenFalse(const int& c) const { return (*wtsWhenFalse_)[c]; }
-  void setWtWhenFalse(const int& c, const double& wt) {(*wtsWhenFalse_)[c]=wt;}
-  void addWtWhenFalse(const int& c, const double& wt) {(*wtsWhenFalse_)[c]+=wt;}
+  double getWtWhenFalse() const { return wtWhenFalse_; }
+  void setWtWhenFalse(const double& wt) {wtWhenFalse_ = wt;}
+  void addWtWhenFalse(const double& wt) {wtWhenFalse_ += wt;}
 
-  const Array<double>* getWtsWhenTrue() const { return wtsWhenTrue_; }
-  double getWtWhenTrue(const int& c) const { return (*wtsWhenTrue_)[c]; }
-  void setWtWhenTrue(const int& c, const double& wt) {(*wtsWhenTrue_)[c]=wt;}
-  void addWtWhenTrue(const int& c, const double& wt) {(*wtsWhenTrue_)[c]+=wt;}
+  double getWtWhenTrue() const { return wtWhenTrue_; }
+  void setWtWhenTrue(const double& wt) {wtWhenTrue_ = wt;}
+  void addWtWhenTrue(const double& wt) {wtWhenTrue_ += wt;}
 
-  double getNumTrue() const { return numTrue_; }
-  void setNumTrue(const double& n) { assert(n >= 0); numTrue_ = n; }
-  void incrementNumTrue() { numTrue_++; }
-
-    //numTrue_ is overloaded to hold the probability that the predicate is true
-  double getProbTrue() const { return numTrue_; }
-  void setProbTrue(const double& p) { assert(p >= 0); numTrue_ = p; }
-
-
-    // get the probability that the ground predicate is true
-  double getProbability(const int& c)
-  { return 1.0 / ( 1.0 + exp((*wtsWhenFalse_)[c] - (*wtsWhenTrue_)[c]) ); }
+    // Get the probability that the ground predicate is true
+  double getProbability()
+  { return 1.0 / ( 1.0 + exp(wtWhenFalse_ - wtWhenTrue_)); }
 
 
   void compress()
   {
-    gndClauses_->compress();
-    senseInGndClauses_->compress();
-    //truthValues_, wtsWhenFalse_, wtsWhenTrue_ need not be compress because
-    //they were assigned the correct exact size in the constructor
+    negGndClauses_->compress();
+    posGndClauses_->compress();
   }
 
 
@@ -129,19 +172,23 @@ class GroundPredicate
 
   bool appendGndClause(GroundClause* const & gc, const bool& senseInGndClause) 
   { 
-    if (gndClauseSet_->find(gc) == gndClauseSet_->end())
+    if (gndClauseSet_== NULL || gndClauseSet_->find(gc) == gndClauseSet_->end())
     {
-      gndClauseSet_->insert(gc);
-      gndClauses_->append(gc);
-      senseInGndClauses_->append(senseInGndClause);
+      if (gndClauseSet_) gndClauseSet_->insert(gc);
+      //gndClauses_->append(gc);
+      if (senseInGndClause) posGndClauses_->append(gc);
+      else                  negGndClauses_->append(gc);
+      //senseInGndClauses_->append(senseInGndClause);
       return true;
     }
     return false;
   } 
 
+  const Array<GroundClause*>* getNegGndClauses() const { return negGndClauses_;}
+  const Array<GroundClause*>* getPosGndClauses() const { return posGndClauses_;}
 
-  const Array<GroundClause*>* getGndClauses() const { return gndClauses_; }
-  const Array<bool>* getSenseInGndClauses() const { return senseInGndClauses_;}
+  int getNumGndClauses() const 
+  { return negGndClauses_->size() + posGndClauses_->size(); }
 
 
   bool same(const GroundPredicate* const & gp)
@@ -192,46 +239,47 @@ class GroundPredicate
       size += (intArrRep_->size()*sizeof(unsigned int) / 1024.0);
       // hashCode_
     size += (sizeof(size_t) / 1024.0);
-      // gndClauses_
-    if (gndClauses_)
+
+    if (negGndClauses_)
     {
-      for (int i = 0; i < gndClauses_->size(); i++)
-        size += ((*gndClauses_)[i]->sizeKB());
+      for (int i = 0; i < negGndClauses_->size(); i++)
+        size += ((*negGndClauses_)[i]->sizeKB());
     }
-      // senseInGndClauses_
-    if (senseInGndClauses_)
-      size += (senseInGndClauses_->size()*sizeof(bool) / 1024.0);
-      // truthValues_
-    if (truthValues_)
-      size += (truthValues_->size()*sizeof(bool) / 1024.0);
-      // wtsWhenFalse_
-    if (wtsWhenFalse_)
-      size += (wtsWhenFalse_->size()*sizeof(double) / 1024.0);
-      // wtsWhenTrue_
-    if (wtsWhenTrue_)
-      size += (wtsWhenTrue_->size()*sizeof(double) / 1024.0);
+    if (posGndClauses_)
+    {
+      for (int i = 0; i < posGndClauses_->size(); i++)
+        size += ((*posGndClauses_)[i]->sizeKB());
+    }
+
+      // truthValue_
+    size += (sizeof(bool) / 1024.0);
+      // wtWhenFalse_
+    size += (sizeof(double) / 1024.0);
+      // wtWhenTrue_
+    size += (sizeof(double) / 1024.0);
     
     return size;
   }
 
  private:
-    //intArrRep_[0] is the pred id; intArrRep_[i] is the constant id where i > 0
-  Array<unsigned int>* intArrRep_;
-  size_t hashCode_;
+    // intArrRep_[0] is the pred id; intArrRep_[i] is the constant id
+    // where i > 0
+  Array<unsigned int>* intArrRep_; // 4 bytes + 4*n bytes (n is the arity)
+  size_t hashCode_; // 4 bytes
+    // gnd pred is a neg lit in these clauses
+  Array<GroundClause*>* negGndClauses_; // 4 bytes + 4*n bytes
+    // gnd pred is a pos lit in these clauses 
+  Array<GroundClause*>* posGndClauses_; // 4 bytes + 4*n bytes
+    // Pointers to ground clauses in which this pred occurs
+  GroundClauseSet* gndClauseSet_; // 4 bytes + 4*n bytes
 
-  Array<GroundClause*>* gndClauses_;
-  GroundClauseSet* gndClauseSet_;
-
-  Array<bool>* senseInGndClauses_;
-
-  Array<bool>* truthValues_;
-  Array<double>* wtsWhenFalse_;
-  Array<double>* wtsWhenTrue_;
-
-    //number of times the ground predicate is set to true
-    //overloaded to hold probability that ground predicate is true
-  double numTrue_; 
-
+    // Truth value
+  bool truthValue_;
+    // Wt when false
+  double wtWhenFalse_;
+    // Wt when true
+  double wtWhenTrue_;
+ 
 };
 
 

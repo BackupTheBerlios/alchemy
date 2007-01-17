@@ -1,16 +1,80 @@
+/*
+ * All of the documentation and software included in the
+ * Alchemy Software is copyrighted by Stanley Kok, Parag
+ * Singla, Matthew Richardson, Pedro Domingos, Marc
+ * Sumner and Hoifung Poon.
+ * 
+ * Copyright [2004-07] Stanley Kok, Parag Singla, Matthew
+ * Richardson, Pedro Domingos, Marc Sumner and Hoifung
+ * Poon. All rights reserved.
+ * 
+ * Contact: Pedro Domingos, University of Washington
+ * (pedrod@cs.washington.edu).
+ * 
+ * Redistribution and use in source and binary forms, with
+ * or without modification, are permitted provided that
+ * the following conditions are met:
+ * 
+ * 1. Redistributions of source code must retain the above
+ * copyright notice, this list of conditions and the
+ * following disclaimer.
+ * 
+ * 2. Redistributions in binary form must reproduce the
+ * above copyright notice, this list of conditions and the
+ * following disclaimer in the documentation and/or other
+ * materials provided with the distribution.
+ * 
+ * 3. All advertising materials mentioning features or use
+ * of this software must display the following
+ * acknowledgment: "This product includes software
+ * developed by Stanley Kok, Parag Singla, Matthew
+ * Richardson, Pedro Domingos, Marc Sumner and Hoifung
+ * Poon in the Department of Computer Science and
+ * Engineering at the University of Washington".
+ * 
+ * 4. Your publications acknowledge the use or
+ * contribution made by the Software to your research
+ * using the following citation(s): 
+ * Stanley Kok, Parag Singla, Matthew Richardson and
+ * Pedro Domingos (2005). "The Alchemy System for
+ * Statistical Relational AI", Technical Report,
+ * Department of Computer Science and Engineering,
+ * University of Washington, Seattle, WA.
+ * http://www.cs.washington.edu/ai/alchemy.
+ * 
+ * 5. Neither the name of the University of Washington nor
+ * the names of its contributors may be used to endorse or
+ * promote products derived from this software without
+ * specific prior written permission.
+ * 
+ * THIS SOFTWARE IS PROVIDED BY THE UNIVERSITY OF WASHINGTON
+ * AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED
+ * WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+ * PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE UNIVERSITY
+ * OF WASHINGTON OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
+ * INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+ * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
+ * ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
+ * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * 
+ */
 #include <fstream>
 #include <iostream>
 #include "arguments.h"
 #include "fol.h"
 #include "learnwts.h"
-#include "infer.h"
+//#include "infer.h"
 #include "structlearn.h"
 
 
 char* inMLNFiles = NULL;
 char* outMLNFile = NULL;
 char* dbFiles = NULL;
-char* funcFiles = NULL;
 char* nonEvidPredsStr = NULL; 
 bool multipleDatabases = false;
 
@@ -18,6 +82,7 @@ int beamSize = 5;
 double minWt = 0.01;
 double penalty = 0.01;
 int maxVars = 6;
+int maxNumPredicates = 6;
 int cacheSize = 500;
 
 bool noSampleClauses = false;
@@ -46,6 +111,8 @@ bool startFromEmptyMLN = false;
 bool tryAllFlips = false;
 int  bestGainUnchangedLimit = 2;
 
+bool structGradDescent = false;
+bool withEM = false;
 
 ARGS ARGS::Args[] = 
 {
@@ -63,10 +130,6 @@ ARGS ARGS::Args[] =
        "(of true/false ground atoms), including function definitions, "
        "e.g. ai.db,graphics.db,languages.db."),
   
-  // Marc: functions defined in .db files
-//  ARGS("functions", ARGS::Opt, funcFiles, 
-//       "Comma-separated .func files containing function definitions."),
-
   ARGS("ne", ARGS::Opt, nonEvidPredsStr, 
        "[all predicates] Non-evidence predicates "
        "(comma-separated with no space), e.g., cancer,smokes,friends."),
@@ -88,6 +151,9 @@ ARGS ARGS::Args[] =
 
   ARGS("maxVars", ARGS::Opt, maxVars, 
        "[6] Maximum number of variables in learned clauses."),
+  
+  ARGS("maxNumPredicates", ARGS::Opt, maxNumPredicates, 
+       "[6] Maximum number of predicates in learned clauses."),
   
   ARGS("cacheSize", ARGS::Opt, cacheSize, 
        "[500] Size in megabytes of the cache that is used to store the clauses "
@@ -190,7 +256,16 @@ ARGS ARGS::Args[] =
   ARGS("bestGainUnchangedLimit", ARGS::Opt, bestGainUnchangedLimit, 
        "[2] Beam search stops when the best clause found does not change "
        "in this number of iterations."),
-       
+
+  //ARGS("structGradDescent", ARGS::Tog, structGradDescent,
+  //     "If set, structural gradient descent is used; "
+  //     "otherwise beam search is used."),
+
+  //ARGS("withEM", ARGS::Tog, withEM,
+  //     "If set, relational structural EM is used to fill in missing truth values; "
+  //     "otherwise missing truth values are set to false. Can only be used with "
+  //     "the structural gradient descent algorithm"),
+
   ARGS()
 };
 
@@ -206,6 +281,11 @@ bool checkParams()
 
   if (maxVars<=0) { cout << "ERROR: maxVar must be positive" << endl;ok =false;}
 
+  if (maxNumPredicates <= 0)
+  { 
+    cout << "ERROR: maxNumPredicates must be positive" << endl; ok = false;
+  }
+  
   if (cacheSize < 0) 
   { cout << "ERROR: cacheSize must be non-negative" << endl; ok = false; }
 
@@ -242,6 +322,16 @@ bool checkParams()
   if (bestGainUnchangedLimit <= 0) 
   { cout << "ERROR: bestGainUnchangedLimit must be positive" << endl; ok=false;}
 
+  if (!structGradDescent && withEM)
+  { cout << "ERROR: EM can only be used with structural gradient descent" << endl; ok=false; }
+  
+  if (structGradDescent && nonEvidPredsStr == NULL)
+  {
+    cout << "ERROR: you must specify non-evidence predicates for "
+         << "structural gradient descent" << endl;
+    ok = false;
+  }
+  
   return ok;
 }
 
@@ -276,13 +366,12 @@ int main(int argc, char* argv[])
   //included into the first .mln file.
 
     //extract .mln and .db, file names
-  Array<string> constFilesArr, dbFilesArr, funcFilesArr;
+  Array<string> constFilesArr, dbFilesArr;
   extractFileNames(inMLNFiles, constFilesArr);
   assert(constFilesArr.size() >= 1);
   string inMLNFile = constFilesArr[0];
   constFilesArr.removeItem(0);
   extractFileNames(dbFiles, dbFilesArr);
-  extractFileNames(funcFiles, funcFilesArr);
 
   if (dbFilesArr.size() <= 0)
   { cout << "ERROR: must specify training data with -t flag."<<endl; return -1;}
@@ -290,10 +379,8 @@ int main(int argc, char* argv[])
     // if multiple databases, check the number of .db/.func files
   if (multipleDatabases) 
   {
-      //if # .mln files containing constants/.func files and .db files are diff
+      //if # .mln files containing constants and .db files are diff
     if ( (constFilesArr.size() > 0 && constFilesArr.size() != dbFilesArr.size()))
-//         ||
-//         (funcFilesArr.size() > 0 && funcFilesArr.size() != dbFilesArr.size()) )
     {
       cout << "ERROR: when there are multiple databases, if .mln files "
            << "containing constants are specified, there must " 
@@ -315,18 +402,29 @@ int main(int argc, char* argv[])
       nonEvidPredNames.append(tmpNEPredNames[i]);
   }
 
-
   ////////////////////////// create domains and mlns ///////////////////////////
 
   Array<Domain*> domains;
   Array<MLN*> mlns;
   StringHashArray* queryPredNames = NULL;
+  if (structGradDescent)
+  {
+    queryPredNames = new StringHashArray();
+    for (int i = 0; i < nonEvidPredNames.size(); i++) 
+      queryPredNames->append(nonEvidPredNames[i]);
+  }
+
   bool addUnitClauses = false;
+    // TODO: Allow user to declare which preds are open-world
+  bool allPredsExceptQueriesAreCW = true;
+  bool mwsLazy = true;
+  if (structGradDescent && withEM) allPredsExceptQueriesAreCW = false;
   begSec = timer.time();
   cout << "Parsing MLN and creating domains..." << endl;
   createDomainsAndMLNs(domains, mlns, multipleDatabases, inMLNFile, 
-                       constFilesArr, funcFilesArr, dbFilesArr, queryPredNames,
-                       addUnitClauses, priorMean, false);
+                       constFilesArr, dbFilesArr, queryPredNames,
+                       addUnitClauses, priorMean, mwsLazy,
+                       allPredsExceptQueriesAreCW, NULL);
   cout << "Parsing MLN and creating domains took ";
   Timer::printTime(cout, timer.time()-begSec); cout << endl << endl;
 
@@ -346,14 +444,15 @@ int main(int argc, char* argv[])
 
 
   //////////////////////////// structure learning //////////////////////////////
-  
+
   if (nonEvidPredNames.size() == 0) 
     domains[0]->getNonEqualPredicateNames(nonEvidPredNames);
   bool cacheClauses = (cacheSize > 0);
   bool reEvalBestCandidatesWithTightParams = true;
   
   StructLearn sl(&mlns, startFromEmptyMLN, outMLNFile, &domains, 
-                 &nonEvidPredNames, maxVars, cacheClauses,cacheSize,tryAllFlips,
+                 &nonEvidPredNames, maxVars, maxNumPredicates, cacheClauses,
+                 cacheSize, tryAllFlips,
                  !noSampleClauses, ddelta, epsilon, 
                  minClauseSamples, maxClauseSamples,
                  !noPrior, priorMean, priorStdDev, 
@@ -362,7 +461,8 @@ int main(int argc, char* argv[])
                  beamSize, bestGainUnchangedLimit, numEstBestClauses, 
                  minWt, penalty, 
                  !noSampleGndPreds,fraction,minGndPredSamples,maxGndPredSamples,
-                 reEvalBestCandidatesWithTightParams);
+                 reEvalBestCandidatesWithTightParams, structGradDescent,
+                 withEM);
   sl.run();
 
   
