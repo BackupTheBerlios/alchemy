@@ -34,14 +34,13 @@ LOGIC=$(SRCDIR)/logic
 INFER=$(SRCDIR)/infer
 LEARNWTS=$(SRCDIR)/learnwts
 LEARNSTRUCT=$(SRCDIR)/learnstruct
-ONLINE=$(SRCDIR)/online
 
 REPLACEFOLCPP=$(PARSER)/replacefolcpp.pl
 
 LIBCINC= -I. -I$(UTIL) -I$(LOGIC) -I$(PARSER) -I$(LEARNWTS) -I$(LEARNSTRUCT) \
-	-I$(INFER) -I$(ONLINE)
+	-I$(INFER)
 LIBLINC= -L. -L$(UTIL) -L$(LOGIC) -L$(PARSER) -L$(LEARNWTS) -L$(LEARNSTRUCT) \
-	-L$(INFER) -L$(ONLINE)
+	-L$(INFER)
 LIBLINK= -ldl
 
 CFLAGS=$(CLFLAGS) -Wall $(BIGNUM) $(LIBCINC)
@@ -65,8 +64,7 @@ CPPFILES=$(UTIL)/arguments.cpp $(UTIL)/powerset.cpp \
 	$(LOGIC)/function.cpp $(LOGIC)/predicate.cpp $(LOGIC)/term.cpp \
 	$(LOGIC)/domain.cpp  $(LOGIC)/clause.cpp $(LOGIC)/clausesampler.cpp\
 	$(INFER)/groundclause.cpp $(LEARNWTS)/learnwts.cpp \
-	$(INFER)/infer.cpp $(LEARNSTRUCT)/learnstruct.cpp \
-	$(ONLINE)/onlinetest.cpp
+	$(INFER)/infer.cpp $(LEARNSTRUCT)/learnstruct.cpp
 
 
 ##############################################################################
@@ -83,9 +81,6 @@ infer: $(OBJDIR)/infer.oo
 learnstruct: $(OBJDIR)/learnstruct.oo
 	cp $(OBJDIR)/learnstruct.oo $(BIN)/learnstruct
 
-onlinetest: $(OBJDIR)/onlinetest.oo
-	cp $(OBJDIR)/onlinetest.oo $(BIN)/onlinetest
-
 $(OBJDIR)/learnwts.o:
 	$(GPP) $(CFLAGS) -o $(OBJDIR)/learnwts.o -c $(LEARNWTS)/learnwts.cpp
 
@@ -94,9 +89,6 @@ $(OBJDIR)/infer.o:
 
 $(OBJDIR)/learnstruct.o:
 	$(GPP) $(CFLAGS) -o $(OBJDIR)/learnstruct.o -c $(LEARNSTRUCT)/learnstruct.cpp
-
-$(OBJDIR)/onlinetest.o:
-	$(GPP) $(CFLAGS) -o $(OBJDIR)/onlinetest.o -c $(ONLINE)/onlinetest.cpp
 
 %.oo: %.o $(OBJS) $(LIBS)
 	echo $<
