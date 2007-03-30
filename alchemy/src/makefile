@@ -1,29 +1,23 @@
 INLINE_LIMIT=-finline-limit=100000
 #INLINE_WARN=-Winline
+STATIC=-static
 
 ######### Profile
-#CLFLAGS=-pg -g -static -DNDEBUG $(INLINE_WARN) $(INLINE_LIMIT) 
+#CLFLAGS=-pg -g $(STATIC) -DNDEBUG $(INLINE_WARN) $(INLINE_LIMIT) 
 
 ######### Profile & optimize
-#CLFLAGS=-pg -g -O3 -static -DNDEBUG $(INLINE_WARN) $(INLINE_LIMIT) 
+#CLFLAGS=-pg -g -O3 $(STATIC) -DNDEBUG $(INLINE_WARN) $(INLINE_LIMIT) 
 
 ######## Optimize
-#CLFLAGS=-O3 -static $(INLINE_WARN) $(INLINE_LIMIT)
+#CLFLAGS=-O3 $(STATIC) $(INLINE_WARN) $(INLINE_LIMIT)
 
 ######## Optimize and turn off asserts
-CLFLAGS=-O3 -static -DNDEBUG $(INLINE_WARN) $(INLINE_LIMIT)
-#CLFLAGS=-O3 -DNDEBUG $(INLINE_WARN) $(INLINE_LIMIT)
+#CLFLAGS=-O3 -DNDEBUG $(STATIC) $(INLINE_WARN) $(INLINE_LIMIT)
 
-######### Debug
-#CLFLAGS=-g
+########## Debug
+CLFLAGS=-g
 
-
-
-#Add the path to the alchemy dir here e.g. /home/alchemy
-#This is not a relative path because the path name is
-#used to set the location of the maxwalksat executable
-#in src/infer/maxwalksat.cpp.
-BASEDIR=
+BASEDIR=..
 
 GPP=g++
 FLEX=flex
@@ -40,15 +34,14 @@ LOGIC=$(SRCDIR)/logic
 INFER=$(SRCDIR)/infer
 LEARNWTS=$(SRCDIR)/learnwts
 LEARNSTRUCT=$(SRCDIR)/learnstruct
+ONLINE=$(SRCDIR)/online
 
 REPLACEFOLCPP=$(PARSER)/replacefolcpp.pl
-#MWSLOC=$(INFER)/mwsloc.pl
-#MAXWALKSATDIR=$(INFER)/Maxwalksat20
 
 LIBCINC= -I. -I$(UTIL) -I$(LOGIC) -I$(PARSER) -I$(LEARNWTS) -I$(LEARNSTRUCT) \
-	-I$(INFER)
+	-I$(INFER) -I$(ONLINE)
 LIBLINC= -L. -L$(UTIL) -L$(LOGIC) -L$(PARSER) -L$(LEARNWTS) -L$(LEARNSTRUCT) \
-	-L$(INFER)
+	-L$(INFER) -L$(ONLINE)
 LIBLINK= -ldl
 
 CFLAGS=$(CLFLAGS) -Wall $(BIGNUM) $(LIBCINC)
@@ -63,8 +56,7 @@ OBJS=$(OBJDIR)/arguments.o $(OBJDIR)/powerset.o \
 	$(OBJDIR)/predicatetemplate.o $(OBJDIR)/functiontemplate.o \
 	$(OBJDIR)/function.o $(OBJDIR)/predicate.o $(OBJDIR)/term.o \
 	$(OBJDIR)/domain.o $(OBJDIR)/clause.o $(OBJDIR)/clausesampler.o \
-	$(OBJDIR)/groundclause.o $(OBJDIR)/intclause.o $(OBJDIR)/lazywalksat.o \
-	$(OBJDIR)/samplesat.o $(OBJDIR)/structlearn.o
+	$(OBJDIR)/groundclause.o
 
 #add .cpp files (including executables') to CPPFILES.
 CPPFILES=$(UTIL)/arguments.cpp $(UTIL)/powerset.cpp \
@@ -72,9 +64,9 @@ CPPFILES=$(UTIL)/arguments.cpp $(UTIL)/powerset.cpp \
 	$(LOGIC)/predicatetemplate.cpp $(LOGIC)/functiontemplate.cpp \
 	$(LOGIC)/function.cpp $(LOGIC)/predicate.cpp $(LOGIC)/term.cpp \
 	$(LOGIC)/domain.cpp  $(LOGIC)/clause.cpp $(LOGIC)/clausesampler.cpp\
-	$(INFER)/groundclause.cpp $(INFER)/intclause.cpp $(INFER)/lazywalksat.cpp \
-	$(INFER)/samplesat.cpp $(LEARNSTRUCT)/structlearn.cpp \
-	$(LEARNWTS)/learnwts.cpp $(INFER)/infer.cpp $(LEARNSTRUCT)/learnstruct.cpp 
+	$(INFER)/groundclause.cpp $(LEARNWTS)/learnwts.cpp \
+	$(INFER)/infer.cpp $(LEARNSTRUCT)/learnstruct.cpp \
+	$(ONLINE)/onlinetest.cpp
 
 
 ##############################################################################
@@ -91,6 +83,8 @@ infer: $(OBJDIR)/infer.oo
 learnstruct: $(OBJDIR)/learnstruct.oo
 	cp $(OBJDIR)/learnstruct.oo $(BIN)/learnstruct
 
+onlinetest: $(OBJDIR)/onlinetest.oo
+	cp $(OBJDIR)/onlinetest.oo $(BIN)/onlinetest
 
 $(OBJDIR)/learnwts.o:
 	$(GPP) $(CFLAGS) -o $(OBJDIR)/learnwts.o -c $(LEARNWTS)/learnwts.cpp
@@ -101,6 +95,8 @@ $(OBJDIR)/infer.o:
 $(OBJDIR)/learnstruct.o:
 	$(GPP) $(CFLAGS) -o $(OBJDIR)/learnstruct.o -c $(LEARNSTRUCT)/learnstruct.cpp
 
+$(OBJDIR)/onlinetest.o:
+	$(GPP) $(CFLAGS) -o $(OBJDIR)/onlinetest.o -c $(ONLINE)/onlinetest.cpp
 
 %.oo: %.o $(OBJS) $(LIBS)
 	echo $<
@@ -159,23 +155,6 @@ $(OBJDIR)/clausesampler.o:
 $(OBJDIR)/groundclause.o:
 	$(GPP) $(CFLAGS) -o $(OBJDIR)/groundclause.o -c $(INFER)/groundclause.cpp
 
-$(OBJDIR)/intclause.o:
-	$(GPP) $(CFLAGS) -o $(OBJDIR)/intclause.o -c $(INFER)/intclause.cpp
-
-$(OBJDIR)/structlearn.o:
-	$(GPP) $(CFLAGS) -o $(OBJDIR)/structlearn.o -c $(LEARNSTRUCT)/structlearn.cpp
-
-$(OBJDIR)/lazywalksat.o:
-	$(GPP) $(CFLAGS) -o $(OBJDIR)/lazywalksat.o -c $(INFER)/lazywalksat.cpp
-
-$(OBJDIR)/samplesat.o:
-	$(GPP) $(CFLAGS) -o $(OBJDIR)/samplesat.o -c $(INFER)/samplesat.cpp
-
-#$(OBJDIR)/maxwalksat.o:
-#	gcc -O2 $(MAXWALKSATDIR)/maxwalksat.c -lm -o $(MAXWALKSATDIR)/maxwalksat
-#	$(MWSLOC) $(INFER) $(MAXWALKSATDIR)
-#	$(GPP) $(CFLAGS) -o $(OBJDIR)/maxwalksat.o -c $(INFER)/maxwalksat.cpp
-
 
 
 ###############################################################################
@@ -200,7 +179,4 @@ depend:
 	) > $(MF).new
 	@mv $(MF) $(MF).last
 	@mv $(MF).new $(MF)
-
-
-############ Everything below here is subject to SUDDEN DEATH #####
 
