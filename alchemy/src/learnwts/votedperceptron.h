@@ -469,6 +469,34 @@ class VotedPerceptron
                                            unknownPred);
       //cout<<endl;
       //cout<<"getting false cnts => "<<endl;
+<<<<<<< votedperceptron.h
+	  mrfs_[i]->getNumClauseGndings(trainFalseCnts[i], clauseCnt, false, chainIdx, domains_[i]);
+    
+	  for (int clauseno=0; clauseno < clauseCnt; clauseno++) 
+      {
+      	//if(!relevantClauses[clauseno]) 
+      	  //continue;
+      	cout<<clauseno<<" : tc = "<<trainTrueCnts_[i][clauseno]
+			          <<" ** fc = "<<trainFalseCnts[i][clauseno]<<endl;      
+	  }
+	
+   /*
+	bool hasUnknownPreds = false;
+    calculateCounts(trainTrueCnts_[i],trainFalseCnts[i],i,hasUnknownPreds);
+  */
+	
+	}  
+			
+  	double tc,fc;
+  	cout << "List of CNF Clauses : " << endl;
+  	for (int clauseno = 0; clauseno < clauseCntPerDomain_[0]; clauseno++) 
+  	{
+      if(!relevantClausesPerDomain_[0][clauseno]) 
+      {
+      	for(int i = 0; i < domainCnt_; i++) 
+      	{
+		  Array<double>& logOdds = logOddsPerDomain_[i];
+=======
       state->getNumClauseGndingsWithUnknown(trainFalseCnts[i], clauseCnt, false,
                                             unknownPred);
       delete unknownPred;
@@ -491,6 +519,7 @@ class VotedPerceptron
         for (int i = 0; i < domainCnt_; i++)
         {
           Array<double>& logOdds = logOddsPerDomain_[i];
+>>>>>>> 1.19
           logOdds[clauseno] = 0.0;
         }
         continue;

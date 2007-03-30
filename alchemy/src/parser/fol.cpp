@@ -79,7 +79,11 @@
 
 
 /* Copy the first part of user declarations.  */
+<<<<<<< fol.cpp
+#line 1 "../src/parser/fol.y"
+=======
 #line 66 "../src/parser/fol.y"
+>>>>>>> 1.20
 
 #define YYSTYPE int
 #define YYDEBUG 1
@@ -972,6 +976,10 @@ struct yyGLRStack {
 
 static void yyexpandGLRStack (yyGLRStack* yystack);
 
+<<<<<<< fol.cpp
+static void yyFail (yyGLRStack* yystack, const char* yymsg)
+  __attribute__ ((__noreturn__));
+=======
 static void yyFail (yyGLRStack* yystack, const char* yymsg)
   __attribute__ ((__noreturn__));
 static void
@@ -984,10 +992,29 @@ yyFail (yyGLRStack* yystack, const char* yymsg)
 
 static void yyMemoryExhausted (yyGLRStack* yystack)
   __attribute__ ((__noreturn__));
+>>>>>>> 1.20
+static void
+<<<<<<< fol.cpp
+yyFail (yyGLRStack* yystack, const char* yymsg)
+=======
+yyMemoryExhausted (yyGLRStack* yystack)
+>>>>>>> 1.20
+{
+<<<<<<< fol.cpp
+  if (yymsg != NULL)
+    yyerror (yymsg);
+  YYLONGJMP (yystack->yyexception_buffer, 1);
+}
+
+static void yyMemoryExhausted (yyGLRStack* yystack)
+  __attribute__ ((__noreturn__));
 static void
 yyMemoryExhausted (yyGLRStack* yystack)
 {
   YYLONGJMP (yystack->yyexception_buffer, 2);
+=======
+  YYLONGJMP (yystack->yyexception_buffer, 2);
+>>>>>>> 1.20
 }
 
 #if YYDEBUG || YYERROR_VERBOSE
@@ -1084,12 +1111,20 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
   switch (yyn)
     {
         case 2:
+<<<<<<< fol.cpp
+#line 49 "../src/parser/fol.y"
+=======
 #line 114 "../src/parser/fol.y"
+>>>>>>> 1.20
     { if (folDbg >= 2) printf("input: empty\n"); ;}
     break;
 
   case 3:
+<<<<<<< fol.cpp
+#line 52 "../src/parser/fol.y"
+=======
 #line 117 "../src/parser/fol.y"
+>>>>>>> 1.20
     { 
     yyerrok; // tell Bison not to suppress any errors
     const char* tok; 
@@ -1103,7 +1138,11 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 13:
+<<<<<<< fol.cpp
+#line 76 "../src/parser/fol.y"
+=======
 #line 141 "../src/parser/fol.y"
+>>>>>>> 1.20
     { 
     if (folDbg >= 2) printf("input: weight\n"); 
     zzreset();
@@ -1111,7 +1150,11 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 14:
+<<<<<<< fol.cpp
+#line 81 "../src/parser/fol.y"
+=======
 #line 146 "../src/parser/fol.y"
+>>>>>>> 1.20
     {  
     if (folDbg >= 2) printf("input: sentence\n");
       // the states should be reset because a parse error may have occurred
@@ -1119,7 +1162,11 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 15:
+<<<<<<< fol.cpp
+#line 86 "../src/parser/fol.y"
+=======
 #line 151 "../src/parser/fol.y"
+>>>>>>> 1.20
     {
 
     ListObj* formula;
@@ -1176,17 +1223,29 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 17:
+<<<<<<< fol.cpp
+#line 144 "../src/parser/fol.y"
+=======
 #line 209 "../src/parser/fol.y"
+>>>>>>> 1.20
     { zzconsumeToken(zztokenList,"@"); ;}
     break;
 
   case 18:
+<<<<<<< fol.cpp
+#line 145 "../src/parser/fol.y"
+=======
 #line 210 "../src/parser/fol.y"
+>>>>>>> 1.20
     { zzconsumeToken(zztokenList,"@"); ;}
     break;
 
   case 20:
+<<<<<<< fol.cpp
+#line 152 "../src/parser/fol.y"
+=======
 #line 217 "../src/parser/fol.y"
+>>>>>>> 1.20
     { 
   if (folDbg >= 1) printf(".\n"); zzconsumeToken(zztokenList,"."); 
   zzassert(!zzhasFullStop, "expecting no full stop");
@@ -1196,27 +1255,47 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 21:
+<<<<<<< fol.cpp
+#line 161 "../src/parser/fol.y"
+=======
 #line 226 "../src/parser/fol.y"
+>>>>>>> 1.20
     { if (folDbg >= 1) printf("\\n\n"); zzconsumeToken(zztokenList,"\n"); ;}
     break;
 
   case 22:
+<<<<<<< fol.cpp
+#line 163 "../src/parser/fol.y"
+=======
 #line 228 "../src/parser/fol.y"
+>>>>>>> 1.20
     { if (folDbg >= 1) printf("\\r\n"); zzconsumeToken(zztokenList,"\r"); ;}
     break;
 
   case 24:
+<<<<<<< fol.cpp
+#line 169 "../src/parser/fol.y"
+=======
 #line 234 "../src/parser/fol.y"
+>>>>>>> 1.20
     { if (folDbg >= 1) printf("\\n\n"); zzconsumeToken(zztokenList,"\n"); ;}
     break;
 
   case 25:
+<<<<<<< fol.cpp
+#line 171 "../src/parser/fol.y"
+=======
 #line 236 "../src/parser/fol.y"
+>>>>>>> 1.20
     { if (folDbg >= 1) printf("\\r\n"); zzconsumeToken(zztokenList,"\r"); ;}
     break;
 
   case 26:
+<<<<<<< fol.cpp
+#line 178 "../src/parser/fol.y"
+=======
 #line 243 "../src/parser/fol.y"
+>>>>>>> 1.20
     {
   const char* inc = zztokenList.removeLast();
   const char* str = zztokenList.removeLast();
@@ -1279,17 +1358,29 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 27:
+<<<<<<< fol.cpp
+#line 240 "../src/parser/fol.y"
+=======
 #line 305 "../src/parser/fol.y"
+>>>>>>> 1.20
     { if (folDbg >= 1) printf("\\n\n"); ;}
     break;
 
   case 28:
+<<<<<<< fol.cpp
+#line 242 "../src/parser/fol.y"
+=======
 #line 307 "../src/parser/fol.y"
+>>>>>>> 1.20
     { if (folDbg >= 1) printf("\\r\n"); ;}
     break;
 
   case 29:
+<<<<<<< fol.cpp
+#line 253 "../src/parser/fol.y"
+=======
 #line 318 "../src/parser/fol.y"
+>>>>>>> 1.20
     { 
   zzconsumeToken(zztokenList,"=");
   zzconsumeToken(zztokenList,"{");
@@ -1299,7 +1390,11 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 30:
+<<<<<<< fol.cpp
+#line 261 "../src/parser/fol.y"
+=======
 #line 326 "../src/parser/fol.y"
+>>>>>>> 1.20
     {
   if (folDbg >= 1) printf("} ");           
   zzconsumeToken(zztokenList, "}");
@@ -1309,7 +1404,11 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 31:
+<<<<<<< fol.cpp
+#line 272 "../src/parser/fol.y"
+=======
 #line 337 "../src/parser/fol.y"
+>>>>>>> 1.20
     {
   const char* idf = zztokenList.removeLast();
   if (folDbg >= 1) printf("type t_%s ", idf);
@@ -1324,7 +1423,11 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 32:
+<<<<<<< fol.cpp
+#line 285 "../src/parser/fol.y"
+=======
 #line 350 "../src/parser/fol.y"
+>>>>>>> 1.20
     {
   const char* idf = zztokenList.removeLast();
   if (folDbg >= 1) printf("type t_%s ", idf);
@@ -1338,12 +1441,20 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 34:
+<<<<<<< fol.cpp
+#line 304 "../src/parser/fol.y"
+=======
 #line 369 "../src/parser/fol.y"
+>>>>>>> 1.20
     { if (folDbg >= 2) printf("constant_declarations: ZZ_VARIABLE\n"); ;}
     break;
 
   case 35:
+<<<<<<< fol.cpp
+#line 306 "../src/parser/fol.y"
+=======
 #line 371 "../src/parser/fol.y"
+>>>>>>> 1.20
     {
     const char* vsc = zztokenList.removeLast();
     if (folDbg >= 1) printf("cd_%s ", vsc);
@@ -1362,12 +1473,20 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 40:
+<<<<<<< fol.cpp
+#line 332 "../src/parser/fol.y"
+=======
 #line 397 "../src/parser/fol.y"
+>>>>>>> 1.20
     { zzconsumeToken(zztokenList, ","); ;}
     break;
 
   case 41:
+<<<<<<< fol.cpp
+#line 335 "../src/parser/fol.y"
+=======
 #line 400 "../src/parser/fol.y"
+>>>>>>> 1.20
     { 
     zzconsumeToken(zztokenList,"\n");
     zzconsumeToken(zztokenList,",");
@@ -1376,7 +1495,11 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 42:
+<<<<<<< fol.cpp
+#line 342 "../src/parser/fol.y"
+=======
 #line 407 "../src/parser/fol.y"
+>>>>>>> 1.20
     { 
     zzconsumeToken(zztokenList,"\n");
     zzconsumeToken(zztokenList,",");
@@ -1384,7 +1507,11 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 43:
+<<<<<<< fol.cpp
+#line 348 "../src/parser/fol.y"
+=======
 #line 413 "../src/parser/fol.y"
+>>>>>>> 1.20
     { 
     zzconsumeToken(zztokenList,",");
     zzconsumeToken(zztokenList,"\n");
@@ -1392,7 +1519,11 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 44:
+<<<<<<< fol.cpp
+#line 358 "../src/parser/fol.y"
+=======
 #line 423 "../src/parser/fol.y"
+>>>>>>> 1.20
     {
   if (folDbg >= 2) printf("numeric_type_declarations: \n");
   zzconsumeToken(zztokenList,"=");
@@ -1401,7 +1532,11 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 45:
+<<<<<<< fol.cpp
+#line 364 "../src/parser/fol.y"
+=======
 #line 429 "../src/parser/fol.y"
+>>>>>>> 1.20
     {
   const char* numStr = zztokenList.removeLast();
   if (folDbg >= 1) printf(" %s ", numStr);
@@ -1431,21 +1566,33 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 46:
+<<<<<<< fol.cpp
+#line 391 "../src/parser/fol.y"
+=======
 #line 456 "../src/parser/fol.y"
+>>>>>>> 1.20
     {
   zzconsumeToken(zztokenList, ",");
 ;}
     break;
 
   case 47:
+<<<<<<< fol.cpp
+#line 396 "../src/parser/fol.y"
+=======
 #line 461 "../src/parser/fol.y"
+>>>>>>> 1.20
     {
   zzconsumeToken(zztokenList, "}");
 ;}
     break;
 
   case 48:
+<<<<<<< fol.cpp
+#line 403 "../src/parser/fol.y"
+=======
 #line 468 "../src/parser/fol.y"
+>>>>>>> 1.20
     {
   //const char* numStr1 = zztokenList.removeLast();
   zzconsumeToken(zztokenList, "...");
@@ -1484,7 +1631,11 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 50:
+<<<<<<< fol.cpp
+#line 446 "../src/parser/fol.y"
+=======
 #line 511 "../src/parser/fol.y"
+>>>>>>> 1.20
     {  
     zzconsumeToken(zztokenList, ",");
     if (folDbg >= 1) printf(", "); 
@@ -1493,7 +1644,11 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 53:
+<<<<<<< fol.cpp
+#line 457 "../src/parser/fol.y"
+=======
 #line 522 "../src/parser/fol.y"
+>>>>>>> 1.20
     {
   const char* numStr = zztokenList.removeLast();
   if (folDbg >= 1) printf(" %s ", numStr);
@@ -1523,7 +1678,11 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 54:
+<<<<<<< fol.cpp
+#line 493 "../src/parser/fol.y"
+=======
 #line 558 "../src/parser/fol.y"
+>>>>>>> 1.20
     {
   const char* predName = zztokenList.removeLast();
 
@@ -1539,17 +1698,29 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 55:
+<<<<<<< fol.cpp
+#line 505 "../src/parser/fol.y"
+=======
 #line 570 "../src/parser/fol.y"
+>>>>>>> 1.20
     { if (folDbg >= 1) printf("( "); zzconsumeToken(zztokenList,"("); ;}
     break;
 
   case 56:
+<<<<<<< fol.cpp
+#line 506 "../src/parser/fol.y"
+=======
 #line 571 "../src/parser/fol.y"
+>>>>>>> 1.20
     { if (folDbg >= 2) printf("predicate_declaration: types\n"); ;}
     break;
 
   case 57:
+<<<<<<< fol.cpp
+#line 508 "../src/parser/fol.y"
+=======
 #line 573 "../src/parser/fol.y"
+>>>>>>> 1.20
     {  
   if (folDbg >= 1) printf(") "); 
 
@@ -1564,7 +1735,11 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 58:
+<<<<<<< fol.cpp
+#line 526 "../src/parser/fol.y"
+=======
 #line 591 "../src/parser/fol.y"
+>>>>>>> 1.20
     { 
   const char* retTypeName = zztokenList.removeLast();
   if (folDbg >= 1) printf("ZZ_FUNCTION t_%s ", retTypeName); 
@@ -1590,7 +1765,11 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 59:
+<<<<<<< fol.cpp
+#line 549 "../src/parser/fol.y"
+=======
 #line 614 "../src/parser/fol.y"
+>>>>>>> 1.20
     {
   const char* funcName = zztokenList.removeLast();
 
@@ -1618,7 +1797,11 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 60:
+<<<<<<< fol.cpp
+#line 574 "../src/parser/fol.y"
+=======
 #line 639 "../src/parser/fol.y"
+>>>>>>> 1.20
     {
   zzconsumeToken(zztokenList,"(");
   if (folDbg >= 1) printf("( "); 
@@ -1627,7 +1810,11 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 61:
+<<<<<<< fol.cpp
+#line 580 "../src/parser/fol.y"
+=======
 #line 645 "../src/parser/fol.y"
+>>>>>>> 1.20
     {  
   zzconsumeToken(zztokenList,")");
   if (folDbg >= 1) printf(") "); 
@@ -1651,17 +1838,29 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 64:
+<<<<<<< fol.cpp
+#line 609 "../src/parser/fol.y"
+=======
 #line 674 "../src/parser/fol.y"
+>>>>>>> 1.20
     { if (folDbg >= 1) printf(", "); zzconsumeToken(zztokenList,","); ;}
     break;
 
   case 66:
+<<<<<<< fol.cpp
+#line 613 "../src/parser/fol.y"
+=======
 #line 678 "../src/parser/fol.y"
+>>>>>>> 1.20
     { if (folDbg >= 1) printf(", "); zzconsumeToken(zztokenList,","); ;}
     break;
 
   case 70:
+<<<<<<< fol.cpp
+#line 621 "../src/parser/fol.y"
+=======
 #line 686 "../src/parser/fol.y"
+>>>>>>> 1.20
     {  
   const char* ttype = zztokenList.removeLast();
   if (folDbg >= 1) printf("t_%s ", ttype);
@@ -1675,7 +1874,11 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 71:
+<<<<<<< fol.cpp
+#line 634 "../src/parser/fol.y"
+=======
 #line 699 "../src/parser/fol.y"
+>>>>>>> 1.20
     {
   const char* varName = zztokenList.removeLast();;
   if (folDbg >= 1) printf("t_%s ", varName);
@@ -1691,14 +1894,22 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 72:
+<<<<<<< fol.cpp
+#line 652 "../src/parser/fol.y"
+=======
 #line 717 "../src/parser/fol.y"
+>>>>>>> 1.20
     { 
     zztrueFalseUnknown = 't';
   ;}
     break;
 
   case 73:
+<<<<<<< fol.cpp
+#line 656 "../src/parser/fol.y"
+=======
 #line 721 "../src/parser/fol.y"
+>>>>>>> 1.20
     { 
     zzconsumeToken(zztokenList,"!"); 
     if (folDbg >= 1) printf("! "); 
@@ -1707,7 +1918,11 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 74:
+<<<<<<< fol.cpp
+#line 662 "../src/parser/fol.y"
+=======
 #line 727 "../src/parser/fol.y"
+>>>>>>> 1.20
     { 
     zzconsumeToken(zztokenList,"?"); 
     if (folDbg >= 1) printf("? "); 
@@ -1716,7 +1931,11 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 75:
+<<<<<<< fol.cpp
+#line 673 "../src/parser/fol.y"
+=======
 #line 738 "../src/parser/fol.y"
+>>>>>>> 1.20
     {
   const char* predName = zztokenList.removeLast();
   if (folDbg >= 1) printf("pd_%s ", predName); 
@@ -1732,7 +1951,11 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 76:
+<<<<<<< fol.cpp
+#line 686 "../src/parser/fol.y"
+=======
 #line 751 "../src/parser/fol.y"
+>>>>>>> 1.20
     { 
   zzconsumeToken(zztokenList,"("); 
   if (folDbg >= 1) printf("( "); 
@@ -1741,7 +1964,11 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 77:
+<<<<<<< fol.cpp
+#line 692 "../src/parser/fol.y"
+=======
 #line 757 "../src/parser/fol.y"
+>>>>>>> 1.20
     { 
   zzconsumeToken(zztokenList,")"); 
   if (folDbg >= 1) printf(")\n"); 
@@ -1778,7 +2005,11 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 78:
+<<<<<<< fol.cpp
+#line 731 "../src/parser/fol.y"
+=======
 #line 795 "../src/parser/fol.y"
+>>>>>>> 1.20
     { 
   zzconsumeToken(zztokenList,"="); 
   if (folDbg >= 1) printf("= "); 
@@ -1787,7 +2018,11 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 79:
+<<<<<<< fol.cpp
+#line 737 "../src/parser/fol.y"
+=======
 #line 801 "../src/parser/fol.y"
+>>>>>>> 1.20
     {
   // Predicate name is PredicateTemplate::ZZ_RETURN_PREFIX + function name
   const char* funcName = zztokenList.removeLast();
@@ -1835,7 +2070,11 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 80:
+<<<<<<< fol.cpp
+#line 782 "../src/parser/fol.y"
+=======
 #line 846 "../src/parser/fol.y"
+>>>>>>> 1.20
     { 
   zzconsumeToken(zztokenList,"("); 
   if (folDbg >= 1) printf("( "); 
@@ -1844,7 +2083,11 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 81:
+<<<<<<< fol.cpp
+#line 788 "../src/parser/fol.y"
+=======
 #line 852 "../src/parser/fol.y"
+>>>>>>> 1.20
     { 
   zzconsumeToken(zztokenList,")"); 
   if (folDbg >= 1) printf(")\n"); 
@@ -1884,7 +2127,11 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 82:
+<<<<<<< fol.cpp
+#line 828 "../src/parser/fol.y"
+=======
 #line 892 "../src/parser/fol.y"
+>>>>>>> 1.20
     {     
     const char* constName = zztokenList.removeLast();
     if (folDbg >= 1) printf("cg_%s ", constName);
@@ -1894,7 +2141,11 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 83:
+<<<<<<< fol.cpp
+#line 836 "../src/parser/fol.y"
+=======
 #line 900 "../src/parser/fol.y"
+>>>>>>> 1.20
     {     
     const char* constName = zztokenList.removeLast();
     if (folDbg >= 1) printf("cg_%s ", constName);
@@ -1904,7 +2155,11 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 85:
+<<<<<<< fol.cpp
+#line 847 "../src/parser/fol.y"
+=======
 #line 911 "../src/parser/fol.y"
+>>>>>>> 1.20
     {
     if (zzconstantMustBeDeclared)
       zzerr("Constant %s must be declared before it is used.",
@@ -1913,7 +2168,11 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 86:
+<<<<<<< fol.cpp
+#line 853 "../src/parser/fol.y"
+=======
 #line 917 "../src/parser/fol.y"
+>>>>>>> 1.20
     {
     const char* intStr = zztokenList.removeLast();
     char constName[100];
@@ -1925,7 +2184,11 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 87:
+<<<<<<< fol.cpp
+#line 862 "../src/parser/fol.y"
+=======
 #line 926 "../src/parser/fol.y"
+>>>>>>> 1.20
     {
     if (zzconstantMustBeDeclared)
       zzerr("Constant %s must be declared before it is used",
@@ -1934,7 +2197,11 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 88:
+<<<<<<< fol.cpp
+#line 870 "../src/parser/fol.y"
+=======
 #line 934 "../src/parser/fol.y"
+>>>>>>> 1.20
     {
     const char* tmp = zztokenList.removeLast();
 	zztmpReturnConstant = (char *)malloc((strlen(tmp) + 1)*sizeof(char));
@@ -1946,7 +2213,11 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 89:
+<<<<<<< fol.cpp
+#line 879 "../src/parser/fol.y"
+=======
 #line 943 "../src/parser/fol.y"
+>>>>>>> 1.20
     {
     if (zzconstantMustBeDeclared)
       zzerr("Constant %s must be declared before it is used.",
@@ -1961,7 +2232,11 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 90:
+<<<<<<< fol.cpp
+#line 891 "../src/parser/fol.y"
+=======
 #line 955 "../src/parser/fol.y"
+>>>>>>> 1.20
     {
   	const char* tmp = zztokenList.removeLast();
   	zztmpReturnConstant = (char *)malloc((strlen(tmp) + 1)*sizeof(char));
@@ -1973,7 +2248,11 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 91:
+<<<<<<< fol.cpp
+#line 900 "../src/parser/fol.y"
+=======
 #line 964 "../src/parser/fol.y"
+>>>>>>> 1.20
     {
     if (zzconstantMustBeDeclared)
       zzerr("Constant %s must be declared before it is used",
@@ -1988,7 +2267,11 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 93:
+<<<<<<< fol.cpp
+#line 918 "../src/parser/fol.y"
+=======
 #line 982 "../src/parser/fol.y"
+>>>>>>> 1.20
     {
     const char* wt = zztokenList.removeLast();
     if (folDbg >= 1) printf("n_%f ", atof(wt));
@@ -1999,7 +2282,11 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 94:
+<<<<<<< fol.cpp
+#line 932 "../src/parser/fol.y"
+=======
 #line 996 "../src/parser/fol.y"
+>>>>>>> 1.20
     { 
     zzconsumeToken(zztokenList,"("); 
     if (folDbg >= 1) printf("( "); 
@@ -2009,7 +2296,11 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 95:
+<<<<<<< fol.cpp
+#line 940 "../src/parser/fol.y"
+=======
 #line 1004 "../src/parser/fol.y"
+>>>>>>> 1.20
     { 
     zzconsumeToken(zztokenList,")"); 
     if (folDbg >= 1) printf(") "); 
@@ -2018,12 +2309,20 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 96:
+<<<<<<< fol.cpp
+#line 946 "../src/parser/fol.y"
+=======
 #line 1010 "../src/parser/fol.y"
+>>>>>>> 1.20
     { if (folDbg >= 2) printf("sentence: atomic_sentence\n"); ;}
     break;
 
   case 98:
+<<<<<<< fol.cpp
+#line 950 "../src/parser/fol.y"
+=======
 #line 1014 "../src/parser/fol.y"
+>>>>>>> 1.20
     {
     const char* imp = zztokenList.removeLast(); 
     if (folDbg >= 1) printf("=> ");
@@ -2033,12 +2332,20 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 99:
+<<<<<<< fol.cpp
+#line 958 "../src/parser/fol.y"
+=======
 #line 1022 "../src/parser/fol.y"
+>>>>>>> 1.20
     { zzcreateListObjFromTopTwo(zzformulaListObjs, "=>"); ;}
     break;
 
   case 100:
+<<<<<<< fol.cpp
+#line 962 "../src/parser/fol.y"
+=======
 #line 1026 "../src/parser/fol.y"
+>>>>>>> 1.20
     { 
     const char* eq = zztokenList.removeLast(); 
     if (folDbg >= 1) printf("<=> ");
@@ -2048,12 +2355,20 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 101:
+<<<<<<< fol.cpp
+#line 970 "../src/parser/fol.y"
+=======
 #line 1034 "../src/parser/fol.y"
+>>>>>>> 1.20
     { zzcreateListObjFromTopTwo(zzformulaListObjs, "<=>"); ;}
     break;
 
   case 102:
+<<<<<<< fol.cpp
+#line 974 "../src/parser/fol.y"
+=======
 #line 1038 "../src/parser/fol.y"
+>>>>>>> 1.20
     { 
     zzconsumeToken(zztokenList,"v"); 
     if (folDbg >= 1) printf("v "); 
@@ -2062,12 +2377,20 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 103:
+<<<<<<< fol.cpp
+#line 981 "../src/parser/fol.y"
+=======
 #line 1045 "../src/parser/fol.y"
+>>>>>>> 1.20
     { zzcreateListObjFromTopTwo(zzformulaListObjs, "v"); ;}
     break;
 
   case 104:
+<<<<<<< fol.cpp
+#line 985 "../src/parser/fol.y"
+=======
 #line 1049 "../src/parser/fol.y"
+>>>>>>> 1.20
     { 
     zzconsumeToken(zztokenList,"^"); 
     if (folDbg >= 1) printf("^ "); 
@@ -2076,17 +2399,29 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 105:
+<<<<<<< fol.cpp
+#line 992 "../src/parser/fol.y"
+=======
 #line 1056 "../src/parser/fol.y"
+>>>>>>> 1.20
     { zzcreateListObjFromTopTwo(zzformulaListObjs, "^"); ;}
     break;
 
   case 106:
+<<<<<<< fol.cpp
+#line 996 "../src/parser/fol.y"
+=======
 #line 1060 "../src/parser/fol.y"
+>>>>>>> 1.20
     { if (folDbg >= 2) printf("sentence: quantifier\n"); ;}
     break;
 
   case 107:
+<<<<<<< fol.cpp
+#line 998 "../src/parser/fol.y"
+=======
 #line 1062 "../src/parser/fol.y"
+>>>>>>> 1.20
     { 
     if (folDbg >= 2) printf("sentence: variables\n"); 
     zzformulaListObjs.push(new ListObj);
@@ -2096,12 +2431,20 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 108:
+<<<<<<< fol.cpp
+#line 1004 "../src/parser/fol.y"
+=======
 #line 1068 "../src/parser/fol.y"
+>>>>>>> 1.20
     { if (folDbg >= 2) printf("sentence: sentence\n"); ;}
     break;
 
   case 109:
+<<<<<<< fol.cpp
+#line 1006 "../src/parser/fol.y"
+=======
 #line 1070 "../src/parser/fol.y"
+>>>>>>> 1.20
     { 
     zzcreateListObjFromTopThree(zzformulaListObjs);
     pair<StringToStringMap*, int> pr = zzoldNewVarList.front();
@@ -2111,7 +2454,11 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 110:
+<<<<<<< fol.cpp
+#line 1015 "../src/parser/fol.y"
+=======
 #line 1079 "../src/parser/fol.y"
+>>>>>>> 1.20
     { 
     zzassert(!zzisNegated,"expecting !zzisNegated");
     zzisNegated = true;
@@ -2124,12 +2471,20 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 111:
+<<<<<<< fol.cpp
+#line 1025 "../src/parser/fol.y"
+=======
 #line 1089 "../src/parser/fol.y"
+>>>>>>> 1.20
     { zzcreateListObjFromTop(zzformulaListObjs, "!"); ;}
     break;
 
   case 112:
+<<<<<<< fol.cpp
+#line 1031 "../src/parser/fol.y"
+=======
 #line 1095 "../src/parser/fol.y"
+>>>>>>> 1.20
     { 
     const char* fa = zztokenList.removeLast();
     if (folDbg >= 1) printf("FORALL ");
@@ -2140,7 +2495,11 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 113:
+<<<<<<< fol.cpp
+#line 1039 "../src/parser/fol.y"
+=======
 #line 1103 "../src/parser/fol.y"
+>>>>>>> 1.20
     { 
     const char* ex = zztokenList.removeLast();
     if (folDbg >= 1) printf("EXIST "); 
@@ -2151,12 +2510,20 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 114:
+<<<<<<< fol.cpp
+#line 1051 "../src/parser/fol.y"
+=======
 #line 1115 "../src/parser/fol.y"
+>>>>>>> 1.20
     { if (folDbg >= 2) printf("variables: variables\n"); ;}
     break;
 
   case 115:
+<<<<<<< fol.cpp
+#line 1053 "../src/parser/fol.y"
+=======
 #line 1117 "../src/parser/fol.y"
+>>>>>>> 1.20
     {  
     zzconsumeToken(zztokenList,",");
     if (folDbg >= 1) printf(", "); 
@@ -2165,12 +2532,20 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 117:
+<<<<<<< fol.cpp
+#line 1060 "../src/parser/fol.y"
+=======
 #line 1124 "../src/parser/fol.y"
+>>>>>>> 1.20
     { zzformulaStr.append(" "); ;}
     break;
 
   case 118:
+<<<<<<< fol.cpp
+#line 1065 "../src/parser/fol.y"
+=======
 #line 1129 "../src/parser/fol.y"
+>>>>>>> 1.20
     {
   const char* varName = zztokenList.removeLast();  
   if (folDbg >= 1) printf("v_%s ", varName); 
@@ -2195,7 +2570,11 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 119:
+<<<<<<< fol.cpp
+#line 1091 "../src/parser/fol.y"
+=======
 #line 1155 "../src/parser/fol.y"
+>>>>>>> 1.20
     {
     const char* predName = zztokenList.removeLast();
     if (folDbg >= 1) printf("p_%s ", predName); 
@@ -2228,7 +2607,11 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 120:
+<<<<<<< fol.cpp
+#line 1121 "../src/parser/fol.y"
+=======
 #line 1185 "../src/parser/fol.y"
+>>>>>>> 1.20
     {  
     zzconsumeToken(zztokenList, "(");
     if (folDbg >= 1) printf("( "); 
@@ -2239,7 +2622,11 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 121:
+<<<<<<< fol.cpp
+#line 1130 "../src/parser/fol.y"
+=======
 #line 1194 "../src/parser/fol.y"
+>>>>>>> 1.20
     {  
     zzconsumeToken(zztokenList, ")");
     if (folDbg >= 1) printf(") "); 
@@ -2389,7 +2776,11 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 122:
+<<<<<<< fol.cpp
+#line 1278 "../src/parser/fol.y"
+=======
 #line 1342 "../src/parser/fol.y"
+>>>>>>> 1.20
     {
     ++zzfdnumPreds;
     //zzfdisEqualPred = true;
@@ -2410,7 +2801,11 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 123:
+<<<<<<< fol.cpp
+#line 1297 "../src/parser/fol.y"
+=======
 #line 1361 "../src/parser/fol.y"
+>>>>>>> 1.20
     {
   	ListObj* predlo = zzpredFuncListObjs.top();
     predlo->replace(PredicateTemplate::EMPTY_NAME, zzinfixPredName);
@@ -2432,7 +2827,11 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 124:
+<<<<<<< fol.cpp
+#line 1316 "../src/parser/fol.y"
+=======
 #line 1380 "../src/parser/fol.y"
+>>>>>>> 1.20
     {  
     ListObj* predlo = zzpredFuncListObjs.top();
     //predlo->replace(PredicateTemplate::EMPTY_NAME, zzinfixPredName);
@@ -2571,7 +2970,11 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 125:
+<<<<<<< fol.cpp
+#line 1455 "../src/parser/fol.y"
+=======
 #line 1519 "../src/parser/fol.y"
+>>>>>>> 1.20
     {
   	zzconsumeToken(zztokenList, ">");
     if (folDbg >= 1) printf("> "); 
@@ -2587,7 +2990,11 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 126:
+<<<<<<< fol.cpp
+#line 1469 "../src/parser/fol.y"
+=======
 #line 1533 "../src/parser/fol.y"
+>>>>>>> 1.20
     {
    	zzconsumeToken(zztokenList, "<");
     if (folDbg >= 1) printf("< "); 
@@ -2603,7 +3010,11 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 127:
+<<<<<<< fol.cpp
+#line 1483 "../src/parser/fol.y"
+=======
 #line 1547 "../src/parser/fol.y"
+>>>>>>> 1.20
     {
   	zzconsumeToken(zztokenList, ">");
     if (folDbg >= 1) printf(">");
@@ -2622,7 +3033,11 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 128:
+<<<<<<< fol.cpp
+#line 1500 "../src/parser/fol.y"
+=======
 #line 1564 "../src/parser/fol.y"
+>>>>>>> 1.20
     {
 	zzconsumeToken(zztokenList, "<");
     if (folDbg >= 1) printf("<");
@@ -2641,7 +3056,11 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 129:
+<<<<<<< fol.cpp
+#line 1517 "../src/parser/fol.y"
+=======
 #line 1581 "../src/parser/fol.y"
+>>>>>>> 1.20
     {
   	zzconsumeToken(zztokenList, "=");
     if (folDbg >= 1) printf("= "); 
@@ -2656,7 +3075,11 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 131:
+<<<<<<< fol.cpp
+#line 1534 "../src/parser/fol.y"
+=======
 #line 1598 "../src/parser/fol.y"
+>>>>>>> 1.20
     { 
     zzconsumeToken(zztokenList, "*");
     if (folDbg >= 1) printf("* "); 
@@ -2669,7 +3092,11 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 132:
+<<<<<<< fol.cpp
+#line 1551 "../src/parser/fol.y"
+=======
 #line 1615 "../src/parser/fol.y"
+>>>>>>> 1.20
     {  
     zzconsumeToken(zztokenList, ",");
     if (folDbg >= 1) printf(", "); 
@@ -2680,7 +3107,11 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 134:
+<<<<<<< fol.cpp
+#line 1562 "../src/parser/fol.y"
+=======
 #line 1626 "../src/parser/fol.y"
+>>>>>>> 1.20
     {
   	// After the first term in an internal pred., check if we can determine type
   	if (zzpred && zzpred->isEmptyPred() &&
@@ -2707,7 +3138,11 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 135:
+<<<<<<< fol.cpp
+#line 1590 "../src/parser/fol.y"
+=======
 #line 1654 "../src/parser/fol.y"
+>>>>>>> 1.20
     {  
     zzassert(zzfunc != NULL,"expecting zzfunc != NULL");
     zzcheckFuncNumTerm(zzfunc);
@@ -2900,7 +3335,11 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 136:
+<<<<<<< fol.cpp
+#line 1764 "../src/parser/fol.y"
+=======
 #line 1845 "../src/parser/fol.y"
+>>>>>>> 1.20
     {
     const char* constName = zztokenList.removeLast();
     if (folDbg >= 1) printf("c2_%s ", constName); 
@@ -2912,7 +3351,11 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 137:
+<<<<<<< fol.cpp
+#line 1774 "../src/parser/fol.y"
+=======
 #line 1855 "../src/parser/fol.y"
+>>>>>>> 1.20
     {
     const char* constName = zztokenList.removeLast();
     if (folDbg >= 1) printf("c2_%s ", constName); 
@@ -2926,7 +3369,11 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 138:
+<<<<<<< fol.cpp
+#line 1786 "../src/parser/fol.y"
+=======
 #line 1867 "../src/parser/fol.y"
+>>>>>>> 1.20
     {
     const char* intStr = zztokenList.removeLast();
     if (folDbg >= 1) printf("c3_%s ", intStr);
@@ -2943,7 +3390,11 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 139:
+<<<<<<< fol.cpp
+#line 1801 "../src/parser/fol.y"
+=======
 #line 1882 "../src/parser/fol.y"
+>>>>>>> 1.20
     {
     zztermIsVariable(folDbg);
     if (zzisPlus) zzisPlus = false;
@@ -2951,7 +3402,11 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 140:
+<<<<<<< fol.cpp
+#line 1807 "../src/parser/fol.y"
+=======
 #line 1888 "../src/parser/fol.y"
+>>>>>>> 1.20
     {
     zztermIsVariable(folDbg);
 
@@ -2976,7 +3431,11 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 142:
+<<<<<<< fol.cpp
+#line 1833 "../src/parser/fol.y"
+=======
 #line 1914 "../src/parser/fol.y"
+>>>>>>> 1.20
     { 
     zzconsumeToken(zztokenList, "+");
     if (folDbg >= 1) printf("+ "); 
@@ -2987,7 +3446,11 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 143:
+<<<<<<< fol.cpp
+#line 1844 "../src/parser/fol.y"
+=======
 #line 1925 "../src/parser/fol.y"
+>>>>>>> 1.20
     {
     const char* funcName = zztokenList.removeLast();
     if (folDbg >= 1) printf("f_%s ", funcName);
@@ -3026,7 +3489,11 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 144:
+<<<<<<< fol.cpp
+#line 1880 "../src/parser/fol.y"
+=======
 #line 1961 "../src/parser/fol.y"
+>>>>>>> 1.20
     {
     zzconsumeToken(zztokenList, "(");
     if (folDbg >= 1) printf("( "); 
@@ -3035,7 +3502,11 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 145:
+<<<<<<< fol.cpp
+#line 1886 "../src/parser/fol.y"
+=======
 #line 1967 "../src/parser/fol.y"
+>>>>>>> 1.20
     {
   	  //If an internal func., then need to determine type
 	if (zzinfixFuncName)
@@ -3114,7 +3585,11 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 146:
+<<<<<<< fol.cpp
+#line 1962 "../src/parser/fol.y"
+=======
 #line 2043 "../src/parser/fol.y"
+>>>>>>> 1.20
     {
     // Make an "empty" function
     const char* funcName = FunctionTemplate::EMPTY_FTEMPLATE_NAME;
@@ -3133,7 +3608,11 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 147:
+<<<<<<< fol.cpp
+#line 1978 "../src/parser/fol.y"
+=======
 #line 2059 "../src/parser/fol.y"
+>>>>>>> 1.20
     {
     zzconsumeToken(zztokenList, "(");
     if (folDbg >= 1) printf("( ");
@@ -3141,7 +3620,11 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 148:
+<<<<<<< fol.cpp
+#line 1983 "../src/parser/fol.y"
+=======
 #line 2064 "../src/parser/fol.y"
+>>>>>>> 1.20
     {
     //Replace empty function with function sign just parsed
     //zzcreateInternalFuncTemplate(zzinfixFuncName);
@@ -3156,7 +3639,11 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 149:
+<<<<<<< fol.cpp
+#line 1995 "../src/parser/fol.y"
+=======
 #line 2076 "../src/parser/fol.y"
+>>>>>>> 1.20
     {
 	ListObj* funclo = zzpredFuncListObjs.top();
     funclo->replace(FunctionTemplate::EMPTY_FTEMPLATE_NAME, zzinfixFuncName);
@@ -3228,7 +3715,11 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 150:
+<<<<<<< fol.cpp
+#line 2068 "../src/parser/fol.y"
+=======
 #line 2149 "../src/parser/fol.y"
+>>>>>>> 1.20
     {
   	zzconsumeToken(zztokenList, "+");
     if (folDbg >= 1) printf("+ "); 
@@ -3239,7 +3730,11 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 151:
+<<<<<<< fol.cpp
+#line 2077 "../src/parser/fol.y"
+=======
 #line 2158 "../src/parser/fol.y"
+>>>>>>> 1.20
     {
    	zzconsumeToken(zztokenList, "-");
     if (folDbg >= 1) printf("- "); 
@@ -3250,7 +3745,11 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 152:
+<<<<<<< fol.cpp
+#line 2086 "../src/parser/fol.y"
+=======
 #line 2167 "../src/parser/fol.y"
+>>>>>>> 1.20
     {
   	zzconsumeToken(zztokenList, "*");
     if (folDbg >= 1) printf("* ");
@@ -3261,7 +3760,11 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 153:
+<<<<<<< fol.cpp
+#line 2095 "../src/parser/fol.y"
+=======
 #line 2176 "../src/parser/fol.y"
+>>>>>>> 1.20
     {
 	zzconsumeToken(zztokenList, "/");
     if (folDbg >= 1) printf("/ ");
@@ -3272,7 +3775,11 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
     break;
 
   case 154:
+<<<<<<< fol.cpp
+#line 2104 "../src/parser/fol.y"
+=======
 #line 2185 "../src/parser/fol.y"
+>>>>>>> 1.20
     {
   	zzconsumeToken(zztokenList, "%");
     if (folDbg >= 1) printf("%% ");
@@ -3294,8 +3801,13 @@ yyuserAction (yyRuleNum yyn, int yyrhslen, yyGLRStackItem* yyvsp,
 # undef YYBACKUP
 # undef yyclearin
 # undef YYRECOVERING
+<<<<<<< fol.cpp
+/* Line 872 of glr.c.  */
+#line 3283 "fol.cpp"
+=======
 /* Line 872 of glr.c.  */
 #line 3299 "fol.cpp"
+>>>>>>> 1.20
 }
 
 
@@ -4727,7 +5239,11 @@ yypdumpstack (yyGLRStack* yystack)
 #endif
 
 
+<<<<<<< fol.cpp
+#line 2114 "../src/parser/fol.y"
+=======
 #line 2195 "../src/parser/fol.y"
+>>>>>>> 1.20
 
 
 /******************* function definitions ****************************/
