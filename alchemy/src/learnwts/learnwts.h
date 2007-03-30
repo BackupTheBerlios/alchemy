@@ -74,7 +74,7 @@
 #include "indextranslator.h"
 
 
-extern const char* ZZ_TMP_FILE_POSTFIX; //defined in fol.y
+extern const char* ZZ_TMP_FILE_POSTFIX; //defined in folhelper.h
 const bool DOMAINS_SHARE_DATA_STRUCT = true;
 
 /**
@@ -129,7 +129,7 @@ void extractArgs(const char* const & argsStr, int& argc, char** argv)
     if (blank == string::npos) return;
     arg = s.substr(cur, blank-cur);
     arg = Util::trim(arg);
-    memset(argv[argc], '\0', 30);
+    memset(argv[argc], '\0', 500);
     arg.copy(argv[argc], arg.length());
     argc++;
     cur = blank + 1;
@@ -148,8 +148,8 @@ void createDomainAndMLN(Array<Domain*>& domains, Array<MLN*>& mlns,
   string::size_type bslash = inMLNFile.rfind("/");
   string tmp = (bslash == string::npos) ? 
                inMLNFile:inMLNFile.substr(bslash+1,inMLNFile.length()-bslash-1);
-  char tmpInMLN[100];
-  sprintf(tmpInMLN, "%s%s",  tmp.c_str(), ZZ_TMP_FILE_POSTFIX);
+  char tmpInMLN[100];  
+  sprintf(tmpInMLN, "%s%d%s",  tmp.c_str(), getpid(), ZZ_TMP_FILE_POSTFIX);
 
   ofstream out(tmpInMLN);
   ifstream in(inMLNFile.c_str());
@@ -180,10 +180,10 @@ void createDomainAndMLN(Array<Domain*>& domains, Array<MLN*>& mlns,
                         warnAboutDupGndPreds, priorMean, mustHaveWtOrFullStop,
                         domain0, mwsLazy, flipWtsOfFlippedClause);
 
-  if (!ok) { unlink(tmpInMLN); exit(-1); }
+  unlink(tmpInMLN);
+  if (!ok) exit(-1);
   domains.append(domain);
   mlns.append(mln);
-  unlink(tmpInMLN);
 }
 
 
@@ -283,10 +283,13 @@ void assignWtsAndOutputMLN(ostream& out, Array<MLN*>& mlns,
   domains[0]->printPredicateTemplates(out);
   out << endl;
 
-  // output the function declarations
-  out << "//function declarations" << endl;
-  domains[0]->printFunctionTemplates(out);
-  out << endl;
+    // output the function declarations
+  if (domains[0]->getNumFunctions() > 0) 
+  {
+    out << "//function declarations" << endl;
+    domains[0]->printFunctionTemplates(out);
+    out << endl;
+  }
 
   mlns[0]->printMLNNonExistFormulas(out, domains[0]);
 

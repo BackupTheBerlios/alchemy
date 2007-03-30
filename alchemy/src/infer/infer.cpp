@@ -70,22 +70,11 @@
 #include "fol.h"
 #include "arguments.h"
 #include "util.h"
-#include "learnwts.h"
+//#include "learnwts.h"
 #include "infer.h"
-#include "inferenceargs.h"
-#include "maxwalksat.h"
-#include "mcsat.h"
-#include "gibbssampler.h"
-#include "simulatedtempering.h"
 
 extern const char* ZZ_TMP_FILE_POSTFIX; //defined in fol.y
 
-// Variables for holding inference command line args are in inferenceargs.h
-
-char* aevidenceFiles  = NULL;
-char* aresultsFile    = NULL;
-char* aqueryPredsStr  = NULL;
-char* aqueryFile      = NULL;
 
   // TODO: List the arguments common to learnwts and inference in
   // inferenceargs.h. This can't be done with a static array.
@@ -367,288 +356,28 @@ int main(int argc, char* argv[])
 {
   ///////////////////////////  read & prepare parameters ///////////////////////
   ARGS::parse(argc, argv, &cout);
-
   Timer timer;
   double begSec = timer.time(); 
-
-  string inMLNFile, wkMLNFile, evidenceFile, queryPredsStr, queryFile;
-
-  StringHashArray queryPredNames;
-  StringHashArray owPredNames;
-  StringHashArray cwPredNames;
-  Domain* domain = NULL;
-  MLN* mln = NULL;
-  GroundPredicateHashArray queries;
-  GroundPredicateHashArray knownQueries;
-  Array<string> constFilesArr;
-  Array<string> evidenceFilesArr;
-
-  Array<Predicate *> queryPreds;
-  Array<TruthValue> queryPredValues;
-  
-  //the second .mln file to the last one in ainMLNFiles _may_ be used 
-  //to hold constants, so they are held in constFilesArr. They will be
-  //included into the first .mln file.
-
-    //extract .mln, .db file names
-  extractFileNames(ainMLNFiles, constFilesArr);
-  assert(constFilesArr.size() >= 1);
-  inMLNFile.append(constFilesArr[0]);
-  constFilesArr.removeItem(0);
-  extractFileNames(aevidenceFiles, evidenceFilesArr);
-  
-  if (aqueryPredsStr) queryPredsStr.append(aqueryPredsStr);
-  if (aqueryFile) queryFile.append(aqueryFile);
-
-  if (queryPredsStr.length() == 0 && queryFile.length() == 0)
-  { cout << "No query predicates specified" << endl; return -1; }
 
   ofstream resultsOut(aresultsFile);
   if (!resultsOut.good())
   { cout << "ERROR: unable to open " << aresultsFile << endl; return -1; }
 
-  if (agibbsInfer && amcmcNumChains < 2) 
-  {
-    cout << "ERROR: there must be at least 2 MCMC chains in Gibbs sampling" 
-         << endl; return -1;
-  }
-
-  if (!asimtpInfer && !amapPos && !amapAll && !agibbsInfer && !amcsatInfer)
-  {
-    cout << "ERROR: must specify one of -ms/-simtp/-m/-a/-p flags." << endl;
-    return-1;
-  }
-
-    //extract names of all query predicates
-  if (queryPredsStr.length() > 0 || queryFile.length() > 0)
-  {
-    if (!extractPredNames(queryPredsStr, &queryFile, queryPredNames)) return -1;
-  }
-
-  if (amwsMaxSteps <= 0)
-  { cout << "ERROR: mwsMaxSteps must be positive" << endl; return -1; }
-
-  if (amwsTries <= 0)
-  { cout << "ERROR: mwsTries must be positive" << endl; return -1; }
-
-    //extract names of open-world evidence predicates
-  if (aOpenWorldPredsStr)
-  {
-    if (!extractPredNames(string(aOpenWorldPredsStr), NULL, owPredNames)) 
-      return -1;
-    assert(owPredNames.size() > 0);
-  }
-
-    //extract names of closed-world non-evidence predicates
-  if (aClosedWorldPredsStr)
-  {
-    if (!extractPredNames(string(aClosedWorldPredsStr), NULL, cwPredNames)) 
-      return -1;
-    assert(cwPredNames.size() > 0);
-    if (!checkQueryPredsNotInClosedWorldPreds(queryPredNames, cwPredNames))
-      return -1;
-  }
-
-  // TODO: Check if query atom in -o -> error
-
-  // TODO: Check if atom in -c and -o -> error
-
-
-  // TODO: Check if ev. atom in -c or
-  // non-evidence in -o -> warning (this is default)
-
-
-    // Set SampleSat parameters
-  SampleSatParams* ssparams = new SampleSatParams;
-  ssparams->lateSa = assLateSa;
-  ssparams->saRatio = assSaRatio;
-  ssparams->saTemp = assSaTemp;
-
-    // Set MaxWalksat parameters
-  MaxWalksatParams* mwsparams = NULL;
-  mwsparams = new MaxWalksatParams;
-  mwsparams->ssParams = ssparams;
-  mwsparams->maxSteps = amwsMaxSteps;
-  mwsparams->maxTries = amwsTries;
-  mwsparams->targetCost = amwsTargetWt;
-  mwsparams->hard = amwsHard;
-    // numSolutions only applies when used in SampleSat.
-    // When just MWS, this is set to 1
-  mwsparams->numSolutions = amwsNumSolutions;
-  mwsparams->heuristic = amwsHeuristic;
-  mwsparams->tabuLength = amwsTabuLength;
-  mwsparams->lazyLowState = amwsLazyLowState;
-
-    // Set MC-SAT parameters
-  MCSatParams* msparams = new MCSatParams;
-  msparams->mwsParams = mwsparams;
-    // MC-SAT needs only one chain
-  msparams->numChains          = 1;
-  msparams->burnMinSteps       = amcmcBurnMinSteps;
-  msparams->burnMaxSteps       = amcmcBurnMaxSteps;
-  msparams->minSteps           = amcmcMinSteps;
-  msparams->maxSteps           = amcmcMaxSteps;
-  msparams->maxSeconds         = amcmcMaxSeconds;
-  msparams->numStepsEveryMCSat = amcsatNumStepsEveryMCSat;
-
-    // Set Gibbs parameters
-  GibbsParams* gibbsparams = new GibbsParams;
-  gibbsparams->mwsParams    = mwsparams;
-  gibbsparams->numChains    = amcmcNumChains;
-  gibbsparams->burnMinSteps = amcmcBurnMinSteps;
-  gibbsparams->burnMaxSteps = amcmcBurnMaxSteps;
-  gibbsparams->minSteps     = amcmcMinSteps;
-  gibbsparams->maxSteps     = amcmcMaxSteps;
-  gibbsparams->maxSeconds   = amcmcMaxSeconds;
-
-  gibbsparams->gamma          = 1 - agibbsDelta;
-  gibbsparams->epsilonError   = agibbsEpsilonError;
-  gibbsparams->fracConverged  = agibbsFracConverged;
-  gibbsparams->walksatType    = agibbsWalksatType;
-  gibbsparams->samplesPerTest = agibbsSamplesPerTest;
-  
-    // Set Sim. Tempering parameters
-  SimulatedTemperingParams* stparams = new SimulatedTemperingParams;
-  stparams->mwsParams    = mwsparams;
-  stparams->numChains    = amcmcNumChains;
-  stparams->burnMinSteps = amcmcBurnMinSteps;
-  stparams->burnMaxSteps = amcmcBurnMaxSteps;
-  stparams->minSteps     = amcmcMinSteps;
-  stparams->maxSteps     = amcmcMaxSteps;
-  stparams->maxSeconds   = amcmcMaxSeconds;
-
-  stparams->subInterval = asimtpSubInterval;
-  stparams->numST       = asimtpNumST;
-  stparams->numSwap     = asimtpNumSwap;
-
-  //////////////////// read in clauses & evidence predicates //////////////////
-
-  cout << "Reading formulas and evidence predicates..." << endl;
-
-    // Copy inMLNFile to workingMLNFile & app '#include "evid.db"'
-  string::size_type bslash = inMLNFile.rfind("/");
-  string tmp = (bslash == string::npos) ? 
-               inMLNFile:inMLNFile.substr(bslash+1,inMLNFile.length()-bslash-1);
-  char buf[100];
-  sprintf(buf, "%s%s", tmp.c_str(), ZZ_TMP_FILE_POSTFIX);
-  wkMLNFile = buf;
-  copyFileAndAppendDbFile(inMLNFile, wkMLNFile,
-                          evidenceFilesArr, constFilesArr);
-
-    // Parse wkMLNFile, and create the domain, MLN, database
-  domain = new Domain;
-  mln = new MLN();
-  bool addUnitClauses = false;
-  bool mustHaveWtOrFullStop = true;
-  bool warnAboutDupGndPreds = true;
-  bool flipWtsOfFlippedClause = true;
-  //bool allPredsExceptQueriesAreCW = true;
-  bool allPredsExceptQueriesAreCW = owPredNames.empty();
-  Domain* forCheckingPlusTypes = NULL;
-
-	// Parse as if lazy inference is set to true to set evidence atoms in DB
-    // If lazy is not used, this is removed from DB
-  if (!runYYParser(mln, domain, wkMLNFile.c_str(), allPredsExceptQueriesAreCW, 
-                   &owPredNames, &queryPredNames, addUnitClauses, 
-                   warnAboutDupGndPreds, 0, mustHaveWtOrFullStop, 
-                   forCheckingPlusTypes, true, flipWtsOfFlippedClause))
-  {
-    unlink(wkMLNFile.c_str());
-    return -1;
-  }
-
-  unlink(wkMLNFile.c_str());
-
-    //////////////////////////// run inference /////////////////////////////////
-
-    ///////////////////////// read & create query predicates ///////////////////
-  Array<int> allPredGndingsAreQueries;
-
-    // Eager inference: Build the queries for the mrf
-    // Lazy version evaluates the query string / file when printing out
-  if (!aLazy)
-  {
-    if (queryFile.length() > 0)
-    {
-      cout << "Reading query predicates that are specified in query file..."
-           << endl;
-      bool ok = createQueryFilePreds(queryFile, domain, domain->getDB(),
-                                     &queries, &knownQueries);
-      if (!ok) { cout<<"Failed to create query predicates."<<endl; exit(-1); }
-    }
-
-    allPredGndingsAreQueries.growToSize(domain->getNumPredicates(), false);
-    if (queryPredsStr.length() > 0)
-    {
-      cout << "Creating query predicates that are specified on command line..." 
-           << endl;
-      bool ok = createComLineQueryPreds(queryPredsStr, domain, domain->getDB(), 
-                                        &queries, &knownQueries, 
-                                        &allPredGndingsAreQueries);
-      if (!ok) { cout<<"Failed to create query predicates."<<endl; exit(-1); }
-    }
-  }
-
-    // Create inference algorithm and state based on queries and mln / domain
-  bool markHardGndClauses = false;
-  bool trackParentClauseWts = false;
-    // Lazy version: queries and allPredGndingsAreQueries are empty,
-    // markHardGndClause and trackParentClauseWts are not used
-  VariableState* state = new VariableState(&queries, NULL, NULL,
-                                           &allPredGndingsAreQueries,
-                                           markHardGndClauses,
-                                           trackParentClauseWts,
-                                           mln, domain, aLazy);
+  Domain* domain = NULL;
   Inference* inference = NULL;
-  bool trackClauseTrueCnts = false;
-    // MAP inference, MC-SAT, Gibbs or Sim. Temp.
-  if (amapPos || amapAll || amcsatInfer || agibbsInfer || asimtpInfer)
+  if (buildInference(inference, domain))
   {
-    if (amapPos || amapAll)
-    { // MaxWalkSat
-        // When standalone MWS, numSolutions is always 1
-        // (maybe there is a better way to do this?)
-      mwsparams->numSolutions = 1;
-      inference = new MaxWalkSat(state, aSeed, trackClauseTrueCnts, mwsparams);
-    }
-    else if (amcsatInfer)
-    { // MC-SAT
-      inference = new MCSAT(state, aSeed, trackClauseTrueCnts, msparams);
-    }
-    else if (asimtpInfer)
-    { // Simulated Tempering
-        // When MWS is used in Sim. Temp., numSolutions is always 1
-        // (maybe there is a better way to do this?)
-      mwsparams->numSolutions = 1;
-      inference = new SimulatedTempering(state, aSeed, trackClauseTrueCnts,
-                                         stparams);
-    }
-    else if (agibbsInfer)
-    { // Gibbs sampling
-        // When MWS is used in Gibbs, numSolutions is always 1
-        // (maybe there is a better way to do this?)
-      mwsparams->numSolutions = 1;
-      inference = new GibbsSampler(state, aSeed, trackClauseTrueCnts,
-                                   gibbsparams);
-    }
-
     inference->init();
     inference->infer();
     
     printResults(queryFile, queryPredsStr, domain, resultsOut, &queries,
-                 inference, state);
+                 inference, inference->getState());
   }
 
   resultsOut.close();
-  if (mwsparams) delete mwsparams;
-  if (ssparams) delete ssparams;
-  if (msparams) delete msparams;
-  if (gibbsparams) delete gibbsparams;
-  if (stparams) delete stparams;
   delete domain;
   for (int i = 0; i < knownQueries.size(); i++)  delete knownQueries[i];
   delete inference;
-  delete state;
   
   cout << "total time taken = "; Timer::printTime(cout, timer.time()-begSec);
   cout << endl;

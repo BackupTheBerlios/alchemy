@@ -110,6 +110,7 @@ double momentum = 0.0;
 bool rescaleGradient = false;
 bool withEM = false;
 char* aInferStr = NULL;
+int amwsMaxSubsequentSteps = -1;
 
 
   // Inference arguments needed for disc. learning defined in inferenceargs.h
@@ -339,6 +340,12 @@ ARGS ARGS::Args[] =
   ARGS("dZeroInit", ARGS::Tog, initToZero,
        "(For discriminative learning only.) "
        "Initialize clause weights to zero instead of their log odds."),
+
+  ARGS("dMwsMaxSubsequentSteps", ARGS::Opt, amwsMaxSubsequentSteps,
+       "[Same as mwsMaxSteps] (For discriminative learning only.) The max "
+       "number of MaxWalkSat steps taken in subsequent iterations (>= 2) of "
+       "disc. learning. If not specified, mwsMaxSteps is used in each "
+       "iteration"),
   
   ARGS("gMaxIter", ARGS::Opt, maxIter, 
        "[10000] (For generative learning only.) "
@@ -419,6 +426,9 @@ int main(int argc, char* argv[])
 
   if (amwsMaxSteps <= 0)
   { cout << "ERROR: maxSteps must be positive" << endl; return -1; }
+  
+    // If max. subsequent steps not specified, use amwsMaxSteps
+  if (amwsMaxSubsequentSteps <= 0) amwsMaxSubsequentSteps = amwsMaxSteps;
 
   if (amwsTries <= 0)
   { cout << "ERROR: tries must be positive" << endl; return -1; }
@@ -455,10 +465,13 @@ int main(int argc, char* argv[])
       char **inferArgv = new char*[200];
       for (int i = 0; i < 200; i++)
       {
-        inferArgv[i] = new char[30];
+        inferArgv[i] = new char[500];
       }
 
-      extractArgs(aInferStr, inferArgc, inferArgv);
+        // Have to add program name (which is not used) to start of string
+      string inferString = "infer ";
+      inferString.append(aInferStr);
+      extractArgs(inferString.c_str(), inferArgc, inferArgv);
       cout << "extractArgs " << inferArgc << endl;
       for (int i = 0; i < inferArgc; i++)
       {
@@ -466,17 +479,6 @@ int main(int argc, char* argv[])
       }
 
       ARGS::parseFromCommandLine(inferArgc, inferArgv);
-
-        // HACK: Argument parser doesn't parse the ARGS::Tog right, so do
-        // it here by hand
-      for (int i = 0; i < inferArgc; i++)
-      {
-        if (string(inferArgv[i]) == "-m") amapPos = true;
-        else if (string(inferArgv[i]) == "-a") amapAll = true;
-        else if (string(inferArgv[i]) == "-p") agibbsInfer = true;
-        else if (string(inferArgv[i]) == "-ms") amcsatInfer = true;
-        else if (string(inferArgv[i]) == "-simtp") asimtpInfer = true;
-      }
 
         // Delete memory allocated for args
       for (int i = 0; i < 200; i++)
@@ -727,32 +729,14 @@ int main(int argc, char* argv[])
       for (int j = 0; j < mln->getNumClauses(); j++)
         ((Clause*) mln->getClause(j))->setWt(1);
 
-        // Find all evidence predicates with unknown value
-        // and make these non-evidence
-      int numPreds = domain->getNumPredicates();
-      for (int j = 0; j < numPreds; j++)
+		// Make open-world evidence preds into non-evidence
+      if (!allPredsExceptQueriesAreCW)
       {
-        const char* predName = domain->getPredicateName(j);
-          // Only look at evidence (but not '=' predicate)
-        if (nonEvidPredNames.contains(predName) ||
-            domain->getPredicateTemplate(j)->isEqualPredicateTemplate())
-          continue;
-          
-        bool unknownPred = false;
-        ppreds.clear();
-        Predicate::createAllGroundings(j, domain, ppreds);
-        for (int k = 0; k < ppreds.size(); k++)
-        {
-          TruthValue tv = domain->getDB()->getValue(ppreds[k]);
-          if (tv == UNKNOWN)
-            unknownPred = true;
-          delete ppreds[k];
-        }
-        if (unknownPred)
+        for (int i = 0; i < owPredNames.size(); i++)
         {
           nePredsStr.append(",");
-          nePredsStr.append(predName);
-          nonEvidPredNames.append(predName);
+          nePredsStr.append(owPredNames[i]);
+          nonEvidPredNames.append(owPredNames[i]);
         }
       }
 
@@ -856,7 +840,7 @@ int main(int argc, char* argv[])
     begSec = timer.time();
     cout << "learning (discriminative) weights .. " << endl;
     vp.learnWeights(wwts, wts.size()-1, numIter, learningRate, momentum,
-                    !initToZero);
+                    !initToZero, amwsMaxSubsequentSteps);
     cout << endl << endl << "Done learning discriminative weights. "<< endl;
     cout << "Time Taken for learning = ";
     Timer::printTime(cout, (timer.time() - begSec)); cout << endl;

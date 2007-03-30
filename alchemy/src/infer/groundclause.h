@@ -211,6 +211,46 @@ class GroundClause
 	  itr->second += increment;
   }
 
+  /**
+   * Removes a ground predicate from this ground clause. The ground predicate
+   * at the given index is removed and the new hash code is stored.
+   * 
+   * @param gndPred The ground predicate to be removed.
+   */
+  void removeGndPred(const int& gndPred)
+  {
+    for (int i = 0; i < gndPredIndexes_->size(); i++)
+    {
+      if (gndPred == (*gndPredIndexes_)[i])
+      {
+        gndPredIndexes_->removeItem(i);
+        gndPredIndexes_->compress();
+        rehash();
+        break;
+      }
+    }
+  }
+
+  /**
+   * Changes the index of a ground predicate in this ground clause. The new hash
+   * code is stored.
+   * 
+   * @param oldIdx Index of the ground predicate to be changed.
+   * @param newIdx New index of the ground predicate.
+   */
+  void changeGndPredIndex(const int& oldIdx, const int& newIdx)
+  {
+    for (int i = 0; i < gndPredIndexes_->size(); i++)
+    {
+      if (oldIdx == (*gndPredIndexes_)[i])
+      {
+        (*gndPredIndexes_)[i] = newIdx;
+        rehash();
+        break;
+      }
+    }    
+  }
+
   size_t hashCode() { return hashCode_; }
   
   bool same(const GroundClause* const & gc)
@@ -251,6 +291,30 @@ class GroundClause
                   const GroundPredicateHashArray* const & predHashArray) const;
 
   double sizeKB();
+
+ private:
+  
+  /**
+   * Computes the hash code and stores it.
+   */
+  void rehash()
+  {
+    Array<unsigned int>* intArrRep = new Array<unsigned int>;
+
+      // For each predicate
+    for (int i = 0; i < gndPredIndexes_->size(); i++)
+    {
+        // For each pred 1 (if pos.) or 0 (if neg.) is appended to intArrRep
+      if ((*gndPredIndexes_)[i] > 0)
+        intArrRep->append(1);
+      else
+        intArrRep->append((unsigned int)0);
+      intArrRep->append(abs((*gndPredIndexes_)[i]));
+    }
+  
+    hashCode_ = Hash::hash(*intArrRep);
+    delete intArrRep;    
+  }
 
  private:
     // Hash code of this ground clause

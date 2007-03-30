@@ -690,11 +690,10 @@ int zzfindInternalPredicate(const char* predname)
  */
 bool zzisLinkedFunction(const char* funcname, void* handle)
 {
-  string (*funccall)(string);
   char *error;
 
   dlerror();    // Clear any existing error
-  *(void **) (&funccall) = dlsym(handle, funcname);
+  dlsym(handle, funcname);
   if ((error = dlerror()) != NULL) return false;
 
   return true;
@@ -710,11 +709,10 @@ bool zzisLinkedFunction(const char* funcname, void* handle)
  */
 bool zzisLinkedPredicate(const char* predname, void* handle)
 {
-  bool (*funccall)(string);
   char *error;
 
   dlerror();    // Clear any existing error
-  *(void **) (&funccall) = dlsym(handle, predname);
+  dlsym(handle, predname);
   if ((error = dlerror()) != NULL) return false;
 
   return true;
@@ -1486,7 +1484,7 @@ void zzcreateClause(const ListObj* const & lo, Clause* const & clause)
   zzvarNameToIdMap.clear();
 
   const Array<ListObj*>& clauselo = lo->getList();
-  if ((clauselo[0]->getStr())[0] == 'v')
+  if (strcmp(clauselo[0]->getStr(), "v")==0)
   {
     for (int i = 1; i < clauselo.size(); i++)
     {

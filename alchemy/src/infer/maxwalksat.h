@@ -275,6 +275,16 @@ class MaxWalkSat : public SAT
     heuristic_ = heuristic;
   }
 
+  int getMaxSteps()
+  {
+    return maxSteps_;
+  }
+  
+  void setMaxSteps(const int& maxSteps)
+  {
+    maxSteps_ = maxSteps;
+  }
+  
  protected:
   
   /**
@@ -283,7 +293,7 @@ class MaxWalkSat : public SAT
    * 
    * @param toFlip Index of atom to flip.
    */
-  void flipAtom (int toFlip)
+  void flipAtom(int toFlip)
   {
     //if (mwsdebug) cout << "Entering MaxWalkSat::flipAtom" << endl;
     if (toFlip == NOVALUE)
@@ -294,8 +304,8 @@ class MaxWalkSat : public SAT
       // Mark this flip as last time atom was changed if tabu is used
     if (heuristic_ == TABU || heuristic_ == SS)
     {
+      changed_.growToSize(state_->getNumAtoms() + 1, -(tabuLength_ + 1));
       changed_[toFlip] = numFlips_;
-      changed_.growToSize(state_->getNumAtoms(), -(tabuLength_ + 1));
     }
     
     if (lazyLowState_)
@@ -401,6 +411,7 @@ class MaxWalkSat : public SAT
     int toFix = state_->getRandomFalseClauseIndex();
     if (toFix == NOVALUE) return NOVALUE;
 
+    if (mwsdebug) cout << "Looking to fix clause " << toFix << endl;
     long double improvement;
 
     Array<int> canNotFlip;
@@ -433,6 +444,9 @@ class MaxWalkSat : public SAT
                                          candidateBlockedVars,
                                          othersToFlip);
 
+      if (mwsdebug)
+        cout << "Improvement of var " << var << " is: " << improvement << endl;
+
       if (improvement >= bestvalue)
       { // Tied or better than previous best
         if (improvement > bestvalue)
@@ -454,7 +468,7 @@ class MaxWalkSat : public SAT
 
       // 1. If no improvement by best,
       // then with prob. choose a random atom
-    if (bestvalue <= 0 && noisyPick)
+    if (noisyPick)
     {
       if (cost > 0)
         toFlip = abs(state_->getRandomAtomInClause(toFix));
@@ -497,6 +511,7 @@ class MaxWalkSat : public SAT
       //if (mwsdebug) cout << "Leaving MaxWalkSat::pickTabu (NOVALUE)" << endl;      
       return NOVALUE;
     }
+    if (mwsdebug) cout << "Looking to fix clause " << toFix << endl;
 
     long double improvement;
     Array<int> canNotFlip;
@@ -528,7 +543,9 @@ class MaxWalkSat : public SAT
 
       improvement = calculateImprovement(var, canNotFlip, candidateBlockedVars,
                                          othersToFlip);
-
+      if (mwsdebug)
+        cout << "Improvement of var " << var << " is: " << improvement << endl;
+        
         // TABU: If pos. improvement, then always add it to best
       if (improvement > 0 && improvement >= bestvalue)
       { // Tied or better than previous best
@@ -543,7 +560,7 @@ class MaxWalkSat : public SAT
       }
       else if (tabuLength_ < numFlips_ - changed_[var])
       {
-        if (noisyPick && bestvalue <= 0)
+        if (noisyPick)
         { 
           best.append(var);
           numbest++;

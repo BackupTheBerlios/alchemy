@@ -164,14 +164,8 @@ void addPredicateToHash(const Clause* const & c,
 /**
  * Creates and adds a ground active clause.
  * 
- * @param activeIntClauses If not NULL, then active IntClauses are accumulated
- * here.
  * @param activeGroundClauses If not NULL, then active GroundClauses are
  * accumulated here.
- * @param uniqueClauses
- * @param seenPreds Predicates which have been seen before. Used when
- * accumulating IntClauses.
- * @param uniquePreds
  * @param seenGndPreds GroundPredicates which have been seen before. Used when
  * accumulating GroundClauses.
  * @param db Database used to check truth values and evidence status of
@@ -179,25 +173,18 @@ void addPredicateToHash(const Clause* const & c,
  * @param getSatisfied If true, satisfied clauses are also retrieved.
  */
 bool Clause::createAndAddActiveClause(
-                           Array<IntClause *> * const & activeIntClauses,
                            Array<GroundClause *> * const & activeGroundClauses,
-		                   IntClauseHashArray * const & uniqueClauses,
-		                   PredicateHashArray * const & seenPreds,
-		                   PredicateHashArray * const & uniquePreds,
                            GroundPredicateHashArray* const& seenGndPreds,
 		                   const Database* const & db,
                            bool const & getSatisfied)
 {
-  assert(!activeIntClauses || !activeGroundClauses);	 
-  bool accumulateClauses = (activeIntClauses || activeGroundClauses);
+  bool accumulateClauses = activeGroundClauses;
   Predicate *cpred;
   PredicateSet predSet; // used to detect duplicates
   PredicateSet::iterator iter;
  
-  IntClause *intClause;
   GroundClause *groundClause;
   
-  Clause* fullClause = NULL;
   Clause* clause = NULL;
   bool isEmpty = true;
   for (int i = 0; i < predicates_->size(); i++)
@@ -212,7 +199,6 @@ bool Clause::createAndAddActiveClause(
 	  if (wt_ >= 0 && !getSatisfied &&
           (*iter)->getSense() !=  predicate->getSense())
       {
-        if (fullClause) delete fullClause;
         if (clause) delete clause;
 		return false;
       }
@@ -223,15 +209,6 @@ bool Clause::createAndAddActiveClause(
     else
       predSet.insert(predicate);
       
-    if (uniqueClauses)
-    {
-	  if (!fullClause) fullClause = new Clause();
-     
-	  cpred = new Predicate(*predicate, fullClause);
-      assert(cpred);
-	  fullClause->appendPredicate(cpred);
-	}
-	 
 	bool isEvidence = db->getEvidenceStatus(predicate);
 //cout << "isEvidence " << isEvidence << endl;
 //predicate->printWithStrVar(cout, db->getDomain());
@@ -245,7 +222,6 @@ bool Clause::createAndAddActiveClause(
                                    predicate->getSense()))
     {
       if (clause) delete clause;
-      if (fullClause) delete fullClause;
       return false;
     }
     
@@ -265,80 +241,22 @@ bool Clause::createAndAddActiveClause(
   if (isEmpty)
   {
 	assert(!clause);
-	if (fullClause)
-	  delete fullClause;
     return false;
   }
     // Came to this point means that the clause is active (and hence nonEmpty)
   else
   {
-  	  // Check if the clause is already present
-  	if (uniqueClauses)
-  	{
-	  assert(uniquePreds);
-	  assert(fullClause);  
-     
-	 	// Note: fullClause should not be canonicalized
-	  intClause = new IntClause(fullClause, uniquePreds);
-	  delete fullClause; 
-	 
-	 	// If the clause is already present then it should
-	 	// not be added again
-	  if (uniqueClauses->append(intClause) < 0)
-	  {
-        intClause->deleteIntPredicates();
-        delete intClause;
-        if (clause)
-	      delete clause;
-	  	return false;
-      } 
-  	} 
-    
    	  // Add the corresponding ground clause if accumulateClauses is true
    	if (accumulateClauses)
    	{
-	  assert(clause);	
+      assert(clause);	
       clause->canonicalizeWithoutVariables();
-    
-	  if (activeIntClauses)
-	  {
-        intClause = new IntClause(clause, seenPreds);
-   
-        if (isHardClause_) 
-          intClause->setWtToHardWt();
-	    activeIntClauses->append(intClause);
-      }
-      else
-      {
-        groundClause = new GroundClause(clause, seenGndPreds);
-/*
-          // Check if preds in clause have been seen
-        for (int i = 0; i < groundClause->getNumGroundPredicates(); i++)
-        {
-          GroundPredicate* gp =
-            (GroundPredicate*)groundClause->getGroundPredicate(i);
-          int index = seenGndPreds->find(gp);
-            // Pred has been seen: Use pointer to previously seen one and tell
-            // it that it appears in this clause
-          if (index >= 0)
-          {
-            groundClause->replaceGroundPredicate(i, (*seenGndPreds)[index]);
-            bool predSense = groundClause->getGroundPredicateSense(i);
-            bool ok = (*seenGndPreds)[index]->appendGndClause(groundClause,
-                                                              predSense);
-            ok = true; // avoid compilation warning
-          }
-            // Pred has not been seen, so append it to seen
-          else
-            index = seenGndPreds->append(gp);
-          groundClause->setGroundPredicateIndex(i, index);
-        }
-*/     
-        if (isHardClause_) 
-          groundClause->setWtToHardWt();
-	    activeGroundClauses->append(groundClause);
-      }
-	  delete clause;
+      
+      groundClause = new GroundClause(clause, seenGndPreds);
+      if (isHardClause_)
+        groundClause->setWtToHardWt();
+      activeGroundClauses->append(groundClause);
+      delete clause;
     }
     return true;
   } 

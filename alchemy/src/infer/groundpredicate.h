@@ -125,7 +125,7 @@ class GroundPredicate
    * Creates a Predicate* equivalent to this GroundPredicate.
    * The caller is responsible for deleting the returned Predicate*.
    */
-  Predicate* createEquivalentPredicate(const Domain* const & domain)
+  Predicate* createEquivalentPredicate(const Domain* const & domain) const
   {
     const PredicateTemplate* pt = domain->getPredicateTemplate(getId());
     assert(pt);

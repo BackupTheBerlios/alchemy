@@ -186,7 +186,8 @@ class VotedPerceptron
     // learn the weights
   void learnWeights(double* const & weights, const int& numWeights,
                     const int& maxIter, const double& learningRate,
-                    const double& momentum, bool initWithLogOdds) 
+                    const double& momentum, bool initWithLogOdds,
+                    const int& mwsMaxSubsequentSteps) 
   {
     //cout << "Learning weights discriminatively... " << endl;
     memset(weights, 0, numWeights*sizeof(double));
@@ -255,6 +256,21 @@ class VotedPerceptron
     for (int iter = 1; iter <= maxIter; iter++) 
     {
       cout << endl << "Iteration " << iter << " : " << endl << endl;
+
+        // In 3rd iteration, we want to tell MWS to perform subsequentSteps
+        // (Iter. 1 is random assigment if initial weights are 0)
+      if (iter == 3)
+      {
+        for (int i = 0; i < inferences_.size(); i++)
+        {
+            // Check if using MWS
+          if (MaxWalkSat* mws = dynamic_cast<MaxWalkSat*>(inferences_[i]))
+          {
+            mws->setMaxSteps(mwsMaxSubsequentSteps);
+          }
+        }
+      }
+
       cout << "Getting the gradient.. " << endl;
       getGradient(weights, gradient, numWeights);
       cout << endl; 
@@ -463,40 +479,12 @@ class VotedPerceptron
         }
       }
 
-      state->initMakeBreakCostWatch(0);
+      state->initMakeBreakCostWatch();
       //cout<<"getting true cnts => "<<endl;
       state->getNumClauseGndingsWithUnknown(trainTrueCnts_[i], clauseCnt, true,
-                                           unknownPred);
+                                            unknownPred);
       //cout<<endl;
       //cout<<"getting false cnts => "<<endl;
-<<<<<<< votedperceptron.h
-	  mrfs_[i]->getNumClauseGndings(trainFalseCnts[i], clauseCnt, false, chainIdx, domains_[i]);
-    
-	  for (int clauseno=0; clauseno < clauseCnt; clauseno++) 
-      {
-      	//if(!relevantClauses[clauseno]) 
-      	  //continue;
-      	cout<<clauseno<<" : tc = "<<trainTrueCnts_[i][clauseno]
-			          <<" ** fc = "<<trainFalseCnts[i][clauseno]<<endl;      
-	  }
-	
-   /*
-	bool hasUnknownPreds = false;
-    calculateCounts(trainTrueCnts_[i],trainFalseCnts[i],i,hasUnknownPreds);
-  */
-	
-	}  
-			
-  	double tc,fc;
-  	cout << "List of CNF Clauses : " << endl;
-  	for (int clauseno = 0; clauseno < clauseCntPerDomain_[0]; clauseno++) 
-  	{
-      if(!relevantClausesPerDomain_[0][clauseno]) 
-      {
-      	for(int i = 0; i < domainCnt_; i++) 
-      	{
-		  Array<double>& logOdds = logOddsPerDomain_[i];
-=======
       state->getNumClauseGndingsWithUnknown(trainFalseCnts[i], clauseCnt, false,
                                             unknownPred);
       delete unknownPred;
@@ -519,7 +507,6 @@ class VotedPerceptron
         for (int i = 0; i < domainCnt_; i++)
         {
           Array<double>& logOdds = logOddsPerDomain_[i];
->>>>>>> 1.19
           logOdds[clauseno] = 0.0;
         }
         continue;
@@ -767,7 +754,7 @@ class VotedPerceptron
       else
       {
         int clauseCnt = clauseCntPerDomain_[i];
-        state->initMakeBreakCostWatch(0);
+        state->initMakeBreakCostWatch();
         //cout<<"getting true cnts => "<<endl;
         const Array<double>* clauseTrueCnts =
           inferences_[i]->getClauseTrueCnts();

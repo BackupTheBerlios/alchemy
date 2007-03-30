@@ -82,11 +82,9 @@ using namespace std;
 #include "database.h"
 #include "predicate.h"
 #include "groundpredicate.h"
-#include "intclause.h"
 #include "clausesampler.h"
 #include "clausehelper.h"
 
-//const bool useInverseIndex = false;
 const bool useInverseIndex = true;
 
 /******************************************************************************/
@@ -2016,11 +2014,8 @@ class Clause
 
 
     // Returns true if the ground clause was active 
-  bool createAndAddActiveClause(Array<IntClause *> * const & activeIntClauses,
+  bool createAndAddActiveClause(
                             Array<GroundClause *> * const & activeGroundClauses,
-                                IntClauseHashArray * const & uniqueClauses,
-                                PredicateHashArray * const & seenPreds,
-                                PredicateHashArray * const & uniquePreds,
                                 GroundPredicateHashArray* const& seenGndPreds,
                                 const Database* const & db,
                                 bool const & getSatisfied);
@@ -2186,12 +2181,8 @@ void sortLiteralsByNegationAndArity(Array<Predicate*>& clauseLits)
 
   //Assumes clauseLits is ordered so that indexable lits are in the front
 void groundIndexableLiterals(const Domain* const & domain,
-                             Array<IntClause *> * const & activeIntClauses,
                              Array<GroundClause *> * const & activeGroundClauses,
                              int & activeClauseCnt,
-                             IntClauseHashArray * const & uniqueClauses,
-                             PredicateHashArray * const & seenPreds,
-                             PredicateHashArray * const & uniquePreds,
                              GroundPredicateHashArray* const& seenGndPreds,
                              Array<Predicate*>& clauseLits,
                              int litIdx, bool const & ignoreActivePreds,
@@ -2259,10 +2250,8 @@ for (int i = 0; i < indexedGndings->size(); i ++)
       
         // Move to next literal
       if (litIdx + 1 < clauseLits.size())
-	    groundIndexableLiterals(domain, activeIntClauses, activeGroundClauses,
-                                activeClauseCnt, uniqueClauses, seenPreds,
-                                uniquePreds, seenGndPreds, clauseLits,
-                                litIdx + 1,
+	    groundIndexableLiterals(domain, activeGroundClauses, activeClauseCnt,
+                                seenGndPreds, clauseLits, litIdx + 1,
                                 ignoreActivePreds, getSatisfied);
 
 	  	// Restore literal and variables
@@ -2376,17 +2365,15 @@ cout << "Subseq. size " << ivg->subseqGndLits.size() << endl;
 		  // 2. It may be empty when evidence is pruned away => not active
     
         bool active;
-        bool accumulateClauses = (activeIntClauses || activeGroundClauses);
-        if (!uniqueClauses && !accumulateClauses)
+        bool accumulateClauses = activeGroundClauses;
+        if (!accumulateClauses)
         {
           active = isActive(db);
         }
         else
         {
-          active = createAndAddActiveClause(activeIntClauses,
-                                            activeGroundClauses, uniqueClauses,
-                                            seenPreds, uniquePreds,
-                                            seenGndPreds, db, getSatisfied);
+          active = createAndAddActiveClause(activeGroundClauses, seenGndPreds,
+                                            db, getSatisfied);
         }
 //cout << "Active " << active << endl;
         if (active) activeClauseCnt++;
@@ -2405,12 +2392,8 @@ cout << "Subseq. size " << ivg->subseqGndLits.size() << endl;
 
 
 void getActiveClausesAndCnt(const Domain* const & domain,
-                            Array<IntClause *> * const & activeIntClauses,
                             Array<GroundClause *> * const & activeGroundClauses,
                             int & activeClauseCnt,
-                            IntClauseHashArray * const & uniqueClauses,
-                            PredicateHashArray * const & seenPreds,
-                            PredicateHashArray * const & uniquePreds,
                             GroundPredicateHashArray* const& seenGndPreds,
                             bool const & ignoreActivePreds,
                             bool const & getSatisfied)
@@ -2426,10 +2409,9 @@ void getActiveClausesAndCnt(const Domain* const & domain,
   if (useInverseIndex)
   {
 	sortLiteralsByNegationAndArity(clauseLits);
-	groundIndexableLiterals(domain, activeIntClauses, activeGroundClauses,
-                            activeClauseCnt, uniqueClauses, seenPreds,
-                            uniquePreds, seenGndPreds, clauseLits, 0,
-                            ignoreActivePreds, getSatisfied);
+	groundIndexableLiterals(domain, activeGroundClauses, activeClauseCnt,
+                            seenGndPreds, clauseLits, 0, ignoreActivePreds,
+                            getSatisfied);
   }
   else
   {
@@ -2520,20 +2502,16 @@ void getActiveClausesAndCnt(const Domain* const & domain,
             // satisfied (and hence not active)
 		  	// 2. It may be empty when evidence is pruned away => not active
 		  bool active;
-          bool accumulateClauses = (activeIntClauses || activeGroundClauses);
-          if (!uniqueClauses && !accumulateClauses)
+          bool accumulateClauses = activeGroundClauses;
+          if (!accumulateClauses)
             active = isActive(db);
           else
-            active = createAndAddActiveClause(activeIntClauses,
-                                              activeGroundClauses,
-                                              uniqueClauses, seenPreds,
-                                              uniquePreds, seenGndPreds, db,
-                                              getSatisfied);
+            active = createAndAddActiveClause(activeGroundClauses, seenGndPreds,
+                                              db, getSatisfied);
             
 //cout << "Active " << active << endl;
           if (active) activeClauseCnt++;
-		   
-	  	}
+        }
       } //while there are groundings of literal's variables
 
       	//if we exit the while loop in order to look at next literal 
@@ -2544,11 +2522,6 @@ void getActiveClausesAndCnt(const Domain* const & domain,
   	} // while stack is not empty
     deleteAllLitIdxVarsGndings(ivgArr);
   }
-  
-  assert(!uniqueClauses || !activeIntClauses || 
-         uniqueClauses->size()==activeIntClauses->size());
-  assert(!uniqueClauses || !activeGroundClauses ||
-         uniqueClauses->size()==activeGroundClauses->size());
 }
 
  
@@ -2556,29 +2529,19 @@ void getActiveClausesAndCnt(const Domain* const & domain,
   //is true, this is equivalent to getting all the unsatisfied clauses
 void getActiveClausesAndCnt(Predicate*  const & gndPred,
                             const Domain* const & domain,
-                            Array<IntClause *>* const & activeIntClauses,
                             Array<GroundClause *>* const & activeGroundClauses,
                             int & activeClauseCnt,
-                            PredicateHashArray * const & seenPreds,
                             GroundPredicateHashArray* const& seenGndPreds,
                             bool const & ignoreActivePreds,
                             bool const & getSatisfied)
-{	
-	//at most one of them is non-null   
-  assert(!activeIntClauses || !activeGroundClauses);
-    
+{
     //create mapping of variable ids (e.g. -1) to variable addresses,
     //note whether they have been grounded, and store their types   
-  IntClauseHashArray *uniqueClauses = NULL;
-  PredicateHashArray *uniquePreds = NULL;
-
   createVarIdToVarsGroundedType(domain); 
   if (gndPred == NULL)
   {
-    getActiveClausesAndCnt(domain, activeIntClauses, activeGroundClauses,
-                           activeClauseCnt, uniqueClauses, seenPreds,
-                           uniquePreds, seenGndPreds, ignoreActivePreds,
-                           getSatisfied);
+    getActiveClausesAndCnt(domain, activeGroundClauses, activeClauseCnt,
+                           seenGndPreds, ignoreActivePreds, getSatisfied);
     restoreVars();
   }
   else
@@ -2594,14 +2557,6 @@ void getActiveClausesAndCnt(Predicate*  const & gndPred,
     Array<int> unarySet;
 	unarySet.append(-1);
 
-	  //we need to take care of duplicates only if there the predicate appears
-	  //in one more than one place in the clause
-	if(gndPredIndexes.size() > 1)
-	{
-	  uniqueClauses = new IntClauseHashArray();
-	  uniquePreds = new PredicateHashArray();
-	}
-    
 	activeClauseCnt = 0;
 	for (int i = 0; i < gndPredIndexes.size(); i++)
 	{
@@ -2615,75 +2570,19 @@ void getActiveClausesAndCnt(Predicate*  const & gndPred,
                        gndPred->getTruthValue(), db,sameTruthValueAndSense,
                        gndPredPosSameSense);
       int cnt;
-	  getActiveClausesAndCnt(domain, activeIntClauses, activeGroundClauses, cnt,
-						     uniqueClauses, seenPreds, uniquePreds,
-                             seenGndPreds, ignoreActivePreds, getSatisfied);
+	  getActiveClausesAndCnt(domain, activeGroundClauses, cnt, seenGndPreds,
+                             ignoreActivePreds, getSatisfied);
 	  activeClauseCnt += cnt;
 	  restoreVars();
 	}
   }
 
-  assert(!uniqueClauses || uniqueClauses->size() == activeClauseCnt);
-  assert(!activeIntClauses || activeIntClauses->size() == activeClauseCnt);
   assert(!activeGroundClauses ||
          activeGroundClauses->size() == activeClauseCnt);
-   
-  if(uniqueClauses)
-  {
-	for (int i = 0; i < uniqueClauses->size(); i++)
-	{
-	  IntClause *intClause = (*uniqueClauses)[i];
-	  intClause->deleteIntPredicates();
-	  delete intClause;
-	}
-	delete uniqueClauses;
-  }
-    
-  if(uniquePreds)
-  {
-	for (int i = 0; i < uniquePreds->size(); i++) 
-	  delete (*uniquePreds)[i];
-	delete uniquePreds;
-  }
 } 
 
 
 public:
-
-//get Active Clauses unifying with the given predicate - if ignoreActivePreds 
-//is true, this is equivalent to getting all the unsatisfied clauses
-// Returns the intClauses
-void getActiveClauses(Predicate*  const & gndPred, 
-                      const Domain* const & domain,
-					  Array<IntClause *>* const & activeIntClauses,
-					  PredicateHashArray * const & seenPreds,
-					  bool const & ignoreActivePreds)
-{
-  int cnt = 0;
-  Array<GroundClause *>* const & activeGroundClauses = NULL;
-  GroundPredicateHashArray* const & seenGndPreds = NULL;
-  bool getSatisfied = false;
-  getActiveClausesAndCnt(gndPred, domain, activeIntClauses, activeGroundClauses, cnt,
-                         seenPreds, seenGndPreds, ignoreActivePreds,
-                         getSatisfied);
-} 
-
-// Get inactive clauses unifying with the given predicate
-// Returns the intClauses
-void getInactiveClauses(Predicate*  const & gndPred, 
-                        const Domain* const & domain,
-                        Array<IntClause *>* const & activeIntClauses,
-                        PredicateHashArray * const & seenPreds)
-{
-  int cnt = 0;
-  Array<GroundClause *>* const & activeGroundClauses = NULL;
-  GroundPredicateHashArray* const & seenGndPreds = NULL;
-  bool ignoreActivePreds = true;
-  bool getSatisfied = true;
-  getActiveClausesAndCnt(gndPred, domain, activeIntClauses, activeGroundClauses, cnt,
-                         seenPreds, seenGndPreds, ignoreActivePreds,
-                         getSatisfied);
-}
 
 //get Active Clauses unifying with the given predicate - if ignoreActivePreds 
 //is true, this is equivalent to getting all the unsatisfied clauses
@@ -2695,12 +2594,9 @@ void getActiveClauses(Predicate* const & gndPred,
 					  bool const & ignoreActivePreds)
 {
   int cnt = 0;
-  Array<IntClause *>* const & activeIntClauses = NULL;
-  PredicateHashArray* const & seenPreds = NULL;
   bool getSatisfied = false;
-  getActiveClausesAndCnt(gndPred, domain, activeIntClauses, activeGroundClauses, cnt,
-                         seenPreds, seenGndPreds, ignoreActivePreds,
-                         getSatisfied);
+  getActiveClausesAndCnt(gndPred, domain, activeGroundClauses, cnt,
+                         seenGndPreds, ignoreActivePreds, getSatisfied);
                          
 } 
 
@@ -2710,18 +2606,15 @@ void getActiveClauses(Predicate* const & gndPred,
 //count of all the unsatisfied clauses
 int getActiveClauseCnt(Predicate*  const & gndPred, 
                        const Domain* const & domain,
-                       PredicateHashArray * const & seenPreds,
                        bool const & ignoreActivePreds)
 {
   int cnt = 0;
-	   
-  Array<IntClause *> *activeIntClauses = NULL;
+   
   Array<GroundClause *> *activeGroundClauses = NULL;
   GroundPredicateHashArray* const & seenGndPreds = NULL;
   bool getSatisfied = false;
-  getActiveClausesAndCnt(gndPred, domain, activeIntClauses, activeGroundClauses, cnt,
-                         seenPreds, seenGndPreds, ignoreActivePreds,
-                         getSatisfied);
+  getActiveClausesAndCnt(gndPred, domain, activeGroundClauses, cnt,
+                         seenGndPreds, ignoreActivePreds, getSatisfied);
 
   return cnt;
 }
