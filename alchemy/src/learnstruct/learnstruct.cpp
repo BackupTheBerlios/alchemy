@@ -424,7 +424,7 @@ int main(int argc, char* argv[])
   createDomainsAndMLNs(domains, mlns, multipleDatabases, inMLNFile, 
                        constFilesArr, dbFilesArr, queryPredNames,
                        addUnitClauses, priorMean, mwsLazy,
-                       allPredsExceptQueriesAreCW, NULL);
+                       allPredsExceptQueriesAreCW, NULL, NULL);
   cout << "Parsing MLN and creating domains took ";
   Timer::printTime(cout, timer.time()-begSec); cout << endl << endl;
 

@@ -177,6 +177,19 @@ class Predicate
     setDirty();
   }
 
+  /**
+   * Removes the last term in the predicate. The template is not changed and terms_
+   * is compressed. Returned Term* no longer belongs to the predicate and caller is
+   * responsible for deleting it.
+   */
+  Term* removeLastTerm()
+  {
+    Term* term = terms_->removeLastItem();
+    terms_->compress();
+    setDirty();
+    return term;
+  }
+
   
   bool getSense() const { return sense_; }
   void setSense(const bool& s) { sense_ = s; setDirty();}
@@ -202,38 +215,42 @@ class Predicate
   static void createAllGroundings(const int& predId, 
                                   const Domain* const & domain,
                                   Array<Predicate*>& returnArray);
-    
+
   
   //Caller is responsible for deleting the Predicate* in returnArray
   static void createAllGroundingsUnifyingWithTerm(const int& predId, 
                                   const Domain* const & domain,
                                   Array<Predicate*>& returnArray,
-								  int termTypeId,int termVal);
+                                  int termTypeId, int termVal);
 
 
   void createAllGroundingsIfAllVarDiff(const Domain* const & domain,
                                        Array<Predicate*>& returnArray)
   { createAllGroundings(getId(), domain, returnArray); }
 
-
-    //Create groundings of predicate, taking into account vars may be shared.
-    //Exactly one of  predReturnArray or constReturnArray must be NULL.
-    //Callers are responsible for deleting the parameters and their contents.
-  void createAllGroundings(const Domain* const & domain,
-                           Array<Predicate*>* const & predReturnArray,
-                           Array<int*>* const & constReturnArray);
-
-    //create groundings of predicate, taking into account vars may be shared
+     //create groundings of predicate, taking into account vars may be shared
   void createAllGroundings(const Domain* const & domain,
                            Array<Predicate*>& returnArray)
-  { createAllGroundings(domain, &returnArray, NULL); }
+  { createAllGroundings(domain, &returnArray, NULL, -1); }
 
 
     //create groundings of predicate, taking into account vars may be shared
   void createAllGroundings(const Domain* const & domain,
                            Array<int*>& returnArray)
-  { createAllGroundings(domain, NULL, &returnArray); }
+  { createAllGroundings(domain, NULL, &returnArray, -1); }
 
+  /**
+   * Generates exactly one grounding of this predicate.
+   * 
+   * @param domain Domain in which this predicate exists.
+   * @param returnArray The one grounding produced is placed as the only element
+   * in this Array.
+   * @param grounding The index of the grounding to be produced. This is the
+   * grounding-th combination of constants.
+   */
+  void getGroundingNumber(const Domain* const & domain,
+                          Array<Predicate*>& returnArray, const int& grounding)
+  { createAllGroundings(domain, &returnArray, NULL, grounding); }
 
   int getNumTerms() const { return terms_->size(); }
 
@@ -262,6 +279,20 @@ class Predicate
     return false;
   }
 
+  /**
+   * Checks if this predicate contains at least one constant.
+   * 
+   * @return True if and only if at least one term is a constant
+   */
+  bool containsConstants() const
+  {
+    for (int i = 0; i < terms_->size(); i++)
+    {
+      Term* t = (*terms_)[i];
+      if (t->getType() == Term::CONSTANT) return true;
+    }
+    return false;    
+  }
 
   void setTemplate(PredicateTemplate* const & t) { template_ = t; }
 
@@ -378,18 +409,16 @@ class Predicate
   Clause* getParent() const { return parent_; }
 
 	// True, if the predicate can be used in the inverted index
-    // If in pos. clause, then it must be negated and binary
+    // If in pos. clause, then it must be negated
     // If in neg. clause, then the inverted index can not be used
   bool isIndexable(bool posClause)
   {
-	  // At most one of the two terms is grounded
-	  // and equality pred is never indexed
-	if (isGrounded() || isEqualPred()) return false;
+      // At most one of the two terms is grounded
+      // and equality pred is never indexed
+    //if (isGrounded() || isEqualPred()) return false;
+    if (isEqualPred()) return false;
     
-    if (posClause)
-      return (!getSense() && getNumTerms() == 2);
-    else
-      return false;
+    return (!getSense());
   }
 
   void createVarsTypeIdArr(Array<VarsTypeId*>*& varsTypeIdArr)
@@ -509,6 +538,27 @@ class Predicate
 
 
  private:
+ 
+ /**
+   * Create groundings of predicate, taking into account vars may be shared.
+   * Exactly one of predReturnArray or constReturnArray must be NULL. If
+   * constReturnArray is NULL, then the generated predicates are stored in
+   * predReturnArray; otherwise arrays of the constant ids are stored in
+   * constReturnArray.
+   * Callers are responsible for deleting the parameters and their contents.
+   * 
+   * @param domain Domain in which this predicate exists.
+   * @param predReturnArray The groundings produced are placed in this Array.
+   * @param constReturnArray The constants produced are placed in this Array.
+   * @param grounding If non-negative, then only the grounding with this index
+   * is produced. This is the grounding-th combination of constants starting at
+   * 0.
+   */
+  void createAllGroundings(const Domain* const & domain,
+                           Array<Predicate*>* const & predReturnArray,
+                           Array<int*>* const & constReturnArray,
+                           const int& grounding);
+ 
   void copy(const Predicate& p)
   {
     template_ = p.template_;

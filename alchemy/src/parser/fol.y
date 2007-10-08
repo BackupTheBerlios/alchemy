@@ -83,7 +83,6 @@ int folDbg = 0;
 %token ZZ_NUM
 %token ZZ_DOTDOTDOT
 %token ZZ_STRING
-%token ZZ_EQEQ
 %token ZZ_INCLUDE
 
 %token ZZ_PREDICATE
@@ -104,7 +103,7 @@ int folDbg = 0;
 %left '*' '/' '%'
 
 %glr-parser
-%expect 16
+%expect 13
 %error-verbose
 %% 
 
@@ -171,18 +170,7 @@ input:
       delete zzwt; zzwt = NULL;
     }
 	
-    // at this point we are sure we are dealing with a formula
-
-    //if the '!' operator is used, check that it's correctly used
-    if (zzuniqueVarIndexes.size() > 0)
-    { 
-      if (zzfdnumPreds != 1 || zznumAsterisk > 0)
-        zzerr("'!' can only be used in a clause with one predicate, "
-              "and cannot be used with '*'.");
-      if (zzformulaStr.find("EXIST") != string::npos || 
-          zzformulaStr.find("FORALL") != string::npos)
-        zzerr("'!' cannot be used with quantifiers");
-    }
+      // at this point we are sure we are dealing with a formula
 
       //if there are errors, we can keep this formula for further processing
     if (zznumErrors == 0)
@@ -190,10 +178,10 @@ input:
         //defer converting the formula to CNF until we have read all the
         //.db files and are sure that we know all the constants to ground
         //formula's clauses
-	    ZZFormulaInfo* epfi 
+      ZZFormulaInfo* epfi 
         = new ZZFormulaInfo(formula, zzformulaStr, zzfdnumPreds, zzwt, 
                             zzdefaultWt, zzdomain, zzmln, zzvarNameToIdMap, 
-                            zzplusVarMap, zznumAsterisk, zzuniqueVarIndexes,
+                            zzplusVarMap, zznumAsterisk,
                             zzhasFullStop, zzreadHardClauseWts, 
                             zzmustHaveWtOrFullStop);
       zzformulaInfos.append(epfi); 
@@ -285,12 +273,9 @@ include: ZZ_INCLUDE ZZ_STRING nnewline
     yyrestart(newin); 
     zznumCharRead = 0;
 
-    // if it is a .db file containing ground predicates
+      // if it is a .db file containing ground predicates
     if ((s.at(len-3)=='.' && s.at(len-2)=='d' && s.at(len-1)=='b'))
-//    	||
-//    	(s.at(len-5)=='.' && s.at(len-4)=='f' && s.at(len-3)=='u' &&
-//    	s.at(len-2)=='n' && s.at(len-1)=='c'))
-    	zzparseGroundPred = true;
+      zzparseGroundPred = true;
   } 
   else
     zzerr("Failed to open file %s.", str);
@@ -690,14 +675,13 @@ type_code: ZZ_TYPE
   // If we are in a function definition, then add the type to the function too
   if (zzfuncTemplate)
 	zzaddType(ttype, NULL, zzfuncTemplate, false, zzdomain);
-  	
   delete [] ttype;
 }
-
+exist_unique
 
 variable_code: ZZ_VARIABLE
 {
-  const char* varName = zztokenList.removeLast();;
+  const char* varName = zztokenList.removeLast();
   if (folDbg >= 1) printf("t_%s ", varName);
   zzassert(!zzdomain->isType(varName), "expecting varName to be not a type");
   int id = zzaddTypeToDomain(zzdomain, varName);
@@ -708,6 +692,23 @@ variable_code: ZZ_VARIABLE
 	zzaddType(varName, NULL, zzfuncTemplate, false, zzdomain);
   delete [] varName;
 }
+exist_unique
+
+exist_unique:
+  // No '!'
+  {
+  }
+| '!'
+  {
+    zzconsumeToken(zztokenList, "!");
+    if (folDbg >= 1) printf("! "); 
+    if (zzfuncTemplate)
+      zzerr("'!' cannot be used in a function declaration.");
+    zzassert(zzpredTemplate, "'!' used outside a predicate declaration.");
+
+    int termIdx = zzpredTemplate->getNumTerms()-1;
+    zzpredTemplate->addUniqueVarIndex(termIdx);
+  }
 
 
 /***************** predicate and function groundings ***********************/
@@ -1306,7 +1307,7 @@ atomic_sentence:
     ListObj* predlo = zzpredFuncListObjs.top();
     zzpredFuncListObjs.pop();
 
-    if(zzisAsterisk)
+    if (zzisAsterisk)
     {
       zzisAsterisk = false;
       ListObj* lo = new ListObj;
@@ -1326,8 +1327,10 @@ atomic_sentence:
 		//zzformulaStr.append(" ^ ");
       ListObj* topPredlo = zzfuncConjStack.top();
       zzfuncConjStack.pop();
+      //zzformulaListObjs.push(topPredlo);
+      //zzcreateListObjFromTopTwo(zzformulaListObjs, "^");
       zzformulaListObjs.push(topPredlo);
-      zzcreateListObjFromTopTwo(zzformulaListObjs, "^");
+      zzcreateListObjFromTopTwo(zzformulaListObjs, "v");
 	} //while (!zzfuncConjStack.empty())
 
 	if (!zzfuncConjStr.empty())
@@ -1344,15 +1347,15 @@ atomic_sentence:
     //zzfdisEqualPred = true;
     //const PredicateTemplate* t = zzdomain->getEqualPredicateTemplate();
     const PredicateTemplate* t = zzdomain->getEmptyPredicateTemplate();
-        
-    zzassert(zzpred == NULL,"expecting zzpred==NULL");
+
+    zzassert(zzpred == NULL, "expecting zzpred==NULL");
     zzpred = new Predicate(t);
 
     ListObj* predlo = new ListObj;
     //predlo->append(PredicateTemplate::EQUAL_NAME);
     predlo->append(PredicateTemplate::EMPTY_NAME);
     zzpredFuncListObjs.push(predlo);
-    if(zzisNegated)  { zzpred->setSense(false); zzisNegated = false; }
+    if (zzisNegated)  { zzpred->setSense(false); zzisNegated = false; }
 
     if (folDbg >= 2) printf("atomic_sentence (left): term\n"); 
   }
@@ -1364,7 +1367,7 @@ atomic_sentence:
     
   	  // If type known from LHS, then set the pred types accordingly
     int lTypeId = zzgetTypeId(zzpred->getTerm(0), (*predlo)[1]->getStr());
-    if (lTypeId>0)
+    if (lTypeId > 0)
     {
       if (strcmp(zzinfixPredName, PredicateTemplate::EQUAL_NAME)==0)
       {
@@ -1440,10 +1443,10 @@ atomic_sentence:
  	      }
         }
         else  // if only one type is known
-        if ( (lTypeId<=0 && rTypeId>0) || (lTypeId>0 && rTypeId<=0) )
+        if ( (lTypeId <= 0 && rTypeId > 0) || (lTypeId > 0 && rTypeId <= 0) )
         {
-          int knownTypeId = (lTypeId>0) ? lTypeId : rTypeId;
-          if (strcmp(zzinfixPredName, PredicateTemplate::EQUAL_NAME)==0)
+          int knownTypeId = (lTypeId > 0) ? lTypeId : rTypeId;
+          if (strcmp(zzinfixPredName, PredicateTemplate::EQUAL_NAME) == 0)
           {
           	zzsetEqPredTypeName(knownTypeId);
           }
@@ -1480,13 +1483,19 @@ atomic_sentence:
 	  //Only left term could be unknown
 	  //const char* leftTerm = (*predlo)[1]->getStr();
 	//}
-	    
+
     zzassert(zzpredFuncListObjs.size()==1,
              "expecting zzpredFuncListObjs.size()==1");
     ListObj* topPredlo = zzpredFuncListObjs.top();
     zzpredFuncListObjs.pop();
     zzformulaListObjs.push(topPredlo);
-    	
+      // This allows for the '!=' operator
+    if (zzisNegated)
+    {
+      zzcreateListObjFromTop(zzformulaListObjs, "!");
+      zzisNegated = false;
+    }
+    
 	delete zzpred;
 	zzpred = NULL;
 	
@@ -1499,8 +1508,10 @@ atomic_sentence:
 		
       ListObj* topPredlo = zzfuncConjStack.top();
 	  zzfuncConjStack.pop();
+      //zzformulaListObjs.push(topPredlo);
+	  //zzcreateListObjFromTopTwo(zzformulaListObjs, "^");
 	  zzformulaListObjs.push(topPredlo);
-	  zzcreateListObjFromTopTwo(zzformulaListObjs, "^");
+	  zzcreateListObjFromTopTwo(zzformulaListObjs, "v");
 	} //while (!zzfuncConjStack.empty())
 
 	if (!zzfuncConjStr.empty())
@@ -1589,6 +1600,27 @@ internal_predicate_sign:
     const PredicateTemplate* t = zzdomain->getEqualPredicateTemplate();
 	zzpred->setTemplate((PredicateTemplate*)t);
   }
+|
+  '!''='
+  {
+  	zzconsumeToken(zztokenList, "!");
+  	zzconsumeToken(zztokenList, "=");
+    if (folDbg >= 1) printf("!= "); 
+    if (folDbg >= 2) printf("atomic_sentence (right): term\n"); 
+    zzformulaStr.append(" != ");
+    zzinfixPredName = (char *)malloc((strlen(PredicateTemplate::EQUAL_NAME)
+    								  + 1)*sizeof(char));
+  	strcpy(zzinfixPredName, PredicateTemplate::EQUAL_NAME);
+    const PredicateTemplate* t = zzdomain->getEqualPredicateTemplate();
+	zzpred->setTemplate((PredicateTemplate*)t);
+	  // Theoretically, we could have "!(a1 != a2)" which would be "a1 = a2"
+    if (zzpred->getSense())
+    {
+      zzpred->setSense(false);
+      zzisNegated = true;
+    }
+    else { zzpred->setSense(true); }
+  }
 ;
 
 
@@ -1609,7 +1641,6 @@ asterisk:
 
 // term ',' terms | term
 terms:  
-  //{ if (folDbg >= 2) printf("terms: terms\n"); }
   terms  
   ',' 
   {  
@@ -1621,7 +1652,6 @@ terms:
   }
   term
 | 
-  //{ if (folDbg >= 2) printf("terms: term\n"); }
   term
   {
   	// After the first term in an internal pred., check if we can determine type
@@ -1650,18 +1680,72 @@ terms:
 
 
 term:
+  ZZ_CONSTANT 
+  {
+    const char* constName = zztokenList.removeLast();
+    if (folDbg >= 1) printf("c2_%s ", constName); 
+    zztermIsConstant(constName, constName);
+    if (zzfunc) zzfdfuncConstants.append(string(constName));
+    else        zzfdconstName = constName;
+    delete [] constName;
+  }
+|
+  ZZ_STRING // the string is a constant
+  {
+    const char* constName = zztokenList.removeLast();
+    if (folDbg >= 1) printf("c2_%s ", constName); 
+      if (zzconstantMustBeDeclared)
+        zzerr("Constant %s must be declared before it is used", constName);
+    zztermIsConstant(constName, constName);
+    if (zzfunc) zzfdfuncConstants.append(string(constName));
+    else        zzfdconstName = constName;
+    delete [] constName;
+  }
+|
+  ZZ_NUM // the integer is a constant
+  {
+    const char* intStr = zztokenList.removeLast();
+    if (folDbg >= 1) printf("c3_%s ", intStr);
+
+    char constName[100];
+    zzcreateAndCheckIntConstant(intStr, zzfunc, zzpred, zzdomain, constName);
+    if (constName == NULL) { break; delete [] intStr; }
+
+    zztermIsConstant(constName, intStr);
+    if (zzfunc) zzfdfuncConstants.append(string(constName));
+    else        zzfdconstName = constName;
+    delete [] intStr;
+  }
+| 
+  ZZ_VARIABLE
+  {
+    zztermIsVariable(folDbg);
+    if (zzisPlus) zzisPlus = false;
+  }
+| 
+  '+' ZZ_VARIABLE
+  {
+    zzconsumeToken(zztokenList, "+");
+    if (folDbg >= 1) printf("+ "); 
+    zzassert(!zzisPlus,"expecting !zzisPlus");
+    zzisPlus = true;
+    zzformulaStr.append("+");
+    zztermIsVariable(folDbg);
+    if (zzisPlus) zzisPlus = false;
+  }  
+|
   function_term
-  {  
+  {
     zzassert(zzfunc != NULL,"expecting zzfunc != NULL");
     zzcheckFuncNumTerm(zzfunc);
     zzassert(zzpred != NULL, "expecting zzpred != NULL");
 
-	   // replace function
+      // replace function
 	 
-	   // Append Term funcVar<zzfuncVarCounter> to predicate where
-	   // function appears and set flag to add conjunction
+	  // Append Term funcVar<zzfuncVarCounter> to predicate where
+      // function appears and set flag to add conjunction
 
-	   // 1. Make new variable
+      // 1. Make new variable
     char* varName;
     string newVarName;
     
@@ -1689,13 +1773,13 @@ term:
       Function* func = new Function(*zzfunc);
       zzfuncToFuncVarMap[func] = newVarName;
     }
-      
+
    	bool rightNumTerms = true;
    	bool rightType = true;
    	int exp, unexp;
 
-	// 2. Create new predicate
-	// Predicate name is PredicateTemplate::ZZ_RETURN_PREFIX + function name
+      // 2. Create new predicate
+      // Predicate name is PredicateTemplate::ZZ_RETURN_PREFIX + function name
 	char* predName;
 	predName = (char *)malloc((strlen(PredicateTemplate::ZZ_RETURN_PREFIX) +
   	    					   strlen(zzfunc->getName()) + 1)*sizeof(char));
@@ -1705,15 +1789,15 @@ term:
 	// Only insert predicate declaration, if not yet declared
 	if (zzdomain->getPredicateId(predName) < 0)
 	{
-	  zzassert(zzpredTemplate==NULL,"expecting zzpredTemplate==NULL");
-	  zzpredTemplate = new PredicateTemplate();
-	  zzpredTemplate->setName(predName);
+      zzassert(zzpredTemplate==NULL,"expecting zzpredTemplate==NULL");
+      zzpredTemplate = new PredicateTemplate();
+      zzpredTemplate->setName(predName);
 			
-	  // Register the types
-	  // First parameter is the return type
+      // Register the types
+      // First parameter is the return type
 	  const char* ttype = zzfunc->getRetTypeName();
 	  zzaddType(ttype, zzpredTemplate, NULL, false, zzdomain);
-	
+
 	  // Register the parameter types
 	  for (int i = 0; i < zzfunc->getNumTerms(); i++)
 	  {
@@ -1732,13 +1816,14 @@ term:
 	zzpred = NULL;
     zzfdnumPreds++;
 	zzcreatePred(zzpred, predName);
-    	
+    
     ListObj* predlo = new ListObj;
     predlo->append(predName);
 		
 	// Put predicate list object in stack to be used in conjunction later
     zzfuncConjStack.push(predlo);
-    zzfuncConjStr.append(" ^ ");
+    //zzfuncConjStr.append(" ^ ");
+    zzfuncConjStr.append(" v !");
     zzfuncConjStr.append(predName);
 	zzfuncConjStr.append("(");
     zzputVariableInPred(varName, folDbg);
@@ -1766,7 +1851,8 @@ term:
 	  zzfuncConjStr.append(name);
 	}
 	zzfuncConjStr.append(")");
-		
+    zzcreateListObjFromTop(zzfuncConjStack, "!");
+    
     // 4. Append new variable to function in stack or to predicate
     if (!zzfuncStack.empty())
     {
@@ -1774,8 +1860,8 @@ term:
 	  zzfuncStack.pop();
     
       // check that we have not exceeded the number of terms
-      if ((unexp=prevFunc->getNumTerms()) ==
-       	  (exp=prevFunc->getTemplate()->getNumTerms()))
+      if ((unexp = prevFunc->getNumTerms()) ==
+       	  (exp = prevFunc->getTemplate()->getNumTerms()))
       {
        	rightNumTerms = false;
        	zzerr("Wrong number of terms for function %s. "
@@ -1803,8 +1889,8 @@ term:
 	else // function stack is empty, so append to predicate
     {
       // check that we have not exceeded the number of terms
-      if ((unexp=prevPred->getNumTerms()) ==
-      	  (exp=prevPred->getTemplate()->getNumTerms()))
+      if ((unexp = prevPred->getNumTerms()) ==
+      	  (exp = prevPred->getTemplate()->getNumTerms()))
       {
         rightNumTerms = false;
         zzerr("Wrong number of terms for predicate %s. "
@@ -1814,7 +1900,7 @@ term:
       int varId = -1;
       if (rightNumTerms)
       {
-        // check that the variable is of the right type
+          // check that the variable is of the right type
         int typeId = prevPred->getTermTypeAsInt(prevPred->getNumTerms());
         rightType = zzcheckRightTypeAndGetVarId(typeId, newVarName.c_str(),
         									    varId);
@@ -1840,88 +1926,11 @@ term:
     delete zzpred;
 	zzpred = prevPred;
   }
-|
-  ZZ_CONSTANT 
-  {
-    const char* constName = zztokenList.removeLast();
-    if (folDbg >= 1) printf("c2_%s ", constName); 
-    zztermIsConstant(constName);
-    if (zzfunc) zzfdfuncConstants.append(string(constName));
-    else        zzfdconstName = constName;
-    delete [] constName;
-  }
-|
-  ZZ_STRING // the string is a constant
-  {
-    const char* constName = zztokenList.removeLast();
-    if (folDbg >= 1) printf("c2_%s ", constName); 
-      if (zzconstantMustBeDeclared)
-        zzerr("Constant %s must be declared before it is used", constName);
-    zztermIsConstant(constName);
-    if (zzfunc) zzfdfuncConstants.append(string(constName));
-    else        zzfdconstName = constName;
-    delete [] constName;
-  }
-|
-  ZZ_NUM // the integer is a constant
-  {
-    const char* intStr = zztokenList.removeLast();
-    if (folDbg >= 1) printf("c3_%s ", intStr);
-
-    char constName[100];
-    zzcreateAndCheckIntConstant(intStr, zzfunc, zzpred, zzdomain, constName);
-    if (constName == NULL) { break; delete [] intStr; }
-
-    zztermIsConstant(constName);
-    if (zzfunc) zzfdfuncConstants.append(string(constName));
-    else        zzfdconstName = constName;
-    delete [] intStr;
-  }
-| 
-  plus ZZ_VARIABLE
-  {
-    zztermIsVariable(folDbg);
-    if (zzisPlus) zzisPlus = false;
-  }
-|
-  plus ZZ_VARIABLE '!'
-  {
-    zztermIsVariable(folDbg);
-
-    zzconsumeToken(zztokenList, "!");
-    if (folDbg >= 1) printf("! "); 
-    if (zzisPlus) { zzisPlus = false; zzerr("'+' cannot be used with '!'"); }
-    if (zzfunc) zzerr("'+' cannot be used in a function");
-    if (zzpred)
-    {
-      if (!zzpred->getSense())
-        zzerr("'!' cannot be used on a variable of a negated predicate.");
-      int termIdx = zzpred->getNumTerms()-1;
-      if (zzpred->getTerm(termIdx)->isConstant())
-        zzerr("'!' cannot be used with a constant term.");
-      zzuniqueVarIndexes.append(termIdx);
-    }
-    else
-    { zzexit("zzpred is NULL in 'not' grammar rule"); }
-
-    zzformulaStr.append("!");    
-  }
 ;
 
-plus: 
-  // empty
-| '+'  
-  { 
-    zzconsumeToken(zztokenList, "+");
-    if (folDbg >= 1) printf("+ "); 
-    zzassert(!zzisPlus,"expecting !zzisPlus");
-    zzisPlus = true;
-    zzformulaStr.append("+");
-  }
-;
-
-function_term: // ZZ_FUNCTION '(' terms ')' | term internal_function_sign term
-  ZZ_FUNCTION     // ZZ_FUNCTION '(' terms ')'
+  // ZZ_FUNCTION '(' terms ')' | term internal_function_sign term
+function_term: 
+  ZZ_FUNCTION
   {
     const char* funcName = zztokenList.removeLast();
     if (folDbg >= 1) printf("f_%s ", funcName);
@@ -1970,13 +1979,14 @@ function_term: // ZZ_FUNCTION '(' terms ')' | term internal_function_sign term
 	{
 	  ListObj* funclo = zzpredFuncListObjs.top();
       funclo->replace(FunctionTemplate::EMPTY_FTEMPLATE_NAME, zzinfixFuncName);
-	  const FunctionTemplate* t = zzgetGenericInternalFunctionTemplate(zzinfixFuncName);
+	  const FunctionTemplate* t =
+	    zzgetGenericInternalFunctionTemplate(zzinfixFuncName);
 		// If in a pred. (not LHS of infix pred.), then we know the return type
 	  if (zzpred)
 	  {
 	  	((FunctionTemplate*)t)->setRetTypeId(
 	  		zzpred->getTermTypeAsInt(zzpred->getNumTerms()), zzdomain);
-	  }
+      }
 	  zzfunc->setTemplate((FunctionTemplate*)t);
 
 		// types are possibly unknown
@@ -2039,63 +2049,47 @@ function_term: // ZZ_FUNCTION '(' terms ')' | term internal_function_sign term
     zzconsumeToken(zztokenList, ")");
     if (folDbg >= 1) printf(") ");
   }
-| //term internal_function_sign term
-  {
-    // Make an "empty" function
-    const char* funcName = FunctionTemplate::EMPTY_FTEMPLATE_NAME;
-    if (zzfunc != NULL) { zzfuncStack.push(zzfunc); zzfunc = NULL; }
-    ++zzfdnumFuncs;
-    zzfdfuncName = funcName;
-    //zzcreateFunc(zzfunc, funcName);
-	const FunctionTemplate* t = zzdomain->getEmptyFunctionBinaryTemplate();
-	zzassert(zzfunc == NULL, "expect zzfunc == NULL");
-  	zzfunc = new Function(t);
-
-    ListObj* funclo = new ListObj;
-    funclo->append(funcName);
-    zzpredFuncListObjs.push(funclo);
-  }
-  '('
-  {
-    zzconsumeToken(zztokenList, "(");
-    if (folDbg >= 1) printf("( ");
-  }
+|
   term internal_function_sign
   {
-    //Replace empty function with function sign just parsed
-    //zzcreateInternalFuncTemplate(zzinfixFuncName);
-    //const FunctionTemplate* t = zzdomain->getFunctionTemplate(zzinfixFuncName);
-	//zzfunc->setTemplate((FunctionTemplate*)t);
-    
-    //ListObj* funclo = zzpredFuncListObjs.top();
-    //funclo->replace(FunctionTemplate::EMPTY_FTEMPLATE_NAME, zzinfixFuncName);
-    
-    //delete [] zzinfixFuncName;
-  }
-  term ')'
-  {
-	ListObj* funclo = zzpredFuncListObjs.top();
-    funclo->replace(FunctionTemplate::EMPTY_FTEMPLATE_NAME, zzinfixFuncName);
-    const FunctionTemplate* t = zzgetGenericInternalFunctionTemplate(zzinfixFuncName);
+      // Create a function corresponding to the infix sign
+    if (zzfunc != NULL) { zzfuncStack.push(zzfunc); zzfunc = NULL; }
+    ++zzfdnumFuncs;
+    zzfdfuncName = zzinfixFuncName;
+	const FunctionTemplate* t =
+      zzgetGenericInternalFunctionTemplate(zzinfixFuncName);
+  	zzfunc = new Function(t);
 	  // If in a pred. (not LHS of infix pred.), then we know the return type
+      // It's the type of the previous variable (getNumTerms() - 1)
 	if (zzpred)
-	  ((FunctionTemplate*)t)->setRetTypeId(
-	  	zzpred->getTermTypeAsInt(zzpred->getNumTerms()), zzdomain);
-	zzfunc->setTemplate((FunctionTemplate*)t);
+      ((FunctionTemplate*)t)->setRetTypeId(
+        zzpred->getTermTypeAsInt(zzpred->getNumTerms() - 1), zzdomain);
+
+    ListObj* funclo = new ListObj;
+    funclo->append(zzfdfuncName.c_str());
+    zzpredFuncListObjs.push(funclo);
+
+      // The first term was added to the previous pred / func
+      // So this needs to be switched to the infix function
+    moveTermToInfixFunction();
+  }
+  term
+  {
+    ListObj* funclo = zzpredFuncListObjs.top();
 
 	  // types are possibly unknown
-	bool unknownTypes = false;
+    bool unknownTypes = false;
+	
+      // First element is return type
+    Array<int> typeIds(zzfunc->getNumTerms() + 1);
+    typeIds.append(zzfunc->getRetTypeId());
+    if (typeIds[0] <= 0) unknownTypes = true;
 		
-	  // First element is return type
-	Array<int> typeIds(zzfunc->getNumTerms() + 1);
-	typeIds.append(zzfunc->getRetTypeId());
-	if (typeIds[0] <= 0) unknownTypes = true;
-		
-	  // Then term types
+      // Then term types
 	for (int i = 1; i <= zzfunc->getNumTerms(); i++)
 	{
-	  typeIds.append(zzgetTypeId(zzfunc->getTerm(i-1), (*funclo)[i]->getStr()));
-	  if (typeIds[i] <= 0) unknownTypes = true;
+      typeIds.append(zzgetTypeId(zzfunc->getTerm(i-1), (*funclo)[i]->getStr()));
+      if (typeIds[i] <= 0) unknownTypes = true;
 	}
 
 	  // If all types are known
@@ -2122,32 +2116,28 @@ function_term: // ZZ_FUNCTION '(' terms ')' | term internal_function_sign term
       for (int i = 1; i < typeIds.size(); i++)
         varNames[i] = (*funclo)[i]->getStr();
 		// Predicate name is PredicateTemplate::ZZ_RETURN_PREFIX + function name
-	  char* predName;
-	  predName = (char *)malloc((strlen(PredicateTemplate::ZZ_RETURN_PREFIX) +
+      char* predName;
+      predName = (char *)malloc((strlen(PredicateTemplate::ZZ_RETURN_PREFIX) +
   	       					     strlen(zzfunc->getName()) + 1)*sizeof(char));
-	  strcpy(predName, PredicateTemplate::ZZ_RETURN_PREFIX);
- 	  strcat(predName, zzinfixFuncName);
+      strcpy(predName, PredicateTemplate::ZZ_RETURN_PREFIX);
+      strcat(predName, zzinfixFuncName);
  	
       string unknownIntFuncName =
-       	  zzappendWithUnderscore(predName, zzintFuncTypeCounter++);
+       	zzappendWithUnderscore(predName, zzintFuncTypeCounter++);
       zzintFuncList.push_back(ZZUnknownIntFuncInfo(unknownIntFuncName, varNames));
         //funclo->replace(zzinfixFuncName, unknownIntFuncName.c_str());
-	  free(predName);
-	  free(varName);
+      free(predName);
+      free(varName);
     }
-	free(zzinfixFuncName);
+    free(zzinfixFuncName);
     zzinfixFuncName = NULL;
-
-    zzconsumeToken(zztokenList, ")");
-    if (folDbg >= 1) printf(") ");
   }
-  
 ;
 
 internal_function_sign:
   '+'
   {
-  	zzconsumeToken(zztokenList, "+");
+    zzconsumeToken(zztokenList, "+");
     if (folDbg >= 1) printf("+ "); 
     zzinfixFuncName = (char *)malloc((strlen(PredicateTemplate::PLUS_NAME)
     								  + 1)*sizeof(char));
@@ -2159,8 +2149,8 @@ internal_function_sign:
    	zzconsumeToken(zztokenList, "-");
     if (folDbg >= 1) printf("- "); 
     zzinfixFuncName = (char *)malloc((strlen(PredicateTemplate::MINUS_NAME)
-    								  + 1)*sizeof(char));
-  	strcpy(zzinfixFuncName, PredicateTemplate::MINUS_NAME);
+                                      + 1)*sizeof(char));
+    strcpy(zzinfixFuncName, PredicateTemplate::MINUS_NAME);
   }
 |
   '*'
@@ -2201,6 +2191,7 @@ bool runYYParser(MLN* const & mln, Domain* const & dom,
                  const char* const & fileName, 
                  const bool& allPredsExceptQueriesAreClosedWorld,
                  const StringHashArray* const & openWorldPredNames,
+                 const StringHashArray* const & closedWorldPredNames,
                  const StringHashArray* const & queryPredNames,
                  const bool& addUnitClauses, const bool& warnDuplicates,
                  const double& defaultWt, const bool& mustHaveWtOrFullStop,
@@ -2237,7 +2228,8 @@ bool runYYParser(MLN* const & mln, Domain* const & dom,
   zzisParsing = false;
 
   zzcheckAllTypesHaveConstants(zzdomain);
-
+  zzcreateBlocks(zzdomain);
+  
   // Insert groundings generated from internally implemented functions and predicates
   zzgenerateGroundingsFromInternalPredicatesAndFunctions();
 
@@ -2266,7 +2258,8 @@ bool runYYParser(MLN* const & mln, Domain* const & dom,
 
     Array<bool> isClosedWorldArr; 
     zzfillClosedWorldArray(isClosedWorldArr,allPredsExceptQueriesAreClosedWorld,
-                           openWorldPredNames, queryPredNames);
+                           openWorldPredNames, closedWorldPredNames,
+                           queryPredNames);
 
     Database* db = new Database(zzdomain, isClosedWorldArr, zzstoreGroundPreds);
     if (lazyInference) db->setLazyFlag();

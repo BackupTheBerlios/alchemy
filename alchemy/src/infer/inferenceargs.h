@@ -76,6 +76,8 @@
  * specific (if any), then the variable name.
  */
 
+bool aisQueryEvidence = false;
+
   // Holds the names of the input mln files comma-separated
 char* ainMLNFiles     = NULL;
 
@@ -114,9 +116,9 @@ int  amwsTabuLength   = 10;
 bool amwsLazyLowState = false;
 
   // SampleSat params
-int  assSaRatio = 50;       // percent of SA steps
-int  assSaTemp  = 50;       // temperature/100: SA temperature
-bool assLateSa  = false;    // sa only at a plateur
+int  assSaRatio = 0;       // percent of SA steps
+int  assSaTemp  = 10;       // temperature/100: SA temperature
+bool assLateSa  = true;    // sa only at a plateur
 
   // MCMC params
 int amcmcNumChains    = 10;
@@ -133,13 +135,12 @@ double agibbsFracConverged  = 0.95;
 int    agibbsWalksatType    = 1;
 int    agibbsSamplesPerTest = 100;
 
-  // MC-SAT params
-  // Number of total steps (mcsat & Gibbs) for each MC-SAT step
-int amcsatNumStepsEveryMCSat = 1;
-
   // Simulated Tempering params
 int asimtpSubInterval = 2;
 int asimtpNumST       = 3;
 int asimtpNumSwap     = 10;
+
+  // Produce clause counts
+bool aclauseCounts = false;
 
 #endif /*INFERENCEARGS_H_*/

@@ -270,20 +270,33 @@ class MCMC : public Inference
     for (int c = 0; c < numChains; c++)
     {
         // For each block: select one to set to true
-      for (int i = 0; i < state_->getNumBlocks(); i++)
+      for (int i = 0; i < state_->getDomain()->getNumPredBlocks(); i++)
       {
           // If evidence atom exists, then all others are false
-        if (state_->getBlockEvidence(i))
+        if (state_->getDomain()->getBlockEvidence(i))
         {
             // If 2nd argument is -1, then all are set to false
           setOthersInBlockToFalse(c, -1, i);
           continue;
         }
-        
-        Array<int>& block = state_->getBlockArray(i);
-        int chosen = random() % block.size();
-        truthValues_[block[chosen]][c] = true;
-        setOthersInBlockToFalse(c, chosen, i);
+
+        bool ok = false;
+        while (!ok)
+        {
+          const Predicate* pred = state_->getDomain()->getRandomPredInBlock(i);
+          GroundPredicate* gndPred = new GroundPredicate((Predicate*)pred);
+          int idx = state_->getIndexOfGroundPredicate(gndPred);
+            
+          delete gndPred;
+          delete pred;
+
+          if (idx >= 0)
+          {
+            truthValues_[idx][c] = true;
+            setOthersInBlockToFalse(c, idx, i);
+            ok = true;
+          }
+        }
       }
       
         // Random tv for all not in blocks
@@ -354,11 +367,19 @@ class MCMC : public Inference
   void setOthersInBlockToFalse(const int& chainIdx, const int& atomIdx,
                                const int& blockIdx)
   {
-    Array<int>& block = state_->getBlockArray(blockIdx);
-    for (int i = 0; i < block.size(); i++)
+    int blockSize = state_->getDomain()->getBlockSize(blockIdx);
+    for (int i = 0; i < blockSize; i++)
     {
-      if (i != atomIdx)
-        truthValues_[block[i]][chainIdx] = false;
+      const Predicate* pred = state_->getDomain()->getPredInBlock(i, blockIdx);
+      GroundPredicate* gndPred = new GroundPredicate((Predicate*)pred);
+      int idx = state_->getIndexOfGroundPredicate(gndPred);
+
+      delete gndPred;
+      delete pred;
+
+        // Pred is in the state
+      if (idx >= 0 && idx != atomIdx)
+        truthValues_[idx][chainIdx] = false;
     }
   }
 
@@ -379,63 +400,85 @@ class MCMC : public Inference
     if (mcmcdebug) cout << "Gibbs step" << endl;
 
       // For each block: select one to set to true
-    for (int i = 0; i < state_->getNumBlocks(); i++)
+    for (int i = 0; i < state_->getDomain()->getNumPredBlocks(); i++)
     {
         // If evidence atom exists, then all others stay false
-      if (state_->getBlockEvidence(i)) continue;
- 
-      Array<int>& block = state_->getBlockArray(i);
-        // chosen is index in the block, block[chosen] is index in gndPreds_
-      int chosen = gibbsSampleFromBlock(chainIdx, block, 1);
+      if (state_->getDomain()->getBlockEvidence(i)) continue;
+
+      int chosen = gibbsSampleFromBlock(chainIdx, i, 1);
         // Truth values are stored differently for multi-chain
       bool truthValue;
-      GroundPredicate* gndPred = state_->getGndPred(block[chosen]);
-      if (numChains_ > 1) truthValue = truthValues_[block[chosen]][chainIdx];
-      else truthValue = gndPred->getTruthValue();
-        // If chosen pred was false, then need to set previous true
-        // one to false and update wts
-      if (!truthValue)
+      const Predicate* pred = state_->getDomain()->getPredInBlock(chosen, i);
+      GroundPredicate* gndPred = new GroundPredicate((Predicate*)pred);
+      int idx = state_->getIndexOfGroundPredicate(gndPred);
+
+      delete gndPred;
+      delete pred;
+      
+        // If gnd pred in state:
+      if (idx >= 0)
       {
-        for (int j = 0; j < block.size(); j++)
+        gndPred = state_->getGndPred(idx);
+        if (numChains_ > 1) truthValue = truthValues_[idx][chainIdx];
+        else truthValue = gndPred->getTruthValue();
+          // If chosen pred was false, then need to set previous true
+          // one to false and update wts
+        if (!truthValue)
         {
-            // Truth values are stored differently for multi-chain
-          bool otherTruthValue;
-          GroundPredicate* otherGndPred = state_->getGndPred(block[j]);
-          if (numChains_ > 1)
-            otherTruthValue = truthValues_[block[j]][chainIdx];
-          else
-            otherTruthValue = otherGndPred->getTruthValue();
-          if (otherTruthValue)
+          int blockSize = state_->getDomain()->getBlockSize(i);
+          for (int j = 0; j < blockSize; j++)
           {
               // Truth values are stored differently for multi-chain
-            if (numChains_ > 1)
-              truthValues_[block[j]][chainIdx] = false;
-            else
-              otherGndPred->setTruthValue(false);
-              
-            affectedGndPreds.clear();
-            affectedGndPredIndices.clear();
-            gndPredFlippedUpdates(block[j], chainIdx, affectedGndPreds,
-                                  affectedGndPredIndices);
-            updateWtsForGndPreds(affectedGndPreds, affectedGndPredIndices,
-                                 chainIdx);
-          }
-        }
-          // Set truth value and update wts for chosen atom
-          // Truth values are stored differently for multi-chain
-        if (numChains_ > 1) truthValues_[block[chosen]][chainIdx] = true;
-        else gndPred->setTruthValue(true);
-        affectedGndPreds.clear();
-        affectedGndPredIndices.clear();
-        gndPredFlippedUpdates(block[chosen], chainIdx, affectedGndPreds,
-                              affectedGndPredIndices);
-        updateWtsForGndPreds(affectedGndPreds, affectedGndPredIndices,
-                             chainIdx);
-      }
+            bool otherTruthValue;
+            const Predicate* otherPred = 
+              state_->getDomain()->getPredInBlock(j, i);
+            GroundPredicate* otherGndPred =
+              new GroundPredicate((Predicate*)otherPred);
+            int otherIdx = state_->getIndexOfGroundPredicate(gndPred);
 
-        // If in actual gibbs sampling phase, track the num of times
-        // the ground predicate is set to true
-      if (!burningIn) numTrue_[block[chosen]]++;
+            delete otherGndPred;
+            delete otherPred;
+      
+              // If gnd pred in state:
+            if (otherIdx >= 0)
+            {
+              otherGndPred = state_->getGndPred(otherIdx);
+              if (numChains_ > 1)
+                otherTruthValue = truthValues_[otherIdx][chainIdx];
+              else
+                otherTruthValue = otherGndPred->getTruthValue();
+              if (otherTruthValue)
+              {
+                  // Truth values are stored differently for multi-chain
+                if (numChains_ > 1)
+                  truthValues_[otherIdx][chainIdx] = false;
+                else
+                  otherGndPred->setTruthValue(false);
+              
+                affectedGndPreds.clear();
+                affectedGndPredIndices.clear();
+                gndPredFlippedUpdates(otherIdx, chainIdx, affectedGndPreds,
+                                      affectedGndPredIndices);
+                updateWtsForGndPreds(affectedGndPreds, affectedGndPredIndices,
+                                     chainIdx);
+              }
+            }
+          }
+            // Set truth value and update wts for chosen atom
+            // Truth values are stored differently for multi-chain
+          if (numChains_ > 1) truthValues_[idx][chainIdx] = true;
+          else gndPred->setTruthValue(true);
+          affectedGndPreds.clear();
+          affectedGndPredIndices.clear();
+          gndPredFlippedUpdates(idx, chainIdx, affectedGndPreds,
+                                affectedGndPredIndices);
+          updateWtsForGndPreds(affectedGndPreds, affectedGndPredIndices,
+                               chainIdx);
+        }
+          // If in actual gibbs sampling phase, track the num of times
+          // the ground predicate is set to true
+        if (!burningIn) numTrue_[idx]++;
+      }
     }
 
       // Now go through all preds not in blocks
@@ -636,21 +679,36 @@ class MCMC : public Inference
    * 
    * @return Index of chosen atom in the block.
    */
-  int gibbsSampleFromBlock(const int& chainIdx, const Array<int>& block,
+  int gibbsSampleFromBlock(const int& chainIdx, const int& blockIndex,
                            const double& invTemp)
   {
     Array<double> numerators;
     double denominator = 0;
-    
-    for (int i = 0; i < block.size(); i++)
+
+    int blockSize = state_->getDomain()->getBlockSize(blockIndex);
+    for (int i = 0; i < blockSize; i++)
     {
-      double prob = getProbabilityOfPred(block[i], chainIdx, invTemp);
+      const Predicate* pred =
+        state_->getDomain()->getPredInBlock(i, blockIndex);
+      GroundPredicate* gndPred = new GroundPredicate((Predicate*)pred);
+      int idx = state_->getIndexOfGroundPredicate(gndPred);
+      
+      delete gndPred;
+      delete pred;
+
+        // Prob is 0 if atom not in state
+      double prob = 0.0;
+        // Pred is in the state; otherwise, prob is zero
+      if (idx >= 0)
+        prob = getProbabilityOfPred(idx, chainIdx, invTemp);
+
       numerators.append(prob);
       denominator += prob;
     }
+
     double r = random();
     double numSum = 0.0;
-    for (int i = 0; i < block.size(); i++)
+    for (int i = 0; i < blockSize; i++)
     {
       numSum += numerators[i];
       if (r < ((numSum / denominator) * RAND_MAX))
@@ -658,7 +716,7 @@ class MCMC : public Inference
         return i;
       }
     }
-    return block.size() - 1;
+    return blockSize - 1;
   }
 
   /**

@@ -1,3 +1,37 @@
+Aug 29, 2007
+-----------
+* Bug in flipping atoms in blocks fixed
+* Various user parameters in learnwts renamed
+* Fixed random number used for seed, if not specified
+* Bug in handling zero-weighted clauses in variablestate fixed
+* Unit clauses normalized to be all positive during inference
+* Bug in handling of external constants across multiple DBs fixed
+* Bug in weight learning on blocks fixed
+* Stopping criterion for second-order discriminative learning added
+
+Aug 3, 2007
+-----------
+* Inverted index implemented on neg. weighted clauses
+* Conjugate Gradient, Newton's method, and per-weight learning rates
+implemented
+
+July 22, 2007
+-------------
+* Mutually exclusive and exhaustive variables now declared in the
+predicate declaration, not in unit clauses
+* Functions with infix operator no longer restricted to parentheses
+* != syntax allowed to express "not equal"
+* Memory leak in structure learning fixed
+* Bug in counting number of true groundings fixed
+
+June 20, 2007
+-------------
+* Tutorial included
+* Bug fixes and optimization of lazy MC-SAT
+* Improvement of inverted index (also used for eager grounding)
+* Memory-efficient blocking scheme implemented
+* Bug fix in MaxWalkSat
+
 Jan 16, 2007
 -------------
 
@@ -10,7 +44,9 @@ algorithms
 * Auto-generated API included
 * MWS can reconstruct low state at the end of inference instead of 
 saving it each time
-* Various bug fixes
+* Memory-efficient version of GroundClause and GroundPredicate
+* Memory leaks in VotedPerceptron fixed
+* Command line arguments for infer and learnwts unified
 
 July 7, 2006
 -------------

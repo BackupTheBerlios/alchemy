@@ -97,7 +97,6 @@ ZZ_PLUS [+]
 ZZ_MINUS [-]
 ZZ_MINUS_OR_PLUS [+-]
 ZZ_QS [?]
-ZZ_EQEQ  [=][=]
 ZZ_EQ  [=]
 ZZ_DOTDOTDOT [.][.][.]
 
@@ -384,15 +383,6 @@ ZZ_ID [a-zA-z_\-][a-zA-Z0-9_\-'']*
   zznumCharRead += strlen(yytext);
   zztokenList.add("=");
   return '=';
-}
-
-
-{ZZ_EQEQ} {
-  if (follexDbg) printf("EQUALEQUAL: %s\n", yytext);
-  zzcolumn += strlen(yytext);
-  zznumCharRead += strlen(yytext);
-  zztokenList.add("==");
-  return ZZ_EQEQ;
 }
 
 

@@ -94,5 +94,13 @@ class Hash
 
 };
 
+struct IntPairHash :
+public unary_function< pair<unsigned int, unsigned int>, size_t >
+{
+  size_t operator()(const pair<unsigned int, unsigned int> p) const
+  {
+    return p.first * 31 + p.second;
+  }
+};
 
 #endif

@@ -43,8 +43,8 @@ LIBLINC= -L. -L$(UTIL) -L$(LOGIC) -L$(PARSER) -L$(LEARNWTS) -L$(LEARNSTRUCT) \
 	-L$(INFER)
 LIBLINK= -ldl
 
-CFLAGS=$(CLFLAGS) -Wall $(BIGNUM) $(LIBCINC)
-LFLAGS=$(CLFLAGS) -Wall $(BIGNUM) $(LIBLINC)
+CFLAGS=$(CLFLAGS) -Wall $(LIBCINC)
+LFLAGS=$(CLFLAGS) -Wall $(LIBLINC)
 
 
 #############################################################################
@@ -63,9 +63,8 @@ CPPFILES=$(UTIL)/arguments.cpp $(UTIL)/powerset.cpp \
 	$(LOGIC)/predicatetemplate.cpp $(LOGIC)/functiontemplate.cpp \
 	$(LOGIC)/function.cpp $(LOGIC)/predicate.cpp $(LOGIC)/term.cpp \
 	$(LOGIC)/domain.cpp  $(LOGIC)/clause.cpp $(LOGIC)/clausesampler.cpp\
-	$(INFER)/groundclause.cpp $(LEARNWTS)/learnwts.cpp \
-	$(INFER)/infer.cpp $(LEARNSTRUCT)/learnstruct.cpp
-
+	$(INFER)/groundclause.cpp \
+	$(LEARNWTS)/learnwts.cpp $(INFER)/infer.cpp $(LEARNSTRUCT)/learnstruct.cpp 
 
 ##############################################################################
 #EXECUTABLES: add executables rules here
@@ -171,4 +170,6 @@ depend:
 	) > $(MF).new
 	@mv $(MF) $(MF).last
 	@mv $(MF).new $(MF)
+
+############ Everything below here is subject to SUDDEN DEATH #####
 

@@ -105,7 +105,9 @@ class PredicateTemplate
   PredicateTemplate() : id_(-1), name_(NULL), termTypesAsInt_(new Array<int>), 
                         termTypesAsStr_(new Array<const char*>),
                         termsUnique_(new Array<bool>), numGnd_(-1.0), 
-                        equalPred_(NONE), intPred_(NONE) {}
+                        uniqueVarIndexes_(new Array<int>),
+                        equalPred_(NONE), intPred_(NONE)
+  {}
   
   virtual ~PredicateTemplate() 
   { 
@@ -115,6 +117,7 @@ class PredicateTemplate
     delete termTypesAsInt_; 
     delete termTypesAsStr_; 
     delete termsUnique_;
+    delete uniqueVarIndexes_;
   }
 
 
@@ -309,13 +312,29 @@ class PredicateTemplate
   const bool termIsUnique(const int& idx) const 
   { return (*termsUnique_)[idx]; }
 
+    // Caller should not delete the returned Array<bool>* nor modify its
+    // contents.
+  const Array<int>* getUniqueVarIndexes() const { return uniqueVarIndexes_; }
+
+  /**
+   * Marks a term as a unique variable index (a blocked variable).
+   * 
+   * @param idx Index of the term to be marked as a unique variable index.
+   */
+  void addUniqueVarIndex(const int& idx) const 
+  {
+    assert(idx < getNumTerms());
+    uniqueVarIndexes_->append(idx);
+  }
 
   virtual ostream& print(ostream& out) const
   {
     out << name_ << "(";
     for (int i = 0; i < termTypesAsStr_->size(); i++)
     {
-      out << (*termTypesAsStr_)[i]; 
+      out << (*termTypesAsStr_)[i];
+      if (uniqueVarIndexes_->contains(i))
+        out << "!";
       out << ((i!=termTypesAsStr_->size()-1)?",":")");
     }
     return out;
@@ -328,6 +347,8 @@ class PredicateTemplate
     for (int i = 0; i < termTypesAsStr_->size(); i++)
     {
       out << "a" << i+1; 
+      if (uniqueVarIndexes_->contains(i))
+        out << "!";
       out << ((i!=termTypesAsStr_->size()-1)?",":")");
     }
     return out;
@@ -341,6 +362,8 @@ class PredicateTemplate
   Array<const char*>* termTypesAsStr_;
   Array<bool>* termsUnique_;
   double numGnd_;
+    // Indices of blocked variables
+  Array<int>* uniqueVarIndexes_;
   
  private:
   int equalPred_;

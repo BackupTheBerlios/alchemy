@@ -112,7 +112,28 @@ Domain::~Domain()
     delete constantsByType_;
   }
 
-  if (predBlocks_) delete predBlocks_;
+  if (externalConstantsByType_)
+  {
+    for (int i = 0; i < externalConstantsByType_->size(); i++)
+      delete (*externalConstantsByType_)[i];
+    delete externalConstantsByType_;
+  }
+
+  if (predBlocks_)
+  {
+    for (int i = 0; i < predBlocks_->size(); i++)
+      delete (*predBlocks_)[i];
+    delete predBlocks_;
+  }
+
+  if (truePredsInBlock_)
+  {
+    for (int i = 0; i < truePredsInBlock_->size(); i++)
+      delete (*truePredsInBlock_)[i];
+    delete truePredsInBlock_;
+  }
+
+  if (blockSizes_) delete blockSizes_;
 
   if (blockEvidence_) delete blockEvidence_;
 
@@ -131,6 +152,10 @@ Domain::~Domain()
     }
     delete funcSet_;
   }
+
+  //if (externalConstant_) delete externalConstant_;
+  
+  if (numNonEvidAtomsPerPred_) delete numNonEvidAtomsPerPred_;
 }
 
 
@@ -150,38 +175,55 @@ void Domain::compress()
   constantsByType_->compress();
   for (int i = 0; i < constantsByType_->size(); i++)
     (*constantsByType_)[i]->compress();
+  externalConstantsByType_->compress();
+  for (int i = 0; i < externalConstantsByType_->size(); i++)
+    (*externalConstantsByType_)[i]->compress();
   db_->compress();
 }
 
-
-void Domain::changePredTermsToNewIds(Predicate* const & p,
-                                      hash_map<int,int>& oldToNewConstIds)
+/**
+ * The constants of this domain are replaced by new constants. The new set of
+ * constants must be a superset of the original one. New constants are marked
+ * as external.
+ */
+void Domain::updatePerOldToNewIds(MLN* const & mln,
+                                  hash_map<int,int> & oldToNewConstIds)
 {
-  for (int j = 0; j < p->getNumTerms(); j++)
+    //ensure that the constants in MLN clauses have the new ids 
+  const ClauseHashArray* clauses = mln->getClauses();
+  for (int i = 0; i < clauses->size(); i++)
   {
-    Term* t = (Term*) p->getTerm(j);
-    if (t->getType() == Term::CONSTANT)
-    {
-      int oldId = t->getId();
-      assert(oldToNewConstIds.find(oldId) != oldToNewConstIds.end());
-      t->setId(oldToNewConstIds[oldId]);
-    }
+    Clause* c = (*clauses)[i];
+    for (int i = 0; i < c->getNumPredicates(); i++)
+      changePredTermsToNewIds(c->getPredicate(i), oldToNewConstIds);
   }
-} 
 
+    // Change the const ids in the pred blocks
+  for (int i = 0; i < predBlocks_->size(); i++)
+  {
+    changePredTermsToNewIds((*predBlocks_)[i], oldToNewConstIds);
+  }
+  for (int i = 0; i < truePredsInBlock_->size(); i++)
+  {
+    changePredTermsToNewIds((*truePredsInBlock_)[i], oldToNewConstIds);
+  }
 
-  // Change the constant ids so that constants of the same type are ordered 
-  // consecutively. Ensure that the constants in the mln and map is consistent
-  // with the new constant ids.
+    // Change the const ids in the database
+  if (db_)
+  {
+    db_->changeConstantsToNewIds(oldToNewConstIds);
+  }
+}
+
+// for parser
 void Domain::reorderConstants(MLN* const & mln,
-                              hash_map<int, PredicateHashArray*>& predIdToPredsMap)
-{  
-  //order the constants so that those of the same type are ordered consecutively
-
+                           hash_map<int, PredicateHashArray*>& predIdToPredsMap)
+{
   hash_map<int,int> oldToNewConstIds;
 
   ConstDualMap* newConstDualMap = new ConstDualMap;
   Array<Array<int>*>* newConstantsByType = new Array<Array<int>*>;
+  Array<Array<int>*>* newExternalConstantsByType = new Array<Array<int>*>;
 
   int prevNewConstId = -1;
   bool constChanged = false;
@@ -194,9 +236,25 @@ void Domain::reorderConstants(MLN* const & mln,
       int constId = (*constIds)[j];
       const char* constName = getConstantName(constId);
       int newConstId = newConstDualMap->insert(constName, i);
-      assert(prevNewConstId+1==newConstId);
+      assert(prevNewConstId + 1 == newConstId);
       prevNewConstId = newConstId;
       (*newConstantsByType)[i]->append(newConstId);
+      oldToNewConstIds[constId] = newConstId;
+      if (constId != newConstId) constChanged = true;
+    }
+  }
+  for (int i = 0; i < externalConstantsByType_->size(); i++)
+  {
+    newExternalConstantsByType->append(new Array<int>);
+    Array<int>* constIds = (*externalConstantsByType_)[i];
+    for (int j = 0; j < constIds->size(); j++)
+    {
+      int constId = (*constIds)[j];
+      const char* constName = getConstantName(constId);
+      int newConstId = newConstDualMap->insert(constName, i);
+      assert(prevNewConstId + 1 == newConstId);
+      prevNewConstId = newConstId;
+      (*newExternalConstantsByType)[i]->append(newConstId);
       oldToNewConstIds[constId] = newConstId;
       if (constId != newConstId) constChanged = true;
     }
@@ -208,6 +266,9 @@ void Domain::reorderConstants(MLN* const & mln,
     for (int i = 0; i < newConstantsByType->size(); i++)
       delete (*newConstantsByType)[i];
     delete newConstantsByType;
+    for (int i = 0; i < newExternalConstantsByType->size(); i++)
+      delete (*newExternalConstantsByType)[i];
+    delete newExternalConstantsByType;
     return;
   }
 
@@ -215,25 +276,26 @@ void Domain::reorderConstants(MLN* const & mln,
   for (int i = 0; i < constantsByType_->size(); i++)
     delete (*constantsByType_)[i];
   delete constantsByType_;
+  for (int i = 0; i < externalConstantsByType_->size(); i++)
+    delete (*externalConstantsByType_)[i];
+  delete externalConstantsByType_;
 
   constDualMap_ = newConstDualMap;
   constantsByType_ = newConstantsByType;
+  externalConstantsByType_ = newExternalConstantsByType;
 
   constantsByType_->compress();
   for (int i = 0; i < constantsByType_->size(); i++)
     (*constantsByType_)[i]->compress();
+  externalConstantsByType_->compress();
+  for (int i = 0; i < externalConstantsByType_->size(); i++)
+    (*externalConstantsByType_)[i]->compress();
   constDualMap_->compress();
 
-  //ensure that the constants in MLN clauses have the new ids 
+    // update
+  updatePerOldToNewIds(mln, oldToNewConstIds);
 
-  const ClauseHashArray* clauses = mln->getClauses();
-  for (int i = 0; i < clauses->size(); i++)
-  {
-    Clause* c = (*clauses)[i];
-    for (int i = 0; i < c->getNumPredicates(); i++)
-      changePredTermsToNewIds(c->getPredicate(i), oldToNewConstIds);
-  }
-
+	// predIdToPredMap
   hash_map<int, PredicateHashArray*>::iterator mit = predIdToPredsMap.begin();
   for (; mit != predIdToPredsMap.end(); mit++)
   {
@@ -242,18 +304,184 @@ void Domain::reorderConstants(MLN* const & mln,
       changePredTermsToNewIds((*pha)[i], oldToNewConstIds);
   }
 
-    // Change the const ids in the pred blocks
-  for (int i = 0; i < predBlocks_->size(); i++)
-  {
-    Array<Predicate*>* predBlock = (*predBlocks_)[i];
-    for (int j = 0; j < predBlock->size(); j++)
-      changePredTermsToNewIds((*predBlock)[j], oldToNewConstIds);
-  }
-  
     //clauses and hence their hash values have changed, and they need to be 
     //inserted into the MLN
   mln->rehashClauses();
 }
+
+  // for domain0 - postprocess
+void Domain::reorderConstants(MLN* const & mln)
+{
+  hash_map<int,int> oldToNewConstIds;
+
+  ConstDualMap* newConstDualMap = new ConstDualMap;
+  Array<Array<int>*>* newConstantsByType = new Array<Array<int>*>;
+  Array<Array<int>*>* newExternalConstantsByType = new Array<Array<int>*>;
+
+  int prevNewConstId = -1;
+  bool constChanged = false;
+  for (int i = 0; i < constantsByType_->size(); i++)
+  {
+    newConstantsByType->append(new Array<int>);
+    Array<int>* constIds = (*constantsByType_)[i];
+    for (int j = 0; j < constIds->size(); j++)
+    {
+      int constId = (*constIds)[j];
+      const char* constName = getConstantName(constId);
+      int newConstId = newConstDualMap->insert(constName, i);
+      assert(prevNewConstId + 1 == newConstId);
+      prevNewConstId = newConstId;
+      (*newConstantsByType)[i]->append(newConstId);
+      oldToNewConstIds[constId] = newConstId;
+      if (constId != newConstId) constChanged = true;
+    }
+  }
+  for (int i = 0; i < externalConstantsByType_->size(); i++)
+  {
+    newExternalConstantsByType->append(new Array<int>);
+    Array<int>* constIds = (*externalConstantsByType_)[i];
+    for (int j = 0; j < constIds->size(); j++)
+    {
+      int constId = (*constIds)[j];
+      const char* constName = getConstantName(constId);
+      int newConstId = newConstDualMap->insert(constName, i);
+      assert(prevNewConstId + 1 == newConstId);
+      prevNewConstId = newConstId;
+      (*newExternalConstantsByType)[i]->append(newConstId);
+      oldToNewConstIds[constId] = newConstId;
+      if (constId != newConstId) constChanged = true;
+    }
+  }
+
+  if (!constChanged)
+  {
+    delete newConstDualMap;
+    for (int i = 0; i < newConstantsByType->size(); i++)
+      delete (*newConstantsByType)[i];
+    delete newConstantsByType;
+    for (int i = 0; i < newExternalConstantsByType->size(); i++)
+      delete (*newExternalConstantsByType)[i];
+    delete newExternalConstantsByType;
+    return;
+  }
+
+  delete constDualMap_;
+  for (int i = 0; i < constantsByType_->size(); i++)
+    delete (*constantsByType_)[i];
+  delete constantsByType_;
+  for (int i = 0; i < externalConstantsByType_->size(); i++)
+    delete (*externalConstantsByType_)[i];
+  delete externalConstantsByType_;
+
+  constDualMap_ = newConstDualMap;
+  constantsByType_ = newConstantsByType;
+  externalConstantsByType_ = newExternalConstantsByType;
+
+  constantsByType_->compress();
+  for (int i = 0; i < constantsByType_->size(); i++)
+    (*constantsByType_)[i]->compress();
+  externalConstantsByType_->compress();
+  for (int i = 0; i < externalConstantsByType_->size(); i++)
+    (*externalConstantsByType_)[i]->compress();
+  constDualMap_->compress();
+
+    // update
+  updatePerOldToNewIds(mln,oldToNewConstIds);
+
+    //clauses and hence their hash values have changed, and they need to be 
+    //inserted into the MLN
+  mln->rehashClauses();
+}
+
+  // for domain1-N - postprocess
+  // Assumption is: map is a superset of this domain's ConstDualMap
+void Domain::reorderConstants(ConstDualMap* const & map,
+                              Array<Array<int>*>* const & cbt,
+                              MLN* const & mln)
+{
+    // Generate oldtoNew
+  hash_map<int,int> oldToNewConstIds;
+
+    // Mark constants not currently in domain as external
+  for (int i = 0; i < externalConstantsByType_->size(); i++)
+    delete (*externalConstantsByType_)[i];
+  delete externalConstantsByType_;
+  externalConstantsByType_ = new Array<Array<int>*>;
+  for (int i = 0; i < cbt->size(); i++)
+    externalConstantsByType_->append(new Array<int>);
+
+  int numConstants = map->getNumInt();
+  for (int i = 0; i < numConstants; i++)
+  {
+    const char* name = map->getStr(i);
+    if (isConstant(name)) 
+    {
+        // Constant is present: note the new id to replace later
+      oldToNewConstIds[constDualMap_->getInt(name)] = i;
+    }
+    else
+    {
+        // Add as external constant
+      for (int i = 0; i < cbt->size(); i++)
+      {
+        bool breakOuter = false;
+        for (int j = 0; j < (*cbt)[i]->size(); j++)
+        {
+          if (map->getInt(name) == (*(*cbt)[i])[j])
+          {
+              // Add as external constant
+            (*externalConstantsByType_)[i]->append((*(*cbt)[i])[j]);
+            breakOuter = true;
+            break;
+          }
+        }
+        if (breakOuter) break;
+      }
+    }
+  }
+  
+    // Replace old ids with new ids in constantsByType_
+  for (int i = 0; i < constantsByType_->size(); i++)
+  {
+    for (int j = 0; j < (*constantsByType_)[i]->size(); j++)
+    {
+      int oldId = (*(*constantsByType_)[i])[j];
+      assert(oldToNewConstIds.find(oldId) != oldToNewConstIds.end());
+      (*(*constantsByType_)[i])[j] = oldToNewConstIds[oldId];
+    }
+  }
+
+    // swap map/type
+  delete constDualMap_;  
+  constDualMap_ = map;
+
+    // update
+  updatePerOldToNewIds(mln, oldToNewConstIds);
+
+    //clauses and hence their hash values have changed, and they need to be 
+    //inserted into the MLN
+  mln->rehashClauses();
+}
+
+
+void Domain::changePredTermsToNewIds(Predicate* const & p,
+                                     hash_map<int,int>& oldToNewConstIds)
+{
+    // p could be NULL
+  if (p)
+  {
+    for (int j = 0; j < p->getNumTerms(); j++)
+    {
+      Term* t = (Term*) p->getTerm(j);
+      if (t->getType() == Term::CONSTANT)
+      {
+        int oldId = t->getId();
+        assert(oldToNewConstIds.find(oldId) != oldToNewConstIds.end());
+        t->setId(oldToNewConstIds[oldId]);
+      } 
+    }
+  }
+} 
 
 
   //Caller is responsible for deleting returned pointer
@@ -299,7 +527,7 @@ int Domain::getNumNonEvidenceAtoms() const
   int numAtoms = 0;
   for (int i = 0; i < getNumPredicates(); i++)
   {
-    numAtoms += (db_->getNumGroundings(i) - db_->getNumEvidenceGndPreds(i));
+    numAtoms += (*numNonEvidAtomsPerPred_)[i];
   }
   return numAtoms;
 }
@@ -307,14 +535,14 @@ int Domain::getNumNonEvidenceAtoms() const
 /*
  * Caller is responsible for deleting returned Predicate* if necessary
  */
-Predicate* Domain::getNonEvidenceAtom(int index) const
+Predicate* Domain::getNonEvidenceAtom(const int& index) const
 {
   int predId = -1;
   int numAtomsPerPred;
   int numAtoms = 0;
   for (int i = 0; i < getNumPredicates(); i++)
   {
-    numAtomsPerPred = (db_->getNumGroundings(i) - db_->getNumEvidenceGndPreds(i));
+    numAtomsPerPred = (*numNonEvidAtomsPerPred_)[i];
     if (numAtoms + numAtomsPerPred >= index + 1)
     {
       predId = i;
@@ -323,42 +551,68 @@ Predicate* Domain::getNonEvidenceAtom(int index) const
     numAtoms += numAtomsPerPred;
   }
   assert(predId >= 0);
-  index = index - numAtoms;
-  
-  Array<Predicate*> preds;
-  Predicate* gndPred = NULL;
-  Predicate::createAllGroundings(predId, this, preds);
-  int nePreds = 0;
-  for (int i = 0; i < preds.size(); i++)
+
+    // Get the newIndex-th grounding of f.o. pred with id predId   
+  Predicate* pred = createPredicate(predId, false);
+  for (int i = 0; i < pred->getNumTerms(); i++)
   {
-    if (!db_->getEvidenceStatus(preds[i]) && index == nePreds++)
-      gndPred = preds[i];
-    else
-      delete preds[i];
+    int termType = pred->getTermTypeAsInt(i);
+    const Array<int>* constantsByType = getConstantsByType(termType);
+    int constIdx = random() % constantsByType->size();
+    pred->setTermToConstant(i, (*constantsByType)[constIdx]);
+    //delete constantsByType;
   }
-  assert(gndPred);
-  return gndPred;
+  assert(pred->isGrounded());
+  return pred;
 }
 
-int Domain::addPredBlock(Array<Predicate*>* const & predBlock) const
+int Domain::addPredBlock(Predicate* const & predBlock) const
 {
   int idx = predBlocks_->append(predBlock);
+    // Record number of groundings
+  Array<Predicate*> predArr;
+  predBlock->createAllGroundings(this, predArr);
+  blockSizes_->append(predArr.size());
+  predArr.deleteItemsAndClear();
+
+    // If nothing known, then no pred is set to true and no evidence in block
+  Predicate* gndPred = NULL;
+  truePredsInBlock_->append(gndPred);
   blockEvidence_->append(false);
   return idx;
 }
 
-  // returns the index of the block which the ground predicate
-  // with index predIndex is in. If not in any, returns -1
-int Domain::getBlock(Predicate* pred) const
+/**
+ * Returns the index of the block which a ground predicate
+ * is in. If not in any, returns -1.
+ * 
+ * @param pred Predicate whose block is being searched for.
+ * @return Index of the block found, or -1 if none.
+ */
+int Domain::getBlock(const Predicate* const & pred) const
+{
+  assert(((Predicate*)pred)->isGrounded());
+  for (int i = 0; i < predBlocks_->size(); i++)
+  {
+    if ((*predBlocks_)[i]->canBeGroundedAs((Predicate*)pred))
+      return i;
+  }
+  return -1;
+}
+
+/**
+ * Returns the index of the block which a ground predicate
+ * is in. If not in any, returns -1.
+ * 
+ * @param pred Predicate whose block is being searched for.
+ * @return Index of the block found, or -1 if none.
+ */
+int Domain::getBlock(const GroundPredicate* const & pred) const
 {
   for (int i = 0; i < predBlocks_->size(); i++)
   {
-    Array<Predicate*>* block = (*predBlocks_)[i];
-    for (int j = 0; j < block->size(); j++)
-    {
-      if (pred->same((*block)[j]))
-        return i;
-    }
+    if ((*predBlocks_)[i]->canBeGroundedAs(pred))
+      return i;
   }
   return -1;
 }
@@ -368,12 +622,12 @@ int Domain::getNumPredBlocks() const
   return predBlocks_->size();
 }
 
-const Array<Array<Predicate*>*>* Domain::getPredBlocks() const
+const Array<Predicate*>* Domain::getPredBlocks() const
 {
   return predBlocks_;
 }
 
-const Array<Predicate*>* Domain::getPredBlock(const int index) const
+const Predicate* Domain::getPredBlock(const int& index) const
 {
   return (*predBlocks_)[index];
 }
@@ -383,23 +637,28 @@ const Array<bool>* Domain::getBlockEvidenceArray() const
   return blockEvidence_;
 }
 
-const bool Domain::getBlockEvidence(const int index) const
+const bool Domain::getBlockEvidence(const int& index) const
 {
   return (*blockEvidence_)[index];
 }
 
-void Domain::setBlockEvidence(const int index, const bool value) const
+void Domain::setBlockEvidence(const int& index, const bool& value) const
 {
   (*blockEvidence_)[index] = value;
 }
 
-int Domain::getEvidenceIdxInBlock(const int index) const
+/**
+ * Computes the number of non-evidence atoms for each first-order predicate.
+ */
+void Domain::computeNumNonEvidAtoms()
 {
-  Array<Predicate*>* block = (*predBlocks_)[index];
-  for (int i = 0; i < block->size(); i++)
+  if (numNonEvidAtomsPerPred_) delete numNonEvidAtomsPerPred_;
+  numNonEvidAtomsPerPred_ = new Array<int>(getNumPredicates());
+  numNonEvidAtomsPerPred_->growToSize(getNumPredicates());
+  for (int i = 0; i < getNumPredicates(); i++)
   {
-    if (db_->getEvidenceStatus((*block)[i]))
-      return i;
+    (*numNonEvidAtomsPerPred_)[i] =
+      (db_->getNumGroundings(i) - db_->getNumEvidenceGndPreds(i));
   }
-  return -1;
 }
+

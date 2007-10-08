@@ -242,15 +242,6 @@ class HashArray
     // caller should not delete the returned pointer nor modify the object
   const Type* getItems() const { return items_; }
 
-
-  //comment out: randomOneOf no longer a static function
-  //Type& randomItem() const 
-  //{
-  //  assert(numItems_>0); 
-  //  return items_[Random::randomOneOf(numItems_)];
-  //}
-  
-
   /**
    * Finds an item in this HashArray.
    * 

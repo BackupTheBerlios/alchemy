@@ -135,9 +135,6 @@ class MRF
     GroundClauseSet gndClausesSet;
     gndPreds_ = new GroundPredicateHashArray;
     gndClauses_ = new Array<GroundClause*>;
-    blocks_ = new Array<Array<int> >;
-    blocks_->growToSize(domain->getNumPredBlocks());
-    blockEvidence_ = new Array<bool>(*(domain->getBlockEvidenceArray()));
     long double memNeeded = 0;
 	
       //add GroundPredicates in queries to unseenPreds
@@ -163,12 +160,6 @@ class MRF
         for (int i = 0; i < gndPreds_->size(); i++)
           if ((*gndPreds_)[i]) delete (*gndPreds_)[i];
         delete gndPreds_;
-    
-        for (int i = 0; i < blocks_->size(); i++)
-          (*blocks_)[i].clearAndCompress();
-        delete blocks_;
-    
-        delete blockEvidence_;
                     
         throw 1;
       }
@@ -230,6 +221,8 @@ class MRF
         }
         catch (bad_alloc&)
         {
+          cout << "Bad alloc when adding unknown ground clauses to MRF!\n";
+          cerr << "Bad alloc when adding unknown ground clauses to MRF!\n";
           throw 1;
         }
 
@@ -251,11 +244,6 @@ class MRF
               if ((*gndPreds_)[i]) delete (*gndPreds_)[i];
             delete gndPreds_;
     
-            for (int i = 0; i < blocks_->size(); i++)
-              (*blocks_)[i].clearAndCompress();
-            delete blocks_;
-    
-            delete blockEvidence_;
             throw 1;
           }
         }
@@ -292,41 +280,10 @@ class MRF
         cout << endl;
       }
     }
-      // Compress preds and find blocks of preds
+      // Compress preds
     for (int i = 0; i < gndPreds_->size(); i++)
-    {
       (*gndPreds_)[i]->compress();
 
-      const Array<Array<Predicate*>*>* blocks = domain->getPredBlocks();
-      for (int j = 0; j < blocks->size(); j++)
-      {
-        Array<Predicate*>* block = (*blocks)[j];
-        for (int k = 0; k < block->size(); k++)
-        {
-          Predicate* pred = (*block)[k];
-          if (pred->canBeGroundedAs((*gndPreds_)[i]))
-          {
-            (*blocks_)[j].append(i);
-          }
-        }
-      }
-    }
-
-      // Remove empty blocks (blocks generated in domain, but contain no query
-      // atoms)
-    int i = 0;
-    while (i < blocks_->size())
-    {
-      Array<int> block = (*blocks_)[i];
-      if (block.empty())
-      {
-        blocks_->removeItem(i);
-        blockEvidence_->removeItem(i);
-        continue;
-      }
-      i++;
-    }
-    
     gndPreds_->compress();
     gndClauses_->compress();
 
@@ -383,17 +340,27 @@ class MRF
           (allGndingsAreQueries && (*allGndingsAreQueries)[gp->getId()] > 1) )
       { 
         seenBefore = true;
+        delete gp;
         break;
       }
       delete gp;
     }
 
-    //delete gndClause;
     if (seenBefore) return;
 
     GroundClause* gndClause = new GroundClause(truncClause, gndPreds);
     if (markHardGndClauses && isHardClause) gndClause->setWtToHardWt();
     assert(gndClause->getWt() != 0);
+
+      // We want to normalize soft unit clauses to all be positives
+      // This is only possible when parent weight ptrs aren't being tracked
+    if (!parentWtPtr && !isHardClause &&
+        gndClause->getNumGroundPredicates() == 1 &&
+        !gndClause->getGroundPredicateSense(0))
+    {
+      gndClause->setGroundPredicateSense(0, true);
+      gndClause->setWt(-gndClause->getWt());
+    }
 
     GroundClauseSet::iterator iter = gndClausesSet->find(gndClause);
       // If the unknown clause is not in gndClauses
@@ -452,12 +419,6 @@ class MRF
     for (int i = 0; i < gndPreds_->size(); i++)
       if ((*gndPreds_)[i]) delete (*gndPreds_)[i];
     delete gndPreds_;
-    
-    for (int i = 0; i < blocks_->size(); i++)
-      (*blocks_)[i].clearAndCompress();
-    delete blocks_;
-    
-    delete blockEvidence_;
   }
 
   void deleteGndPredsGndClauseSets()
@@ -510,23 +471,9 @@ class MRF
     return gndClauses_->size();
   }
 
-  Array<Array<int> >* getBlocks()
-  {
-    return blocks_;
-  }
-  
-  Array<bool>* getBlockEvidence()
-  {
-    return blockEvidence_;
-  }
-  
  private:
   GroundPredicateHashArray* gndPreds_;
   Array<GroundClause*>* gndClauses_;
-    // Blocks of gndPred indices which belong together
-  Array<Array<int> >* blocks_;
-    // Flags indicating if block is fulfilled by evidence
-  Array<bool>* blockEvidence_;
 };
 
 

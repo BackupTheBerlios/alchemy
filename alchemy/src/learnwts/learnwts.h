@@ -143,7 +143,8 @@ void createDomainAndMLN(Array<Domain*>& domains, Array<MLN*>& mlns,
                         const bool& addUnitClauses, const double& priorMean,
                         const bool& checkPlusTypes, const bool& mwsLazy,
                         const bool& allPredsExceptQueriesAreCW,
-                        const StringHashArray* const & owPredNames)
+                        const StringHashArray* const & owPredNames,
+                        const StringHashArray* const & cwPredNames)
 {
   string::size_type bslash = inMLNFile.rfind("/");
   string tmp = (bslash == string::npos) ? 
@@ -176,9 +177,10 @@ void createDomainAndMLN(Array<Domain*>& domains, Array<MLN*>& mlns,
   Domain* domain0 = (checkPlusTypes) ? domains[0] : NULL;
 
   bool ok = runYYParser(mln, domain, tmpInMLN, allPredsExceptQueriesAreCW, 
-                        owPredNames, nonEvidPredNames, addUnitClauses, 
-                        warnAboutDupGndPreds, priorMean, mustHaveWtOrFullStop,
-                        domain0, mwsLazy, flipWtsOfFlippedClause);
+                        owPredNames, cwPredNames, nonEvidPredNames,
+                        addUnitClauses,  warnAboutDupGndPreds, priorMean,
+                        mustHaveWtOrFullStop, domain0, mwsLazy,
+                        flipWtsOfFlippedClause);
 
   unlink(tmpInMLN);
   if (!ok) exit(-1);
@@ -196,7 +198,8 @@ void createDomainsAndMLNs(Array<Domain*>& domains, Array<MLN*>& mlns,
                           const bool& addUnitClauses, const double& priorMean,
                           const bool& mwsLazy,
                           const bool& allPredsExceptQueriesAreCW,
-                          const StringHashArray* const & owPredNames)
+                          const StringHashArray* const & owPredNames,
+                          const StringHashArray* const & cwPredNames)
 {
   if (!multipleDatabases)
   {
@@ -208,7 +211,7 @@ void createDomainsAndMLNs(Array<Domain*>& domains, Array<MLN*>& mlns,
     createDomainAndMLN(domains, mlns, inMLNFile, constFilesStream, 
                        dbFilesStream, nonEvidPredNames,
                        addUnitClauses, priorMean, false, mwsLazy,
-                       allPredsExceptQueriesAreCW, owPredNames);
+                       allPredsExceptQueriesAreCW, owPredNames, cwPredNames);
   }
   else
   {   //if multiple databases
@@ -225,15 +228,37 @@ void createDomainsAndMLNs(Array<Domain*>& domains, Array<MLN*>& mlns,
       createDomainAndMLN(domains, mlns, inMLNFile, constFilesStream,
                          dbFilesStream, nonEvidPredNames,
                          addUnitClauses, priorMean, checkPlusTypes, mwsLazy,
-                         allPredsExceptQueriesAreCW, owPredNames);
+                         allPredsExceptQueriesAreCW, owPredNames, cwPredNames);
 
         // let the domains share data structures
       if (DOMAINS_SHARE_DATA_STRUCT && i > 0)
       {
+		  // Add new constants to base domain as external
+          // Assumption: all domains have same number and ordering of types
+        int numTypes = domains[i]->getNumTypes();
+        for (int j = 0; j < numTypes; j++)
+        {
+          const char* typeName = domains[i]->getTypeName(j);
+          const Array<int>* constantsByType = domains[i]->getConstantsByType(j);
+          for (int k = 0; k < constantsByType->size(); k++)
+          {
+            const char* constantName =
+              domains[i]->getConstantName((*constantsByType)[k]);
+              // Add external constant to base domain
+            if (!domains[0]->isConstant(constantName))
+            {
+              domains[0]->addExternalConstant(constantName, typeName);
+            }
+          }
+        }
+ 
+          // Share all predicate templates
         const ClauseHashArray* carr = mlns[i]->getClauses();
         for (int j = 0; j < carr->size(); j++)
         {
           Clause* c = (*carr)[j];
+
+            // Share all predicate templates
           for (int k = 0; k < c->getNumPredicates(); k++)
           {
             Predicate* p = c->getPredicate(k);
@@ -242,8 +267,9 @@ void createDomainsAndMLNs(Array<Domain*>& domains, Array<MLN*>& mlns,
             assert(t);
             p->setTemplate((PredicateTemplate*)t);
           }
-        }
+        } // for all clauses
 
+          // All mlns can use the following data structures from mln0
         ((Domain*)domains[i])->replaceTypeDualMap((
                                          DualMap*)domains[0]->getTypeDualMap());
         ((Domain*)domains[i])->replaceStrToPredTemplateMapAndPredDualMap(
@@ -257,9 +283,74 @@ void createDomainsAndMLNs(Array<Domain*>& domains, Array<MLN*>& mlns,
         ((Domain*)domains[i])->replaceFuncSet(
                                         (FunctionSet*)domains[0]->getFuncSet());
       }
-
     } // for each domain
-  }
+  
+	// Reorder constants in all domains
+	domains[0]->reorderConstants(mlns[0]);
+    for (int i = 1; i < domains.size(); i++)
+    {
+      ((Domain*)domains[i])->reorderConstants(
+                                   (ConstDualMap*)domains[0]->getConstDualMap(),
+                          (Array<Array<int>*>*)domains[0]->getConstantsByType(),
+                                              mlns[i]);
+    }
+
+      // Share clauses across all mlns as external clauses.
+      // This happens when per-constant is used and dbs have diff. constants
+    Array<Array<bool>*>* externalClausesPerMLN = new Array<Array<bool>*>;
+    externalClausesPerMLN->growToSize(mlns.size());
+    (*externalClausesPerMLN)[0] = new Array<bool>;
+    (*externalClausesPerMLN)[0]->growToSize(mlns[0]->getNumClauses(), false);
+    for (int i = 1; i < mlns.size(); i++)
+    {
+      const ClauseHashArray* carr = mlns[i]->getClauses();
+      (*externalClausesPerMLN)[i] = new Array<bool>;
+      for (int j = 0; j < carr->size(); j++)
+      {
+        Clause* c = (*carr)[j];
+        if (!mlns[0]->containsClause(c))
+        {
+          string formulaString = mlns[i]->getParentFormula(j, 0);
+          bool hasExist = mlns[i]->isExistClause(j);
+          if (mlns[0]->appendExternalClause(formulaString, hasExist,
+                                            new Clause(*c), domains[0]))
+          {
+            (*externalClausesPerMLN)[0]->append(false);
+          }
+        }
+      } // for all clauses
+    } // for all mlns except base
+
+    const ClauseHashArray* carr = mlns[0]->getClauses();
+    for (int j = 0; j < carr->size(); j++)
+    {
+      Clause* c = (*carr)[j];
+        // Do not add existentially qualified clauses
+      //if (mlns[i]->isExistClause(j)) continue;
+      for (int k = 1; k < mlns.size(); k++)
+      {
+        if (mlns[k]->containsClause(c))
+          (*externalClausesPerMLN)[k]->append(false);
+        else
+          (*externalClausesPerMLN)[k]->append(true);
+      }
+    } // for all clauses
+
+    for (int i = 1; i < mlns.size(); i++)
+    {
+      mlns[i]->replaceClauses(new ClauseHashArray(*(ClauseHashArray*)mlns[0]->getClauses()));
+      mlns[i]->replaceMLNClauseInfos(new Array<MLNClauseInfo*>(*(Array<MLNClauseInfo*>*)mlns[0]->getMLNClauseInfos()));
+      mlns[i]->replacePredIdToClausesMap(new Array<Array<IndexClause*>*>(*(Array<Array<IndexClause*>*>*)mlns[0]->getPredIdToClausesMap()));
+      mlns[i]->replaceFormulaAndClausesArray(new FormulaAndClausesArray(*(FormulaAndClausesArray*)mlns[0]->getFormulaAndClausesArray()));      
+      mlns[i]->replaceExternalClause((*externalClausesPerMLN)[i]);
+    }
+
+    delete externalClausesPerMLN;
+
+    for (int i = 1; i < mlns.size(); i++)
+      mlns[i]->rehashClauses();
+ } // if multiple databases
+  
 
   //commented out: not true when there are domains with different constants
   //int numClauses = mlns[0]->getNumClauses();
@@ -342,6 +433,10 @@ void deleteDomains(Array<Domain*>& domains)
       ((Domain*)domains[i])->setStrToFuncTemplateMapAndFuncDualMap(NULL, NULL);
       ((Domain*)domains[i])->setEqualPredTemplate(NULL);
       ((Domain*)domains[i])->setFuncSet(NULL);
+
+        // Need this since it is pointing to domain0's copy
+	  ((Domain*)domains[i])->setConstDualMap(NULL);
+	  ((Domain*)domains[i])->setConstantsByType(NULL);
     }
     delete domains[i];
   }

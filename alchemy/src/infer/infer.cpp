@@ -63,6 +63,7 @@
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  * 
  */
+
 #include <unistd.h>
 #include <fstream>
 #include <climits>
@@ -74,7 +75,6 @@
 #include "infer.h"
 
 extern const char* ZZ_TMP_FILE_POSTFIX; //defined in fol.y
-
 
   // TODO: List the arguments common to learnwts and inference in
   // inferenceargs.h. This can't be done with a static array.
@@ -96,6 +96,10 @@ ARGS ARGS::Args[] =
        "Atoms appearing here cannot appear in the -c option."),
     // END: Common arguments
 
+  ARGS("queryEvidence", ARGS::Tog, aisQueryEvidence, 
+       "If this flag is set, then all the groundings of query preds not in db "
+       "are assumed false evidence."),
+
     // BEGIN: Common inference arguments
   ARGS("m", ARGS::Tog, amapPos, 
        "Run MAP inference and return only positive query atoms."),
@@ -115,10 +119,12 @@ ARGS ARGS::Args[] =
        "Run inference using simulated tempering and return probabilities "
        "for all query atoms"),
 
+  ARGS("counts", ARGS::Tog, aclauseCounts,
+       "Write clause counts, not atom values or probabilities"),
+
   ARGS("seed", ARGS::Opt, aSeed,
-       "[random] Seed used to initialize the randomizer in the inference "
-       "algorithm. If not set, seed is initialized from the current date and "
-       "time."),
+       "[2350877] Seed used to initialize the randomizer in the inference "
+       "algorithm. If not set, seed is initialized from a fixed random number."),
 
   ARGS("lazy", ARGS::Opt, aLazy, 
        "[false] Run lazy version of inference if this flag is set."),
@@ -134,7 +140,7 @@ ARGS ARGS::Args[] =
 
     // BEGIN: MaxWalkSat args
   ARGS("mwsMaxSteps", ARGS::Opt, amwsMaxSteps,
-       "[1000000] (MaxWalkSat) The max number of steps taken."),
+       "[100000] (MaxWalkSat) The max number of steps taken."),
 
   ARGS("tries", ARGS::Opt, amwsTries, 
        "[1] (MaxWalkSat) The max number of attempts taken to find a solution."),
@@ -148,7 +154,7 @@ ARGS ARGS::Args[] =
        "satisfy a soft one."),
   
   ARGS("heuristic", ARGS::Opt, amwsHeuristic,
-       "[1] (MaxWalkSat) Heuristic used in MaxWalkSat (0 = RANDOM, 1 = BEST, "
+       "[2] (MaxWalkSat) Heuristic used in MaxWalkSat (0 = RANDOM, 1 = BEST, "
        "2 = TABU, 3 = SAMPLESAT)."),
   
   ARGS("tabuLength", ARGS::Opt, amwsTabuLength,
@@ -171,10 +177,10 @@ ARGS ARGS::Args[] =
        "[100] (MCMC) Maximum number of burn-in steps (-1: no maximum)."),
 
   ARGS("minSteps", ARGS::Opt, amcmcMinSteps, 
-       "[-1] (MCMC) Minimum number of Gibbs sampling steps."),
+       "[-1] (MCMC) Minimum number of MCMC sampling steps."),
 
   ARGS("maxSteps", ARGS::Opt, amcmcMaxSteps, 
-       "[1000] (MCMC) Maximum number of Gibbs sampling steps."),
+       "[1000] (MCMC) Maximum number of MCMC sampling steps."),
 
   ARGS("maxSeconds", ARGS::Opt, amcmcMaxSeconds, 
        "[-1] (MCMC) Max number of seconds to run MCMC (-1: no maximum)."),
@@ -192,9 +198,9 @@ ARGS ARGS::Args[] =
     // END: Simulated tempering args
 
     // BEGIN: MC-SAT args
-  ARGS("numStepsEveryMCSat", ARGS::Opt, amcsatNumStepsEveryMCSat,
-       "[1] (MC-SAT) Number of total steps (mcsat + gibbs) for every mcsat "
-       "step"),
+  //ARGS("numStepsEveryMCSat", ARGS::Opt, amcsatNumStepsEveryMCSat,
+  //     "[1] (MC-SAT) Number of total steps (mcsat + gibbs) for every mcsat "
+  //     "step"),
     // END: MC-SAT args
 
     // BEGIN: SampleSat args
@@ -202,7 +208,7 @@ ARGS ARGS::Args[] =
        "[10] (MC-SAT) Return nth SAT solution in SampleSat"),
 
   ARGS("saRatio", ARGS::Opt, assSaRatio,
-       "[50] (MC-SAT) Ratio of sim. annealing steps mixed with WalkSAT in "
+       "[0] (MC-SAT) Ratio of sim. annealing steps mixed with WalkSAT in "
        "MC-SAT"),
 
   ARGS("saTemperature", ARGS::Opt, assSaTemp,
@@ -210,7 +216,7 @@ ARGS ARGS::Args[] =
         "SampleSat"),
 
   ARGS("lateSa", ARGS::Tog, assLateSa,
-       "[false] Run simulated annealing from the start in SampleSat"),
+       "[true] Run simulated annealing from the start in SampleSat"),
     // END: SampleSat args
 
     // BEGIN: Gibbs sampling args
@@ -276,20 +282,32 @@ ARGS ARGS::Args[] =
  * the results.
  */
 void printResults(const string& queryFile, const string& queryPredsStr,
-                  Domain *domain, ostream& out, 
-                  GroundPredicateHashArray* const &queries,
-                  Inference* const &inference, VariableState* const &state)
+				  Domain *domain, ostream& out, 
+				  GroundPredicateHashArray* const &queries,
+				  Inference* const &inference, VariableState* const &state,
+					Array<Predicate *> const &queryPreds,
+					Array<TruthValue> const &queryPredValues)
 {
     // Lazy version: Have to generate the queries from the file or query string.
     // This involves calling createQueryFilePreds / createComLineQueryPreds
   if (aLazy)
   {
-    const GroundPredicateHashArray* gndPredHashArray = NULL;
-    Array<double>* gndPredProbs = NULL;
       // Inference algorithms with probs: have to retrieve this info from state.
       // These are the ground preds which have been brought into memory. All
       // others have always been false throughout sampling.
-    if (!(amapPos || amapAll))
+
+	for (int i = 0; i < queryPreds.size(); i++)
+	{
+		int val=(queryPredValues[i] == TRUE)?1:0;
+
+		// Prob is smoothed in inference->getProbability
+		double prob = inference->getProbability((GroundPredicate*)queryPreds[i]);
+
+		queryPreds[i]->print(out, domain); out << " " << prob << " " << val << endl;
+	}
+
+	/*
+	if (!(amapPos || amapAll))
     {
       gndPredHashArray = state->getGndPredHashArrayPtr();
       gndPredProbs = new Array<double>;
@@ -322,6 +340,79 @@ void printResults(const string& queryFile, const string& queryPredsStr,
       if (!ok) { cout <<"Failed to create query predicates."<< endl; exit(-1); }
     }
     
+    if (!(amapPos || amapAll))
+      delete gndPredProbs;
+	  */
+  }
+    // Eager version: Queries have already been generated and we can get the
+    // information directly from the state
+  else
+  {
+    if (amapPos)
+      inference->printTruePreds(out);
+    else
+    {
+      for (int i = 0; i < queryPreds.size(); i++)
+      {
+        int val = (queryPredValues[i] == TRUE) ? 1 : 0;
+
+          // Prob is smoothed in inference->getProbability
+        double prob = inference->getProbability((GroundPredicate*)queryPreds[i]);
+
+        queryPreds[i]->print(out, domain);
+        out << " " << prob << " " << val << endl;
+      }
+    }
+  }
+}
+
+void printResults(const string& queryFile, const string& queryPredsStr,
+                  Domain *domain, ostream& out,
+                  GroundPredicateHashArray* const &queries,
+                  Inference* const &inference, VariableState* const &state)
+{
+	// Lazy version: Have to generate the queries from the file or query string.
+	// This involves calling createQueryFilePreds / createComLineQueryPreds
+  if (aLazy)
+  {
+    const GroundPredicateHashArray* gndPredHashArray = NULL;
+    Array<double>* gndPredProbs = NULL;
+      // Inference algorithms with probs: have to retrieve this info from state.
+      // These are the ground preds which have been brought into memory. All
+      // others have always been false throughout sampling.
+    if (!(amapPos || amapAll))
+    {
+      gndPredHashArray = state->getGndPredHashArrayPtr();
+      gndPredProbs = new Array<double>;
+      gndPredProbs->growToSize(gndPredHashArray->size());
+      for (int i = 0; i < gndPredProbs->size(); i++)
+        (*gndPredProbs)[i] =
+          inference->getProbability((*gndPredHashArray)[i]);
+    }
+
+    if (queryFile.length() > 0)
+    {
+      cout << "Writing query predicates that are specified in query file..."
+           << endl;
+      bool ok = createQueryFilePreds(queryFile, domain, domain->getDB(), NULL,
+                                     NULL, true, out, amapPos,
+                                     gndPredHashArray, gndPredProbs);
+      if (!ok) { cout <<"Failed to create query predicates."<< endl; exit(-1); }
+    }
+
+    Array<int> allPredGndingsAreQueries;
+    allPredGndingsAreQueries.growToSize(domain->getNumPredicates(), false);
+    if (queryPredsStr.length() > 0)
+    {
+      cout << "Writing query predicates that are specified on command line..." 
+           << endl;
+      bool ok = createComLineQueryPreds(queryPredsStr, domain, domain->getDB(), 
+                                        NULL, NULL, &allPredGndingsAreQueries,
+                                        true, out, amapPos, gndPredHashArray,
+                                        gndPredProbs);
+      if (!ok) { cout <<"Failed to create query predicates."<< endl; exit(-1); }
+    }
+
     if (!(amapPos || amapAll))
       delete gndPredProbs;
   }
@@ -359,25 +450,34 @@ int main(int argc, char* argv[])
   Timer timer;
   double begSec = timer.time(); 
 
+  Array<Predicate *> queryPreds;
+  Array<TruthValue> queryPredValues;
+
   ofstream resultsOut(aresultsFile);
   if (!resultsOut.good())
   { cout << "ERROR: unable to open " << aresultsFile << endl; return -1; }
 
   Domain* domain = NULL;
   Inference* inference = NULL;
-  if (buildInference(inference, domain))
+  if (buildInference(inference, domain, aisQueryEvidence, queryPreds,
+                     queryPredValues) > -1)
   {
     inference->init();
     inference->infer();
     
-    printResults(queryFile, queryPredsStr, domain, resultsOut, &queries,
-                 inference, inference->getState());
+	if (aisQueryEvidence) printResults(queryFile, queryPredsStr, domain,
+                                       resultsOut, &queries,
+                                       inference, inference->getState(),
+                                       queryPreds, queryPredValues);
+	else printResults(queryFile, queryPredsStr, domain, resultsOut, &queries,
+                      inference, inference->getState());
   }
 
   resultsOut.close();
-  delete domain;
-  for (int i = 0; i < knownQueries.size(); i++)  delete knownQueries[i];
-  delete inference;
+  if (domain) delete domain;
+  for (int i = 0; i < knownQueries.size(); i++)
+    if (knownQueries[i]) delete knownQueries[i];
+  if (inference) delete inference;
   
   cout << "total time taken = "; Timer::printTime(cout, timer.time()-begSec);
   cout << endl;

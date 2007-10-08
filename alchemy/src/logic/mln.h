@@ -80,22 +80,42 @@ class MLN
  public: 
   MLN() : clauses_(new ClauseHashArray),clauseInfos_(new Array<MLNClauseInfo*>),
           formAndClausesArray_(new FormulaAndClausesArray), 
-          predIdToClausesMap_(new Array<Array<IndexClause*>*>) {}
+          predIdToClausesMap_(new Array<Array<IndexClause*>*>),
+          externalClause_(new Array<bool>) {}
 
   ~MLN()
   {
-    clauses_->deleteItemsAndClear(); delete clauses_;
-    clauseInfos_->deleteItemsAndClear(); delete clauseInfos_;
-    formAndClausesArray_->deleteItemsAndClear(); delete formAndClausesArray_;
-    for (int i = 0; i < predIdToClausesMap_->size(); i++)
-      if ((*predIdToClausesMap_)[i]) 
-      {
-        (*predIdToClausesMap_)[i]->deleteItemsAndClear();
-        delete (*predIdToClausesMap_)[i];
-      }
-    delete predIdToClausesMap_;
-  }
+    if (clauses_)
+    {
+      clauses_->deleteItemsAndClear();
+      delete clauses_;
+    }
+    
+    if (clauseInfos_)
+    {
+      clauseInfos_->deleteItemsAndClear();
+      delete clauseInfos_;
+    }
+    
+    if (formAndClausesArray_)
+    {
+      formAndClausesArray_->deleteItemsAndClear();
+      delete formAndClausesArray_;
+    }
+    
+    if (predIdToClausesMap_)
+    {
+      for (int i = 0; i < predIdToClausesMap_->size(); i++)
+        if ((*predIdToClausesMap_)[i]) 
+        {
+          (*predIdToClausesMap_)[i]->deleteItemsAndClear();
+          delete (*predIdToClausesMap_)[i];
+        }
+      delete predIdToClausesMap_;
+    }
 
+    if (externalClause_) delete externalClause_;
+  }
 
   int getNumClauses() const { return clauses_->size(); }
 
@@ -113,6 +133,24 @@ class MLN
   bool containsClause(const Clause* const & c) const
   { return clauses_->contains((Clause*)c); }
 
+  /**
+   * Append a clause to the mln and mark it as external. It is assumed that
+   * the clause is in CNF.
+   */
+  bool appendExternalClause(const string& formulaString, const bool& hasExist,
+                            Clause* const& c, const Domain* const & domain)
+  {
+    int idx;
+    bool app = appendClause(formulaString, hasExist, c, c->getWt(), c->isHardClause(), idx);
+    if (app)
+    {
+      setFormulaNumPreds(formulaString, c->getNumPredicates());
+      setFormulaIsHard(formulaString, c->isHardClause());
+      setFormulaPriorMean(formulaString, c->getWt());
+      (*externalClause_)[idx] = true;
+    }
+    return app;   
+  }
 
     //MLN owns clause c and is responsible for its deletion.
     //hasExist is true if formulaString contains an existential quantifier
@@ -142,6 +180,7 @@ class MLN
       clause = c;
       isAppended = true;
       clause->setWt(0); //start accumulating weight from 0
+      externalClause_->append(false);
     }
     clause->addWt(wt);
     if (isHardClause) clause->setIsHardClause(isHardClause);
@@ -193,6 +232,8 @@ class MLN
     Clause* r = clauses_->removeItemFastDisorder(remIdx);
     MLNClauseInfo* ci = clauseInfos_->removeItemFastDisorder(remIdx);
     assert(ci->index == remIdx);
+
+    externalClause_->removeItemFastDisorder(remIdx);
 
     if (clauseInfos_->size() != remIdx) //if we didn't just remove the last item
     {
@@ -353,6 +394,18 @@ class MLN
     return (*clauses_)[i];
   }
 
+  bool isExternalClause(const int& i) const
+  {
+    assert(0 <= i && i < clauses_->size());
+    return (*externalClause_)[i];
+  }
+
+  bool isExternalClause(const Clause* const & c) const
+  {
+    int i = findClauseIdx(c);
+    assert(i >= 0);
+    return isExternalClause(i);
+  }
 
     // returns true if the ith clause is in the CNF of an existentially
     // quantified formula
@@ -436,6 +489,18 @@ class MLN
   void getClauses(Array<Clause*>* const & clauses) const
   { for (int i = 0; i < clauses_->size();i++) clauses->append((*clauses_)[i]); }
 
+  void setClauses(ClauseHashArray* const & clauses)
+  { clauses_ = clauses; }
+
+  void replaceClauses(ClauseHashArray* const & clauses)
+  {
+    if (clauses_)
+    {
+      clauses_->deleteItemsAndClear();
+      delete clauses_;
+    }
+    clauses_ = clauses;
+  }
 
   const MLNClauseInfo* getMLNClauseInfo(const int& i) const
   {
@@ -452,6 +517,77 @@ class MLN
 
   const Array<MLNClauseInfo*>* getMLNClauseInfos() const
   { return clauseInfos_; }
+
+  void setMLNClauseInfos(Array<MLNClauseInfo*>* const & clauseInfos)
+  { clauseInfos_ = clauseInfos; }
+
+  void replaceMLNClauseInfos(Array<MLNClauseInfo*>* const & clauseInfos)
+  {
+    if (clauseInfos_)
+    {
+      clauseInfos_->deleteItemsAndClear();
+      delete clauseInfos_;
+    }
+    clauseInfos_ = clauseInfos;
+  }
+
+  
+    // Caller should not modify the returned array or its contents
+  const Array<Array<IndexClause*>*>* getPredIdToClausesMap() const
+  { return predIdToClausesMap_; }
+  
+  void setPredIdToClausesMap(Array<Array<IndexClause*>*>* const & predIdToClausesMap)
+  { predIdToClausesMap_ = predIdToClausesMap; }
+
+  void replacePredIdToClausesMap(Array<Array<IndexClause*>*>* const & predIdToClausesMap)
+  {
+    if (predIdToClausesMap_)
+    {
+      for (int i = 0; i < predIdToClausesMap_->size(); i++)
+        if ((*predIdToClausesMap_)[i]) 
+        {
+          (*predIdToClausesMap_)[i]->deleteItemsAndClear();
+          delete (*predIdToClausesMap_)[i];
+        }
+      
+      delete predIdToClausesMap_;
+    }
+    
+    predIdToClausesMap_ = predIdToClausesMap;
+  }
+  
+  const FormulaAndClausesArray* getFormulaAndClausesArray() const
+  { return formAndClausesArray_; }
+  
+  void setFormulaAndClausesArray(FormulaAndClausesArray* const & formAndClausesArray)
+  { formAndClausesArray_ = formAndClausesArray; }
+
+  void replaceFormulaAndClausesArray(FormulaAndClausesArray* const & formAndClausesArray)
+  {
+    if (formAndClausesArray_)
+    {
+      formAndClausesArray_->deleteItemsAndClear();
+      delete formAndClausesArray_;
+    }
+    formAndClausesArray_ = formAndClausesArray;
+  }
+  
+  const Array<bool>* getExternalClause() const
+  { return externalClause_; }
+
+  void setExternalClause(Array<bool>* const & externalClause)
+  {
+    externalClause_ = externalClause;
+  }
+
+  void replaceExternalClause(Array<bool>* const & externalClause)
+  {
+    if (externalClause_)
+    {
+      delete externalClause_;
+    }
+    externalClause_ = externalClause;
+  }
 
 
   void setClauseInfoPriorMeansToClauseWts()
@@ -564,20 +700,41 @@ class MLN
   }
 
 
-  const FormulaAndClausesArray* getFormulaAndClausesArray() const
-  { return formAndClausesArray_; }
-
-  
-    // Caller should not modify the returned array or its contents
-  const Array<Array<IndexClause*>*>* getPredIdToClausesMap() const
-  { return predIdToClausesMap_; }
-
-
   const Array<IndexClause*>* getClausesContainingPred(const int& predId) const
   { 
     if (predId < predIdToClausesMap_->size())
       return (*predIdToClausesMap_)[predId];
     return NULL;
+  }
+
+  /**
+   * Returns a parent formula of a clause.
+   * 
+   * @param clauseIdx Index of clause for which parent formula is returned
+   * @param formulaIdx Index of parent formula which is returned
+   * 
+   * @return Parent formula as string 
+   */
+  const string getParentFormula(const int& clauseIdx, const int& formulaIdx) const 
+  {
+    FormulaClauseIndexes* fcIdxs =
+      (*clauseInfos_)[clauseIdx]->formulaClauseIndexes[formulaIdx];
+    return (*formAndClausesArray_)[*fcIdxs->formulaIndex]->formula;
+  }
+
+  /**
+   * Returns a parent formula of a clause.
+   * 
+   * @param c Clause for which parent formula is returned
+   * @param formulaIdx Index of parent formula which is returned
+   * 
+   * @return Parent formula as string 
+   */
+  const string getParentFormula(const Clause* const & c, const int& formulaIdx) const 
+  {
+    int i = findClauseIdx(c);
+    if (i < 0) return NULL;
+    return getParentFormula(i, formulaIdx);
   }
 
 
@@ -915,6 +1072,10 @@ class MLN
     //predIdToClausesMap_[p] may be NULL.
   Array<Array<IndexClause*>*>* predIdToClausesMap_;
 
+    // externalClause_[c] indicates if clause c is external, i.e. it contains
+    // constants not present in this mln (can occur when per-constant rules are
+    // used with multiple dbs).
+  Array<bool>* externalClause_;
 };
 
 #endif

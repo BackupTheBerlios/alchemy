@@ -175,6 +175,13 @@ class ListObj
 
   void append(const char* const & s) { list_.append(new ListObj(s)); }
 
+  ListObj* removeLast()
+  {
+    ListObj* lo = list_.removeLastItem();
+    list_.compress();
+    return lo;
+  }
+
   int size() const { return list_.size(); }
 
   ListObj* operator[](const int& index) const { return list_[index]; } 
@@ -326,6 +333,7 @@ class ListObj
         }
         newFormula->append(replacedFormula);
       }
+      //arrAccessor.deleteArraysAndClear();
       //newFormula->print(cout); cout << endl;
 
       delete p1;

@@ -81,9 +81,11 @@ class TrueFalseGroundingsStore;
 class MLN;
 
 
-typedef hash_map<const char*, const PredicateTemplate*, hash<const char*>, EqualStr>  StrToPredTemplateMap;
+typedef hash_map<const char*, const PredicateTemplate*, hash<const char*>,
+                 EqualStr>  StrToPredTemplateMap;
 
-typedef hash_map<const char*, const FunctionTemplate*, hash<const char*>, EqualStr>  StrToFuncTemplateMap;
+typedef hash_map<const char*, const FunctionTemplate*, hash<const char*>,
+                 EqualStr>  StrToFuncTemplateMap;
 
 
 class Domain
@@ -93,10 +95,15 @@ class Domain
              predDualMap_(new DualMap), funcDualMap_(new DualMap),
              strToPredTemplateMap_(new StrToPredTemplateMap),
              strToFuncTemplateMap_(new StrToFuncTemplateMap),
-             constantsByType_(new Array<Array<int>*>), db_(NULL),
+             constantsByType_(new Array<Array<int>*>),
+             externalConstantsByType_(new Array<Array<int>*>), db_(NULL),
              trueFalseGroundingsStore_(NULL), funcSet_(new FunctionSet),
-             predBlocks_(new Array<Array<Predicate*>*>),
-             blockEvidence_(new Array<bool>)
+             predBlocks_(new Array<Predicate*>),
+             truePredsInBlock_(new Array<Predicate*>),
+             blockSizes_(new Array<int>),
+             blockEvidence_(new Array<bool>),
+             //externalConstant_(new Array<bool>),
+             numNonEvidAtomsPerPred_(new Array<int>)
   {
     equalPredTemplate_ = new PredicateTemplate();
     equalPredTemplate_->setName(PredicateTemplate::EQUAL_NAME);
@@ -126,8 +133,7 @@ class Domain
     emptyFuncBinaryTemplate_->appendTermType(FunctionTemplate::ANY_TYPE_NAME, 
                                        false, this);
     emptyFuncBinaryTemplate_->appendTermType(FunctionTemplate::ANY_TYPE_NAME, 
-                                       false, this);
-                                       
+                                       false, this);                                       
   }
 
 
@@ -253,29 +259,9 @@ class Domain
   const FunctionTemplate* getEmptyFuncBinaryTemplate() const
   { return emptyFuncBinaryTemplate_; }
 
-  void replaceConstDualMap(ConstDualMap* const & map)
-  {
-    if (constDualMap_) delete constDualMap_;
-    constDualMap_ = map;
-  }
-
   void setConstDualMap(ConstDualMap* const & map) { constDualMap_ = map; }
 
-
   const ConstDualMap* getConstDualMap() const { return constDualMap_; }
-
-
-  void replaceConstantsByType(Array<Array<int>*>* const & cbt)
-  {
-    if (constantsByType_)
-    {
-      for (int i = 0; i < constantsByType_->size(); i++)
-        delete (*constantsByType_)[i];
-      delete constantsByType_;
-    }
-    constantsByType_ = cbt;
-  }
-
 
   void setConstantsByType(Array<Array<int>*>* const & cbt) 
   { constantsByType_ = cbt; }
@@ -320,8 +306,21 @@ class Domain
 
   void compress();
 
-  void reorderConstants(MLN* const & mln, 
+    // common
+  void updatePerOldToNewIds(MLN* const & mln,
+                            hash_map<int,int> & oldToNewConstIds);
+
+    // for parser
+  void reorderConstants(MLN* const & mln,
                         hash_map<int, PredicateHashArray*>& predIdToPredsMap);
+
+    // for domain0 - postprocess
+  void reorderConstants(MLN* const & mln);
+
+    // for domain1-N - postprocess
+  void reorderConstants(ConstDualMap* const & map,
+                        Array<Array<int>*>* const & cbt, MLN* const & mln);
+
 
     //Caller is responsible for deleting returned pointer
   Predicate* createPredicate(const int& predId, 
@@ -352,6 +351,7 @@ class Domain
     }
       
     constantsByType_->append(new Array<int>);
+    externalConstantsByType_->append(new Array<int>);
     return typeId;
   }
 
@@ -379,16 +379,39 @@ class Domain
 
 
   //////////////////////// constant functions //////////////////////
-
     // Caller must not delete returned pointer.
   const Array<int>* getConstantsByType(const int& typeId) const
-  { return (*constantsByType_)[typeId]; }
+  {
+    return (*constantsByType_)[typeId];
+  }
 
+    // Caller must not delete returned pointer.
   const Array<int>* getConstantsByType(const char* const & typeName) const
+  {
+    int typeId = getTypeId(typeName);
+    if (typeId < 0) return NULL;
+    return getConstantsByType(typeId);
+  }
+
+    // Caller must delete returned pointer.
+  const Array<int>* getConstantsByTypeWithExt(const int& typeId) const
+  {
+    Array<int>* cbt = (*constantsByType_)[typeId];
+    Array<int>* retArr = new Array<int>;
+    for (int i = 0; i < cbt->size(); i++)
+      retArr->append((*cbt)[i]);
+    Array<int>* ecbt = (*externalConstantsByType_)[typeId];
+    for (int i = 0; i < ecbt->size(); i++)
+      retArr->append((*ecbt)[i]);
+    return retArr;
+  }
+
+    // Caller must delete returned pointer.
+  const Array<int>* getConstantsByTypeWithExt(const char* const & typeName) const
   { 
     int typeId = getTypeId(typeName);
     if (typeId < 0) return NULL;
-    return (*constantsByType_)[typeId]; 
+    return getConstantsByTypeWithExt(typeId);
   }
 
 	// Returns the index of the given constant of all constants of this type
@@ -397,26 +420,101 @@ class Domain
   	int typeId = getConstantTypeId(constId);
   	const Array<int>* constArray = getConstantsByType(typeId);
   	for (int i = 0; i < constArray->size(); i++)
-  	  if (constId == (*constArray)[i]) return i;
+  	  if (constId == (*constArray)[i])
+        return i;
   	return -1;
   }
   
+  /**
+   * Returns the number of constants of a certain type in this domain.
+   * External constants are not included.
+   * 
+   * @param typeId Id of type for which number of constants is retrieved.
+   * 
+   * @return Number of constants with type typeId in this domain (not including
+   * external).
+   */  
   int getNumConstantsByType(const int& typeId) const
-  { return ((*constantsByType_)[typeId])->size(); }
+  { 
+    if (!(*constantsByType_)[typeId]) return 0;
+    return (*constantsByType_)[typeId]->size();
+  }
 
-
+  /**
+   * Returns the number of constants of a certain type in this domain.
+   * External constants are not included.
+   * 
+   * @param typeName Name of type for which number of constants is retrieved.
+   * 
+   * @return Number of constants of type typeName in this domain (not including
+   * external).
+   */  
   int getNumConstantsByType(const char* const & typeName) const
   {
     int typeId = getTypeId(typeName);
     if (typeId < 0) return 0;
-    return ((*constantsByType_)[typeId])->size(); 
+    return getNumConstantsByType(typeId);
   }
 
+  /**
+   * Returns the number of constants of a certain type in this domain.
+   * External constants are included.
+   * 
+   * @param typeId Id of type for which number of constants is retrieved.
+   * 
+   * @return Number of constants with type typeId in this domain (including external).
+   */  
+  int getNumConstantsByTypeWithExt(const int& typeId) const
+  {
+    return ((*constantsByType_)[typeId])->size() +
+           ((*externalConstantsByType_)[typeId])->size();
+  }
+
+
+  /**
+   * Returns the number of constants of a certain type in this domain.
+   * External constants are included.
+   * 
+   * @param typeName Name of type for which number of constants is retrieved.
+   * 
+   * @return Number of constants of type typeName in this domain (including external).
+   */  
+  int getNumConstantsByTypeWithExt(const char* const & typeName) const
+  {
+    int typeId = getTypeId(typeName);
+    if (typeId < 0) return 0;
+    return getNumConstantsByTypeWithExt(typeId); 
+  }
+
+  /**
+   * Adds a constant to the domain.
+   * 
+   * @param constName Name of constant as a char*
+   * @param typeName Type of constant as a char*
+   */
+  int addConstant(const char* const & constName, const char* const & typeName)
+  {
+    return addConstant(constName, typeName, false);
+  }
+
+  /**
+   * Adds an external constant to the domain. External constants are not used when
+   * generating groundings of preds.
+   * 
+   * @param constName Name of constant as a char*
+   * @param typeName Type of constant as a char*
+   */
+  int addExternalConstant(const char* const & constName,
+                          const char* const & typeName)
+  {
+    return addConstant(constName, typeName, true);
+  }
 
     // Returns id of constant or -1 if constant has been added before.
     // Constant id increases by one each time addConstant() is called.
     // Caller is responsible for deleting name and typeName if needed.
-  int addConstant(const char* const & constName, const char* const & typeName)
+  int addConstant(const char* const & constName, const char* const & typeName,
+                  const bool& external)
   {
     int typeId =  typeDualMap_->getInt(typeName);
     if (typeId < 0)
@@ -426,8 +524,8 @@ class Domain
       return typeId;
     }
     
-    int constId 
-      = constDualMap_->insert(constName, typeId);
+      // Insert constant into constDualMap_
+    int constId = constDualMap_->insert(constName, typeId);
     if (constId < 0)
     {
       cout << "Warning: failed to add constant " << constName << " of type " 
@@ -435,7 +533,18 @@ class Domain
       return constId;
     }
     
-    (*constantsByType_)[typeId]->append(constId);
+    if (external)
+    {
+      (*externalConstantsByType_)[typeId]->append(constId);
+      //externalConstant_->append(true);
+    }
+    else
+    {
+      //externalConstant_->append(false);
+      (*constantsByType_)[typeId]->append(constId);
+    }
+      // Insert id into by type index
+    //(*constantsByType_)[typeId]->append(constId);
     return constId;
   }
 
@@ -467,8 +576,7 @@ class Domain
       return newTypeId;
     }
     
-    int constId 
-      = constDualMap_->insert(constName, newTypeId);
+    int constId = constDualMap_->insert(constName, newTypeId);
     if (constId < 0)
     {
       cout << "Warning: failed to remove constant " << constName << " of type " 
@@ -476,40 +584,72 @@ class Domain
       return constId;
     }
     
-    (*constantsByType_)[oldTypeId]->append(constId);    
+    (*constantsByType_)[oldTypeId]->removeItem(constId);
     (*constantsByType_)[newTypeId]->append(constId);
     return constId;
   }
   
-  int getNumConstants() const { return constDualMap_->getNumInt(); }
+  /**
+   * Returns number of (internal) constants.
+   */
+  int getNumConstants() const
+  {
+    int count = 0;
+    for (int i = 0; i < constantsByType_->size(); i++)
+    {
+      for (int j = 0; j < (*constantsByType_)[i]->size(); j++)
+        count++;
+    }
+    return count;
+  }
 
-    // Caller SHOULD delete the returned array but not its contents.
-  const Array<const char*>* getConstantNames()
-  { return constDualMap_->getIntToStrArr(); }
+  /**
+   * Returns number of internal and external constants.
+   */
+  int getNumConstantsWithExt() const
+  {
+    return constDualMap_->getNumInt();
+  }
 
 
-    // Caller should not delete returned const char*
-    // Returns NULL if id does not exist.
+  /**
+   * Returns the name of a constant in this domain associated with a given
+   * id. Caller should not delete returned const char*
+   * 
+   * @param id Id of constant whose name is to be retrieved.
+   * 
+   * @return name of constant if id is found as constant or external constant,
+   * otherwise NULL.
+   */
   const char* getConstantName(const int& id) const
-  { return constDualMap_->getStr(id); }
+  {
+    return constDualMap_->getStr(id);
+  }
 
 
     // Caller is responsible for deleting name if required.
     // Returns -1 if the constant isn't found
   int getConstantId(const char* const & name) const
-  { return constDualMap_->getInt(name); }
+  {
+    return constDualMap_->getInt(name);
+  }
 
 
-  bool isConstant(const char* const & name) const {return (getConstantId(name) >= 0);}
+  bool isConstant(const char* const & name) const
+  { return (getConstantId(name) >= 0); }
   bool isConstant(const int& id) const { return (getConstantName(id) != NULL); }
 
     // Caller should delete the constName argument if required
   int getConstantTypeId(const char* const & constName) const 
-  { return constDualMap_->getInt2(constName); }
+  { 
+    return constDualMap_->getInt2(constName);
+  }
 
 
   int getConstantTypeId(const int& constId) const
-  { return constDualMap_->getInt2(constId); }
+  {
+    return constDualMap_->getInt2(constId);
+  }
 
 
     // Caller should not delete returned const char*
@@ -639,11 +779,11 @@ class Domain
     return getPredicateTemplate(predName);
   }
 
-	/**
-	 * Finds the maximum arity of all predicates present in the domain.
-	 *  
-	 * @return maximum arity of all predicates in the domain.
-	 */
+ /**
+  * Finds the maximum arity of all predicates present in the domain.
+  *  
+  * @return maximum arity of all predicates in the domain.
+  */
   const int getHighestPredicateArity() const
   {
   	int highestArity = 1;
@@ -761,9 +901,9 @@ class Domain
     return (*it).second;
   }
 
-    // Returns the PredicateTemplate* with the given id or NULL if there is no
-    // PredicateTemplate with the specified id.
-    // Caller should not delete the returned PredicateTemplate* nor modify it.
+    // Returns the FunctionTemplate* with the given id or NULL if there is no
+    // FunctionTemplate with the specified id.
+    // Caller should not delete the returned FunctionTemplate* nor modify it.
   const FunctionTemplate* getFunctionTemplate(const int& id) const
   {
     const char* funcName = ((Domain*)this)->getFunctionName(id);
@@ -843,26 +983,119 @@ class Domain
 
   int getNumNonEvidenceAtoms() const;
   
-  Predicate* getNonEvidenceAtom(int index) const;
+  Predicate* getNonEvidenceAtom(const int& index) const;
   
-  int addPredBlock(Array<Predicate*>* const & predBlock) const;
+  int addPredBlock(Predicate* const & predBlock) const;
+
+  int getBlock(const Predicate* const & pred) const;
   
-  int getBlock(Predicate* pred) const;
+  int getBlock(const GroundPredicate* const & pred) const;
   
   int getNumPredBlocks() const;
   
-  const Array<Array<Predicate*>*>* getPredBlocks() const;
+  const Array<Predicate*>* getPredBlocks() const;
 
-  const Array<Predicate*>* getPredBlock(const int index) const;
+  const Predicate* getPredBlock(const int& index) const;
   
+  /**
+   * Caller should not delete returned Predicate.
+   * 
+   * @param index Index of the block.
+   */
+  const Predicate* getTruePredInBlock(const int& index) const
+  {
+    assert(index <= truePredsInBlock_->size());
+    return (*truePredsInBlock_)[index];
+  }
+
+  /**
+   * Sets the true predicate in a block. The truth value must also be set in
+   * the database.
+   * 
+   * @param index Index of the block.
+   * @param pred Predicate being set to the true one in the block.
+   */
+  void setTruePredInBlock(const int& index, Predicate* const & pred) const
+  {
+    assert(index <= truePredsInBlock_->size());
+    if ((*truePredsInBlock_)[index]) delete (*truePredsInBlock_)[index];
+    (*truePredsInBlock_)[index] = pred;
+  }
+
+  const int getBlockSize(const int& index) const
+  {
+    return (*blockSizes_)[index];
+  }
+
   const Array<bool>* getBlockEvidenceArray() const;
   
-  const bool getBlockEvidence(const int index) const;
+  const bool getBlockEvidence(const int& index) const;
 
-  void setBlockEvidence(const int index, const bool value) const;
+  void setBlockEvidence(const int& index, const bool& value) const;
 
-  int getEvidenceIdxInBlock(const int index) const;
- 
+  /**
+   * Picks a predicate at random from a block. Caller should delete the
+   * returned Predicate*.
+   * 
+   * @param index Index of block from which to generate the Predicate.
+   */
+  const Predicate* getRandomPredInBlock(const int& index) const
+  {
+    const int chosen = random() % getBlockSize(index);
+    return getPredInBlock(chosen, index);
+  }
+  
+  /**
+   * Gets one ground predicate from a block. Caller should delete the
+   * returned Predicate*.
+   * 
+   * @param grounding Index of grounding in block to generate.
+   * @param index Index of block from which to generate the Predicate.
+   */
+  const Predicate* getPredInBlock(const int& grounding, const int& index) const
+  {
+    Predicate* pred = (Predicate*)getPredBlock(index);
+    assert(grounding <= getBlockSize(index));
+    Array<Predicate*> predArr;
+    pred->getGroundingNumber(this, predArr, grounding);
+    assert(predArr.size() == 1);
+    const Predicate* gndPred = new Predicate(*predArr[0]);
+    predArr.deleteItemsAndClear();
+    return gndPred;
+  }
+  
+  /**
+   * Gets the index in a block of a predicate
+   * 
+   * @param pred Predicate being searched for in the block.
+   * @param blockIdx Index of block to search.
+   * 
+   * @return Index in the block of the predicate, if present; otherwise, -1.
+   */
+  const int getIndexOfPredInBlock(const Predicate* const & pred,
+                                  const int& blockIdx) const
+  {
+    assert(((Predicate*)pred)->isGrounded());
+
+    for (int i = 0; i < getBlockSize(blockIdx); i++)
+    {
+      const Predicate* predInBlock = getPredInBlock(i, blockIdx);
+      if (((Predicate*)pred)->same((Predicate*)predInBlock))
+      {
+        delete predInBlock;
+        return i;
+      }
+      delete predInBlock;
+    }
+    return -1;
+  }
+
+  /**
+   * Computes the number of non-evidence atoms for each first-order predicate.
+   */
+  void computeNumNonEvidAtoms();
+   
+    
  private:
  
   void changePredTermsToNewIds(Predicate* const & p,
@@ -874,7 +1107,7 @@ class Domain
   ConstDualMap* constDualMap_; //maps constant id to name and vice versa
   DualMap* predDualMap_;  //maps predicate id to name and vice versa
   DualMap* funcDualMap_;  //maps func id to name and vice versa
-    //maps predicate name to PredicateTemplatex*. shares key with predDualMap_
+    //maps predicate name to PredicateTemplate*. shares key with predDualMap_
   StrToPredTemplateMap* strToPredTemplateMap_;
     //maps function name to FunctionTemplate*. shares its key with funcDualMap_
   StrToFuncTemplateMap* strToFuncTemplateMap_;
@@ -891,15 +1124,36 @@ class Domain
     // empty binary function template used when infix operators are used
   FunctionTemplate* emptyFuncBinaryTemplate_;
   
-    // constantsByTypeArr_[0] is an Array<int> of constants of type 0
+    // constantsByType_[0] is an Array<int> of constants of type 0
   Array<Array<int>*>* constantsByType_;
+    // externalConstantsByType_[0] is an Array<int> of ext. constants of type 0
+  Array<Array<int>*>* externalConstantsByType_;
   Database* db_;
   TrueFalseGroundingsStore* trueFalseGroundingsStore_; //for sampling clauses
   FunctionSet* funcSet_;
-    // Array storing blocks of preds which are mutually exclusive and exhaustive
-  Array<Array<Predicate*>*>* predBlocks_;
+    // (Partially grounded) predicates which represent one block. Terms which
+    // are still variables are the vars with !
+  Array<Predicate*>* predBlocks_;
+    // Ground predicate in each block which is true
+  Array<Predicate*>* truePredsInBlock_;
+    // Grounding index in each block which is true (i-th combination of
+    // constants)
+  Array<int>* trueGroundingsInBlock_;
+    // Size of each block
+  Array<int>* blockSizes_;
     // Flags indicating if block is fulfilled by evidence
-  Array<bool >* blockEvidence_;
+  Array<bool>* blockEvidence_;
+  
+    // externalConstant_[c] indicates if constant with id c is external, i.e. it
+    // originates from another domain (can occur when per-constant rules are
+    // used with multiple dbs). In this case, the constant is not used when
+    // grounding out preds and clauses.
+  //Array<bool>* externalConstant_;
+  
+    // numNonEvidAtomsPerPred_[p] holds the number of non-evidence groundings
+    // of the first-order predicate with index p
+  Array<int>* numNonEvidAtomsPerPred_;
+  
 };
 
 

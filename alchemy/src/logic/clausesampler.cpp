@@ -249,6 +249,7 @@ Array<int>* ClauseSampler::chooseSample(const Clause* const & clause,
     assert(constants->size() > 0);
     int idx = random_.randomOneOf(constants->size());
       (*samp)[i] = (*constants)[idx];
+    //delete constants;
   }
   
   delete rtSensePred;

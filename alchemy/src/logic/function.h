@@ -114,6 +114,18 @@ class Function
     setDirty();
   }
 
+  /**
+   * Removes the last term in the function. The template is not changed and terms_
+   * is compressed. Returned Term* no longer belongs to the function and caller is
+   * responsible for deleting it.
+   */
+  Term* removeLastTerm()
+  {
+    Term* term = terms_->removeLastItem();
+    terms_->compress();
+    setDirty();
+    return term;
+  }
   
   int getNumTerms() const { return terms_->size(); }
 

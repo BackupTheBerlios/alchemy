@@ -128,7 +128,7 @@ class MaxWalkSat : public SAT
     numerator_ = 50; // User-set?
     denominator_ = 100; // User-set?
       // We assume we are not in a block
-    inBlock_ = false;
+    inBlock_ = -1;
     flipInBlock_ = NOVALUE;
 
       // Initialize array of function pointers
@@ -176,14 +176,14 @@ class MaxWalkSat : public SAT
     int numsuccesstry = 0;
     long double lowCost = LDBL_MAX;
 
-      // If keeping track of true clause groundings, then init to zero
+      /* If keeping track of true clause groundings, then init to zero
     if (trackClauseTrueCnts_)
-      for (int clauseno = 0; clauseno < clauseTrueCnts_->size(); clauseno++)
-        (*clauseTrueCnts_)[clauseno] = 0;
+      resetCnts();
+      */
 
       // Perform up to maxTries tries or numSolutions successful tries
-    while (numsuccesstry < numSolutions_ &&
-           numtry < maxTries_*numSolutions_)
+    //while (numsuccesstry < numSolutions_ && numtry < maxTries_*numSolutions_)
+    while (numsuccesstry < numSolutions_ && numtry < maxTries_)
     {
       numtry++;
       numFlips_ = 0;
@@ -211,18 +211,27 @@ class MaxWalkSat : public SAT
         numFlips_++;
         flipAtom((this->*(pickcode[heuristic_]))());
           // If in a block, then another atom was also chosen to flip
-        if (inBlock_)
+        if (inBlock_ > -1)
+        {
+          if (mwsdebug)
+          {
+            cout << "In block " << inBlock_ << ": flip atom " << flipInBlock_
+                 << endl;
+          }
           flipAtom(flipInBlock_);
+        }
 
           // set in block back to false
-        inBlock_ = false;
+        inBlock_ = -1;
         flipInBlock_ = NOVALUE;
         
         long double costOfFalseClauses = state_->getCostOfFalseClauses();
         //long double lowCost = state_->getLowCost();
-          // If the cost of false clauses is lower than the low cost of all
-          // tries, then save this as the low state.
-        if (costOfFalseClauses < lowCost)
+          // If the cost of false clauses is less than the low cost
+          // of all tries, then save this as the low state. Or if we have
+          // reached a solution the cost could be equal
+        if ((costOfFalseClauses <= targetCost_ + 0.0001 &&
+             costOfFalseClauses <= lowCost) || (costOfFalseClauses < lowCost))
         {
           if (mwsdebug)
           {
@@ -262,7 +271,7 @@ class MaxWalkSat : public SAT
 
       // If keeping track of true clause groundings
     if (trackClauseTrueCnts_)
-      state_->getNumClauseGndings(clauseTrueCnts_, true);    
+      tallyCntsFromState();
   }
   
   const int getHeuristic()
@@ -300,7 +309,7 @@ class MaxWalkSat : public SAT
       return;
 
       // Flip the atom in the state
-    state_->flipAtom(toFlip);
+    state_->flipAtom(toFlip, inBlock_);
       // Mark this flip as last time atom was changed if tabu is used
     if (heuristic_ == TABU || heuristic_ == SS)
     {
@@ -345,9 +354,15 @@ class MaxWalkSat : public SAT
   int pickRandom()
   {
     //if (mwsdebug) cout << "Entering MaxWalkSat::pickRandom" << endl;
-    assert(!inBlock_);
+    assert(inBlock_ == -1);
     int atomIdx = state_->getIndexOfAtomInRandomFalseClause();
     assert(atomIdx > 0);
+
+      // if false => fix atoms
+    bool ignoreActivePreds = false;
+    bool groundOnly = false;
+    if (!state_->activateAtom(atomIdx, ignoreActivePreds, groundOnly))
+      return NOVALUE;
 
       // If atom is in a block, then another one has to be picked
     int blockIdx = state_->getBlockIndex(atomIdx - 1);
@@ -355,38 +370,58 @@ class MaxWalkSat : public SAT
     {
         // Atom is in a block
         // If evidence atom exists or in block of size 1, then can not flip
-      if (state_->isBlockEvidence(blockIdx) ||
-          state_->getBlockSize(blockIdx) == 1)
+      if (state_->getDomain()->getBlockEvidence(blockIdx) ||
+          state_->getDomain()->getBlockSize(blockIdx) == 1)
         return NOVALUE;
       else
       {
           //Dealing with atom in a block
-        Array<int>& block = state_->getBlockArray(blockIdx);
+        int blockSize = state_->getDomain()->getBlockSize(blockIdx);
           // 0->1: choose atom in block which is already 1
         if (state_->getValueOfAtom(atomIdx) == 0)
         {
-          for (int i = 0; i < block.size(); i++)
+          for (int i = 0; i < blockSize; i++)
           {
-            if (state_->getValueOfAtom(block[i] + 1) == 1)
+            const Predicate* pred =
+              state_->getDomain()->getPredInBlock(i, blockIdx);
+            GroundPredicate* gndPred = new GroundPredicate((Predicate*)pred);
+
+            int idx = state_->getIndexOfGroundPredicate(gndPred);
+
+            delete gndPred;
+            delete pred;
+
+              // Pred is in the state
+            if (idx >= 0)
             {
-              inBlock_ = true;
-              flipInBlock_ = block[i] + 1;
-              return atomIdx;
+              if (state_->getValueOfAtom(idx + 1) == 1)
+              {
+                inBlock_ = blockIdx;
+                flipInBlock_ = idx + 1;
+                return atomIdx;
+              }
             }
           }
         }
           // 1->0: choose to flip the other randomly
-          // TODO: choose to flip the other with best improvement
         else
         {
           bool ok = false;
           while (!ok)
           {
-            int chosen = random() % block.size();
-            if (block[chosen] + 1 != atomIdx)
+            const Predicate* pred =
+              state_->getDomain()->getRandomPredInBlock(blockIdx);
+            GroundPredicate* gndPred = new GroundPredicate((Predicate*)pred);
+
+            int idx = state_->getIndexOfGroundPredicate(gndPred);
+            
+            delete gndPred;
+            delete pred;
+
+            if (idx + 1 != atomIdx)
             {
-              inBlock_ = true;
-              flipInBlock_ = block[chosen] + 1;
+              inBlock_ = blockIdx;
+              flipInBlock_ = idx + 1;
               return atomIdx;
             }
           }
@@ -406,30 +441,41 @@ class MaxWalkSat : public SAT
   int pickBest()
   {
     //if (mwsdebug) cout << "Entering MaxWalkSat::pickBest" << endl;
-    assert(!inBlock_);
+      // With prob. do a noisy pick
+    bool noisyPick = (numerator_ > 0 && random()%denominator_ < numerator_); 
+    if (noisyPick)
+      return pickRandom();
+
+    assert(inBlock_ == -1);
       // Clause to fix picked at random    
     int toFix = state_->getRandomFalseClauseIndex();
     if (toFix == NOVALUE) return NOVALUE;
 
     if (mwsdebug) cout << "Looking to fix clause " << toFix << endl;
-    long double improvement;
-
-    Array<int> canNotFlip;
-      // If var in candidateBlockedVars is chosen, then
-      // corresponding var in othersToFlip is flipped as well
-    Array<int> candidateBlockedVars;
-    Array<int> othersToFlip;
 
     int clauseSize = state_->getClauseSize(toFix);
     long double cost = state_->getClauseCost(toFix);
+
+    long double improvement;
+      // Arrays to hold information on candidate flips
+    Array<Array<int> > canNotFlip;
+      // If var in candidateBlockedVars is chosen, then
+      // corresponding var in othersToFlip is flipped as well
+    Array<Array<int> > candidateBlockedVars;
+    Array<Array<int> > othersToFlip;
+    Array<int> blockIdx;
+
+    canNotFlip.growToSize(clauseSize);
+    candidateBlockedVars.growToSize(clauseSize);
+    othersToFlip.growToSize(clauseSize);
+    blockIdx.growToSize(clauseSize);
+
       // Holds the best atoms so far
     Array<int> best;
       // How many are tied for best
     register int numbest = 0;
       // Best value so far
     long double bestvalue = -LDBL_MAX;
-      // With prob. do a noisy pick
-    bool noisyPick = (numerator_ > 0 && random()%denominator_ < numerator_); 
 
       // Look at each atom and pick best ones
     for (int i = 0; i < clauseSize; i++)
@@ -440,10 +486,15 @@ class MaxWalkSat : public SAT
         // var is the index of the atom
       register int var = abs(lit);
 
-      improvement = calculateImprovement(var, canNotFlip,
-                                         candidateBlockedVars,
-                                         othersToFlip);
+      if (state_->isFixedAtom(var)) continue;
+      bool ignoreActivePreds = false;
+      bool groundOnly = false;
+	  if (!state_->activateAtom(var, ignoreActivePreds, groundOnly))
+        return NOVALUE;
 
+      improvement = calculateImprovement(var, canNotFlip[i],
+                                         candidateBlockedVars[i],
+                                         othersToFlip[i], blockIdx[i]);
       if (mwsdebug)
         cout << "Improvement of var " << var << " is: " << improvement << endl;
 
@@ -455,7 +506,7 @@ class MaxWalkSat : public SAT
           best.clear();
         }
         bestvalue = improvement;
-        best.append(var);
+        best.append(i);
         numbest++;
       }
     }
@@ -466,33 +517,29 @@ class MaxWalkSat : public SAT
       // (default if none of the following 2 cases occur)
     int toFlip = best[random()%numbest];
 
-      // 1. If no improvement by best,
-      // then with prob. choose a random atom
-    if (noisyPick)
-    {
-      if (cost > 0)
-        toFlip = abs(state_->getRandomAtomInClause(toFix));
-      else
-        toFlip = state_->getRandomTrueLitInClause(toFix);
-    }
-      // 2. Exactly one best atom
-    else if (numbest == 1)
+      // Exactly one best atom
+    if (numbest == 1)
       toFlip = best[0];
+    int toFlipAtom = abs(state_->getAtomInClause(toFlip, toFix));
 
-      // If atom can not be flipped, then null flip
-    if (canNotFlip.contains(toFlip)) toFlip = NOVALUE;
-    else
-    { // If toFlip is in block, then set other to flip
-      int idx = candidateBlockedVars.find(toFlip);
-      if (idx >= 0)
-      {
-        inBlock_ = true;
-        flipInBlock_ = othersToFlip[idx];
+    if (blockIdx[toFlip] > -1)
+    {
+        // If atom can not be flipped, then null flip
+      if (canNotFlip[toFlip].contains(toFlipAtom))
+        toFlipAtom = NOVALUE;
+      else
+      { // If toFlip is in block, then set other to flip
+        int idx = candidateBlockedVars[toFlip].find(toFlipAtom);
+        if (idx >= 0)
+        {
+          inBlock_ = blockIdx[toFlip];
+          flipInBlock_ = othersToFlip[toFlip][idx];
+        }
       }
     }
-
+    
     //if (mwsdebug) cout << "Leaving MaxWalkSat::pickBest" << endl;
-    return toFlip;
+    return toFlipAtom;
   }
 
   /**
@@ -503,7 +550,7 @@ class MaxWalkSat : public SAT
   int pickTabu()
   {
     //if (mwsdebug) cout << "Entering MaxWalkSat::pickTabu" << endl;
-    assert(!inBlock_);
+    assert(inBlock_ == -1);
       // Clause to fix picked at random    
     int toFix = state_->getRandomFalseClauseIndex();
     if (toFix == NOVALUE)
@@ -513,15 +560,22 @@ class MaxWalkSat : public SAT
     }
     if (mwsdebug) cout << "Looking to fix clause " << toFix << endl;
 
-    long double improvement;
-    Array<int> canNotFlip;
-      // If var in candidateBlockedVars is chosen, then
-      // corresponding var in othersToFlip is flipped as well
-    Array<int> candidateBlockedVars;
-    Array<int> othersToFlip;
-
     int clauseSize = state_->getClauseSize(toFix);
     long double cost = state_->getClauseCost(toFix);
+
+    long double improvement;
+      // Arrays to hold information on candidate flips
+    Array<Array<int> > canNotFlip;
+      // If var in candidateBlockedVars is chosen, then
+      // corresponding var in othersToFlip is flipped as well
+    Array<Array<int> > candidateBlockedVars;
+    Array<Array<int> > othersToFlip;
+    Array<int> blockIdx;
+
+    canNotFlip.growToSize(clauseSize);
+    candidateBlockedVars.growToSize(clauseSize);
+    othersToFlip.growToSize(clauseSize);
+    blockIdx.growToSize(clauseSize);
 
       // Holds the best atoms so far
     Array<int> best;
@@ -540,12 +594,19 @@ class MaxWalkSat : public SAT
       if (cost < 0 && !state_->isTrueLiteral(lit)) continue;
         // var is the index of the atom
       register int var = abs(lit);
+      
+	  if (state_->isFixedAtom(var)) continue;
+      bool ignoreActivePreds = false;
+      bool groundOnly = false;
+      if (!state_->activateAtom(var, ignoreActivePreds, groundOnly))
+        return NOVALUE;
 
-      improvement = calculateImprovement(var, canNotFlip, candidateBlockedVars,
-                                         othersToFlip);
+      improvement = calculateImprovement(var, canNotFlip[i],
+                                         candidateBlockedVars[i],
+                                         othersToFlip[i], blockIdx[i]);
       if (mwsdebug)
         cout << "Improvement of var " << var << " is: " << improvement << endl;
-        
+
         // TABU: If pos. improvement, then always add it to best
       if (improvement > 0 && improvement >= bestvalue)
       { // Tied or better than previous best
@@ -555,14 +616,14 @@ class MaxWalkSat : public SAT
           best.clear();
         }
         bestvalue = improvement;
-        best.append(var);
+        best.append(i);
         numbest++;
       }
       else if (tabuLength_ < numFlips_ - changed_[var])
       {
         if (noisyPick)
         { 
-          best.append(var);
+          best.append(i);
           numbest++;
         }
         else if (improvement >= bestvalue)
@@ -573,12 +634,12 @@ class MaxWalkSat : public SAT
             best.clear();
           }
           bestvalue = improvement;
-          best.append(var);
+          best.append(i);
           numbest++;
         }
       }
     }
-    
+
     if (numbest == 0) 
     {
       //if (mwsdebug) cout << "Leaving MaxWalkSat::pickTabu (NOVALUE)" << endl;
@@ -592,22 +653,26 @@ class MaxWalkSat : public SAT
     else
       // Choose one of the best at random
       toFlip = best[random()%numbest];
+    int toFlipAtom = abs(state_->getAtomInClause(toFlip, toFix));
 
-
-      // If atom can not be flipped, then null flip
-    if (canNotFlip.contains(toFlip)) toFlip = NOVALUE;
-    else
-    { // If toflip is in block, then set other to flip
-      int idx = candidateBlockedVars.find(toFlip);
-      if (idx >= 0)
-      {
-        inBlock_ = true;
-        flipInBlock_ = othersToFlip[idx];
+    if (blockIdx[toFlip] > -1)
+    {
+        // If atom can not be flipped, then null flip
+      if (canNotFlip[toFlip].contains(toFlipAtom))
+        toFlipAtom = NOVALUE;
+      else
+      { // If toFlip is in block, then set other to flip
+        int idx = candidateBlockedVars[toFlip].find(toFlipAtom);
+        if (idx >= 0)
+        {
+          inBlock_ = blockIdx[toFlip];
+          flipInBlock_ = othersToFlip[toFlip][idx];
+        }
       }
     }
 
     //if (mwsdebug) cout << "Leaving MaxWalkSat::pickTabu" << endl;
-    return toFlip;
+    return toFlipAtom;
   }
 
   /**
@@ -619,12 +684,14 @@ class MaxWalkSat : public SAT
   int pickSS()
   {
     //if (mwsdebug) cout << "Entering MaxWalkSat::pickSS" << endl;
-    assert(!inBlock_);
+    assert(inBlock_ == -1);
     Array<int> canNotFlip;
       // If var in candidateBlockedVars is chosen, then
       // corresponding var in othersToFlip is flipped as well
     Array<int> candidateBlockedVars;
     Array<int> othersToFlip;
+    int blockIdx;
+    
     long double costOfFalseClauses = state_->getCostOfFalseClauses();
 
       // If we have already reached a solution or if in an SA step,
@@ -632,14 +699,22 @@ class MaxWalkSat : public SAT
       // Add 0.0001 to targetCost_ because of double precision error
       // This needs to be fixed
     if (costOfFalseClauses <= targetCost_ + 0.0001 ||
-        (random() % 100 < saRatio_ && !lateSa_))
+        (!lateSa_ && random() % 100 < saRatio_ ))
     {
         // Choose a random atom to flip
       int toFlip = state_->getIndexOfRandomAtom();
       if (toFlip == NOVALUE) return NOVALUE;
+
+      if (state_->isFixedAtom(toFlip)) return NOVALUE;
+      bool ignoreActivePreds = false;
+        // SA step: we don't want to activate
+      bool groundOnly = true;
+	  if (!state_->activateAtom(toFlip, ignoreActivePreds, groundOnly))
+        return NOVALUE;
       long double improvement = calculateImprovement(toFlip, canNotFlip,
                                                      candidateBlockedVars,
-                                                     othersToFlip);
+                                                     othersToFlip, blockIdx);
+      if (mwsdebug) cout << "Total improvement: " << improvement << endl;
 
         // If pos. or no improvement, then the atom will be flipped
         // Or neg. improvement: According to temp. flip atom anyway
@@ -653,9 +728,15 @@ class MaxWalkSat : public SAT
           int idx = candidateBlockedVars.find(toFlip);
           if (idx >= 0)
           {
-            inBlock_ = true;
+            inBlock_ = blockIdx;
             flipInBlock_ = othersToFlip[idx];
           }
+        }
+        
+          // SA
+        if (toFlip != NOVALUE)
+        {
+          state_->setActive(toFlip);
         }
         return toFlip;
       }
@@ -686,54 +767,58 @@ class MaxWalkSat : public SAT
    * index is appended here.
    * @param othersToFlip If dealing with an atom in a block, then the index of
    * the other atom chosen to be flipped is appended here.
+   * @param blockIdx Index of block if atom with atomIdx is in a block.
+   * Otherwise, -1.
    */
   long double calculateImprovement(const int& atomIdx, Array<int>& canNotFlip,
                                    Array<int>& candidateBlockedVars,
-                                   Array<int>& othersToFlip)
+                                   Array<int>& othersToFlip, int& blockIdx)
   {
-    int blockIdx = state_->getBlockIndex(atomIdx - 1);
+    blockIdx = state_->getBlockIndex(atomIdx - 1);
     if (blockIdx == -1)
     {
         // Atom not in a block
       return state_->getImprovementByFlipping(atomIdx);
     }
-
     else
     {
         // Atom is in a block
         // If evidence atom exists or in block of size 1, then can not flip
-      if (state_->isBlockEvidence(blockIdx) ||
-          state_->getBlockSize(blockIdx) == 1)
+      if (state_->getDomain()->getBlockEvidence(blockIdx) ||
+          state_->getDomain()->getBlockSize(blockIdx) == 1)
       {
         canNotFlip.append(atomIdx);
         return -LDBL_MAX;
       }
       else
       {
-          //Dealing with atom in a block
-        Array<int>& block = state_->getBlockArray(blockIdx);
+          // Dealing with atom in a block
+        int blockSize = state_->getDomain()->getBlockSize(blockIdx);
         int chosen = -1;
         int otherToFlip = -1;
 
           // 0->1: choose atom in block which is already 1
         if (state_->getValueOfAtom(atomIdx) == 0)
         {
-          if (mwsdebug)
+          for (int i = 0; i < blockSize; i++)
           {
-            cout << "0->1 atom " << atomIdx << endl;
-            for (int i = 0; i < block.size(); i++)
+            const Predicate* pred =
+              state_->getDomain()->getPredInBlock(i, blockIdx);
+            GroundPredicate* gndPred = new GroundPredicate((Predicate*)pred);
+
+            int idx = state_->getIndexOfGroundPredicate(gndPred);
+
+            delete gndPred;
+            delete pred;
+
+              // Pred is in the state
+            if (idx >= 0)
             {
-              cout << "Atom in block " << block[i] + 1 << " ";
-              cout << state_->getValueOfAtom(block[i] + 1) << endl;
-            }
-          }
-          
-          for (int i = 0; i < block.size(); i++)
-          {
-            if (state_->getValueOfAtom(block[i] + 1) == 1)
-            {
-              chosen = i;
-              break;
+              if (state_->getValueOfAtom(idx + 1) == 1)
+              {
+                chosen = idx + 1;
+                break;
+              }
             }
           }
         }
@@ -741,31 +826,35 @@ class MaxWalkSat : public SAT
           // TODO: choose to flip the other with best improvement
         else
         {
-          if (mwsdebug)
-          {
-            cout << "1->0 atom " << atomIdx << endl;
-            for (int i = 0; i < block.size(); i++)
-            {
-              cout << "Atom in block " << block[i] + 1 << " ";
-              cout << state_->getValueOfAtom(block[i] + 1) << endl;
-            }
-          }
           bool ok = false;
           while (!ok)
           {
-            chosen = random() % block.size();
-            if (block[chosen] + 1 != atomIdx)
+            const Predicate* pred =
+              state_->getDomain()->getRandomPredInBlock(blockIdx);
+            GroundPredicate* gndPred = new GroundPredicate((Predicate*)pred);
+
+            int idx = state_->getIndexOfGroundPredicate(gndPred);
+            if (idx == -1)
+            {
+              continue;
+              // TODO: Other atom not yet in state (lazy) - must activate it              
+            }
+            chosen = idx + 1;
+            
+            delete gndPred;
+            delete pred;
+
+            if (chosen != atomIdx)
               ok = true;
           }
         }
-    
+
         assert(chosen >= 0);
         candidateBlockedVars.append(atomIdx);
-        otherToFlip = block[chosen] + 1;
+        otherToFlip = chosen;
         othersToFlip.append(otherToFlip);
         return (state_->getImprovementByFlipping(atomIdx) +
                 state_->getImprovementByFlipping(otherToFlip));
-
       }
     }
   }
@@ -785,7 +874,7 @@ class MaxWalkSat : public SAT
       {
         cout << "Flipping atom " << (*it) << endl;
       }
-      state_->flipAtomValue(*it);
+      state_->flipAtomValue(*it, -1);
     }
     state_->saveLowState();
     if (mwsdebug) cout << "Done reconstructing low state ..." << endl;
@@ -820,7 +909,7 @@ class MaxWalkSat : public SAT
   int denominator_;
       
     // Which other atom to flip in block
-  bool inBlock_;
+  int inBlock_;
   int flipInBlock_;
   
     // If false, the naive way of saving low states (each time a low state is

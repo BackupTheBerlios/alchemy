@@ -68,7 +68,7 @@
 
 #include <string>
 using namespace std;
-
+#include <sstream>
 
 class Util
 {
@@ -92,10 +92,11 @@ class Util
 
   static string trim(const string& str)
   {
+    if (str.empty()) return str;
     int lt = 0; 
-    while (isspace(str.at(lt))) lt++;
+    while (lt < (int)str.length() && isspace(str.at(lt))) lt++;
     int rt = str.length()-1;
-    while (isspace(str.at(rt))) rt--;
+    while (rt >= 0 && isspace(str.at(rt))) rt--;
     return str.substr(lt, rt+1-lt);
   }
   

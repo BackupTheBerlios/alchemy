@@ -67,6 +67,7 @@
 #define VARIABLESTATE_H_
 
 #include "mrf.h"
+#include "timer.h"
 
 const int NOVALUE = -1;
 const bool vsdebug = false;
@@ -121,6 +122,11 @@ class VariableState
                 const MLN* const & mln, const Domain* const & domain,
                 const bool& lazy)
   {
+      // By default MaxWalkSAT mode
+    inferenceMode_ = MODE_MWS;
+    Timer timer;
+    double startTime = timer.time();
+
     this->mln_ = (MLN*)mln;
     this->domain_ = (Domain*)domain;
     this->lazy_ = lazy;
@@ -134,7 +140,7 @@ class VariableState
     lowBad_ = INT_MAX;
 
       // Clauses and preds are stored in gndClauses_ and gndPreds_
-    gndClauses_ = new Array<GroundClause*>;
+    gndClauses_ = new GroundClauseHashArray;
     gndPreds_ = new Array<GroundPredicate*>;
 
       // Set the hard clause weight
@@ -143,12 +149,11 @@ class VariableState
       // Lazy version: Produce state with initial active atoms and clauses
     if (lazy_)
     {
+        // Set number of non-evidence atoms from domain
+      domain_->computeNumNonEvidAtoms();
+      numNonEvAtoms_ = domain_->getNumNonEvidenceAtoms();
         // Unknown preds are treated as false
       domain_->getDB()->setPerformingInference(true);
-
-        // Blocks are copied from the domain
-      initLazyBlocks();
-
       clauseLimit_ = INT_MAX;
       noApprox_ = false;
       haveDeactivated_ = false;
@@ -158,11 +163,7 @@ class VariableState
         // Assumption is: all atoms are initially false except those in blocks
 
         // One atom in each block is set to true and activated
-      addOneAtomToEachBlock();
-
-//cout << "After addOneAtomToEachBlock" << endl;
-//for (int i = 1; i < atom_.size(); i++)
-//  cout << atom_[i] << endl;
+      initBlocksRandom();
 
       bool ignoreActivePreds = false;
       getActiveClauses(newClauses_, ignoreActivePreds);
@@ -196,16 +197,13 @@ class VariableState
       for (int i = 0; i < baseNumAtoms_; i++)
       {
         domain_->getDB()->setActiveStatus(gndPredHashArray_[i], true);
-        activeAtoms_++;        
+        activeAtoms_++;     
       }
-
-        // Add the rest of the atoms in the blocks, but don't activate
-      fillLazyBlocks();
 
         // Get the initial set of active clauses
       ignoreActivePreds = false;
       getActiveClauses(newClauses_, ignoreActivePreds);      
-    } // End lazy version
+	} // End lazy version
       // Eager version: Use KBMC to produce the state
     else
     {
@@ -223,16 +221,13 @@ class VariableState
       mrf_ = new MRF(queries, allPredGndingsAreQueries, domain_,
                      domain_->getDB(), mln_, markHardGndClauses,
                      trackParentClauseWts, -1);
+
         //delete to save space. Can be deleted because no more gndClauses are
         //appended to gndPreds beyond this point
       mrf_->deleteGndPredsGndClauseSets();
         //do not delete the intArrRep in gndPreds_;
       delete queries;
 
-        // Blocks built in MRF
-      blocks_ = mrf_->getBlocks();
-      blockEvidence_ = mrf_->getBlockEvidence();
-        
         // Put ground clauses in newClauses_
       newClauses_ = *(Array<GroundClause*>*)mrf_->getGndClauses();
         // Put ground preds in the hash array
@@ -253,32 +248,25 @@ class VariableState
     bool initial = true;
     addNewClauses(initial);
     
-    cout << "Initial num. of clauses: " << getNumClauses() << endl;
+	cout << "[VS] ";
+	Timer::printTime(cout,timer.time()-startTime);
+	cout << endl;
+	cout << ">>> DONE: Initial num. of clauses: " << getNumClauses() << endl;
   }
 
   /**
-   * Destructor. Blocks are deleted in lazy version; MRF is deleted in eager
-   * version.
+   * Destructor. MRF is deleted in eager version.
    */ 
   ~VariableState()
   {
-    if (lazy_)
-    {
-        // Block information from lazy version is deleted
-      for (int i = 0; i < blocks_->size(); i++)
-        (*blocks_)[i].clearAndCompress();
-      delete blocks_;
-    
-      delete blockEvidence_;  
-    }
-    else
+    if (!lazy_)
     {
         // MRF from eager version is deleted
       if (mrf_) delete mrf_;
       //if (unePreds_) delete unePreds_;
       //if (knePreds_) delete knePreds_;
       //if (knePredValues_) delete knePredValues_;
-    }    
+    }
   }
 
 
@@ -291,116 +279,8 @@ class VariableState
    */
   void addNewClauses(bool initial)
   {
-    if (vsdebug)
-      cout << "Adding " << newClauses_.size() << " new clauses.." << endl;
-
-      // Store the old number of clauses and atoms
-    int oldNumClauses = getNumClauses();
-    int oldNumAtoms = getNumAtoms();
-
-    gndClauses_->append(newClauses_);
-    gndPreds_->growToSize(gndPredHashArray_.size());
-
-    int numAtoms = getNumAtoms();
-    int numClauses = getNumClauses();
-      // If no new atoms or clauses have been added, then do nothing
-    if (numAtoms == oldNumAtoms && numClauses == oldNumClauses) return;
-
-    if (vsdebug) cout << "Clauses: " << numClauses << endl;
-      // atomIdx starts at 1
-    atom_.growToSize(numAtoms + 1, false);
-
-    makeCost_.growToSize(numAtoms + 1, 0.0);
-    breakCost_.growToSize(numAtoms + 1, 0.0);
-    lowAtom_.growToSize(numAtoms + 1, false);
-    fixedAtom_.growToSize(numAtoms + 1, 0);
-
-      // Copy ground preds to gndPreds_ and set values in atom and lowAtom
-    for (int i = oldNumAtoms; i < gndPredHashArray_.size(); i++)
-    {
-      (*gndPreds_)[i] = gndPredHashArray_[i];
-
-      if (vsdebug)
-      {
-        cout << "New pred " << i + 1 << ": ";
-        (*gndPreds_)[i]->print(cout, domain_);
-        cout << endl;
-      }
-
-      lowAtom_[i + 1] = atom_[i + 1] = 
-        (domain_->getDB()->getValue((*gndPreds_)[i]) == TRUE) ? true : false;
-    }
-    newClauses_.clear();
-
-    clause_.growToSize(numClauses);
-    clauseCost_.growToSize(numClauses);
-    falseClause_.growToSize(numClauses);
-    whereFalse_.growToSize(numClauses);
-    numTrueLits_.growToSize(numClauses);
-    watch1_.growToSize(numClauses);
-    watch2_.growToSize(numClauses);
-    isSatisfied_.growToSize(numClauses, false);
-    deadClause_.growToSize(numClauses, false);
-    threshold_.growToSize(numClauses, false);
-
-    occurence_.growToSize(2*numAtoms + 1);
-
-    for (int i = oldNumClauses; i < numClauses; i++)
-    {
-      GroundClause* gndClause = (*gndClauses_)[i];
-
-      if (vsdebug)
-      {
-        cout << "New clause " << i << ": ";
-        gndClause->print(cout, domain_, &gndPredHashArray_);
-        cout << endl;
-      }
-      
-        // Set thresholds for clause selection
-      if (gndClause->isHardClause()) threshold_[i] = RAND_MAX;
-      else
-      {
-        double w = gndClause->getWt();
-        threshold_[i] = RAND_MAX*(1 - exp(-abs(w)));
-        if (vsdebug)
-        {
-          cout << "Weight: " << w << endl;            
-        }
-      }
-      if (vsdebug)
-        cout << "Threshold: " << threshold_[i] << endl;            
-      
-      int numGndPreds = gndClause->getNumGroundPredicates();
-      clause_[i].growToSize(numGndPreds);
-
-      for (int j = 0; j < numGndPreds; j++) 
-      {
-        int lit = gndClause->getGroundPredicateIndex(j);
-        clause_[i][j] = lit;
-        int litIdx = 2*abs(lit) - (lit > 0);
-        occurence_[litIdx].append(i);
-      }
-
-        // Hard clause weight has been previously determined
-      if (gndClause->isHardClause())
-        clauseCost_[i] = hardWt_;
-      else
-        clauseCost_[i] = gndClause->getWt();
-    }
-
-    if (!initial)
-    {
-      //initNumSatLiterals(1, oldNumClauses);
-      if (useThreshold_)
-      {
-        killClauses(oldNumClauses);
-      }
-      else
-      {
-        initMakeBreakCostWatch(oldNumClauses);
-      }
-    }
-    if (vsdebug) cout << "Done adding new clauses.." << endl;
+    if (initial) addNewClauses(ADD_CLAUSE_INITIAL, newClauses_);
+    else addNewClauses(ADD_CLAUSE_REGULAR, newClauses_);
   }
 
   /**
@@ -411,7 +291,7 @@ class VariableState
       // Initialize info arrays
     initMakeBreakCostWatch();
   }
-  
+
   /**
    * State is re-initialized with all new clauses and atoms.
    */
@@ -428,7 +308,10 @@ class VariableState
     deadClause_.clearAndCompress();
     threshold_.clearAndCompress();
 
-    newClauses_.append(gndClauses_);
+    //newClauses_.append(gndClauses_);
+    for (int i = 0; i < gndClauses_->size(); i++)
+      newClauses_.append((*gndClauses_)[i]);
+
     gndClauses_->clearAndCompress();
     gndPreds_->clearAndCompress();
     for (int i = 0; i < occurence_.size(); i++)
@@ -449,32 +332,44 @@ class VariableState
    */
   void initRandom()
   {
+      // If performing SampleSat, do a run of UP
+  	if (inferenceMode_ == MODE_SAMPLESAT)
+  	{
+      unitPropagation();
+    }
+
       // Set one in each block to true randomly
     initBlocksRandom();
 
-      // Random truth value for all not in blocks
-    for (int i = 1; i <= baseNumAtoms_; i++)
+    for (int i = 1; i <= gndPreds_->size(); i++)
     {
-        // fixedAtom_[i] = -1: false, fixedAtom_[i] = 1: true
       if (fixedAtom_[i] != 0)
       {
-        setValueOfAtom(i, (fixedAtom_[i] == 1));
         continue;
       }
+
         // Blocks are initialized above
       if (getBlockIndex(i - 1) >= 0)
       {
-        if (vsdebug) cout << "Atom " << i << " in block" << endl;
-        continue;
+      	if (vsdebug) cout << "Atom " << i << " in block" << endl;
+      	continue;
       }
         // Not fixed and not in block
       else
       {
         if (vsdebug) cout << "Atom " << i << " not in block" << endl;
-        setValueOfAtom(i, random() % 2);
+			
+          // only need to activate inactive true atoms
+        if (!lazy_ || isActive(i))
+        {
+          bool isTrue = random() % 2;
+          bool activate = false;
+          setValueOfAtom(i, isTrue, activate, -1);
+        }
       }
     }
-    init();
+
+    init();	
   }
 
   /**
@@ -485,56 +380,85 @@ class VariableState
     if (vsdebug)
     {
       cout << "Initializing blocks randomly" << endl;
-      cout << "Num. of blocks: " << blocks_->size() << endl;
+      cout << "Num. of blocks: " << domain_->getNumPredBlocks() << endl;
     }
-    
       // For each block: select one to set to true
-    for (int i = 0; i < blocks_->size(); i++)
+    for (int i = 0; i < domain_->getNumPredBlocks(); i++)
     {
+      int trueFixedAtom = getTrueFixedAtomInBlock(i);
         // True fixed atom in the block: set others to false
-      if (int trueFixedAtomInBlock = getTrueFixedAtomInBlock(i) >= 0)
+      if (trueFixedAtom >= 0)
       {
-        if (vsdebug) cout << "True fixed atom in block " << i << endl;
-        setOthersInBlockToFalse(trueFixedAtomInBlock, i);
+        if (vsdebug)
+        {
+          cout << "True fixed atom " << trueFixedAtom  << " in block "
+               << i << endl;
+        }
+        setOthersInBlockToFalse(trueFixedAtom, i);
         continue;
       }
 
         // If evidence atom exists, then all others are false
-      if ((*blockEvidence_)[i])
+      if (domain_->getBlockEvidence(i))
       {
+        if (vsdebug) cout << "Block evidence in block " << i << endl;
           // If first argument is -1, then all are set to false
         setOthersInBlockToFalse(-1, i);
         continue;
       }
 
-        // Eager version: pick one at random
-      Array<int>& block = (*blocks_)[i];
+        // Pick one pred from block at random
       bool ok = false;
       while (!ok)
       {
-        int chosen = random() % block.size();
-          // Atom not fixed
-        if (fixedAtom_[block[chosen] + 1] == 0)
+        const Predicate* pred = domain_->getRandomPredInBlock(i);
+        GroundPredicate* gndPred = new GroundPredicate((Predicate*)pred);
+        int atomIdx = gndPredHashArray_.find(gndPred);
+        delete pred;
+
+        assert(lazy_ || atomIdx >= 0);        
+          // Pred not yet present: add it
+        if (atomIdx == -1)
         {
-          if (vsdebug) cout << "Atom " << block[chosen] + 1 
-                            << " chosen in block" << endl;
-          setValueOfAtom(block[chosen] + 1, true);
-          setOthersInBlockToFalse(chosen, i);
+          atomIdx = gndPredHashArray_.append(gndPred);
+          bool initial = false;
+          addNewClauses(initial);
           ok = true;
         }
+          // Pred already present: check that it's not fixed
+        else
+        {
+          delete gndPred;
+          if (fixedAtom_[atomIdx + 1] == 0)
+          {
+            if (vsdebug) cout << "Atom " << atomIdx + 1 
+                              << " chosen in block " << i << endl;
+            ok = true;
+          }
+          else
+          {
+            if (vsdebug) cout << "Atom " << atomIdx + 1 
+                              << " is fixed to " << fixedAtom_[atomIdx + 1]
+                              << endl;
+              // Atom is fixed
+            continue;
+          }
+        }
+        bool activate = false;
+        setValueOfAtom(atomIdx + 1, true, activate, i);
+        setOthersInBlockToFalse(atomIdx, i);
       }
     }
     if (vsdebug) cout << "Done initializing blocks randomly" << endl;
   }      
 
   /**
-   * Re-initializes the makeCost, breakCost and watch arrays based on the
-   * current variable assignment.
+   * Resets the makeCost, breakCost and watch arrays.
    */
-  void initMakeBreakCostWatch()
+  void resetMakeBreakCostWatch()
   {
-      // Reset info concerning true lits, false clauses, etc.
-    for (int i = 0; i < getNumClauses(); i++) numTrueLits_[i] = 0;
+  	  // Reset info concerning true lits, false clauses, etc.
+  	for (int i = 0; i < getNumClauses(); i++) numTrueLits_[i] = 0;
     numFalseClauses_ = 0;
     costOfFalseClauses_ = 0.0;
     lowCost_ = LDBL_MAX;
@@ -546,6 +470,16 @@ class VariableState
     {
       makeCost_[i] = breakCost_[i] = 0.0;
     }
+  }
+
+
+  /**
+   * Re-initializes the makeCost, breakCost and watch arrays based on the
+   * current variable assignment.
+   */
+  void initMakeBreakCostWatch()
+  {
+    resetMakeBreakCostWatch();
     initMakeBreakCostWatch(0);
   }
 
@@ -562,8 +496,9 @@ class VariableState
       // Initialize breakCost and makeCost in the following:
     for (int i = startClause; i < getNumClauses(); i++)
     {
-        // Don't look at dead clauses
-      if (deadClause_[i]) continue;
+        // Don't look at dead or satisfied clauses
+      if (deadClause_[i] || isSatisfied_[i]) continue;
+
       int trueLit1 = 0;
       int trueLit2 = 0;
       long double cost = clauseCost_[i];
@@ -581,7 +516,7 @@ class VariableState
 
         // Unsatisfied positive-weighted clauses or
         // Satisfied negative-weighted clauses
-      if ((numTrueLits_[i] == 0 && cost > 0) ||
+      if ((numTrueLits_[i] == 0 && cost >= 0) ||
           (numTrueLits_[i] > 0 && cost < 0))
       {
         whereFalse_[i] = numFalseClauses_;
@@ -611,13 +546,13 @@ class VariableState
         }
       }
         // Pos. clauses satisfied by one true literal
-      else if (numTrueLits_[i] == 1 && cost > 0)
+      else if (numTrueLits_[i] == 1 && cost >= 0)
       {
         breakCost_[theTrueLit] += cost;
         watch1_[i] = theTrueLit;
       }
         // Pos. clauses satisfied by 2 or more true literals
-      else if (cost > 0)
+      else if (cost >= 0)
       { /*if (numtruelit[i] == 2)*/
         watch1_[i] = trueLit1;
         watch2_[i] = trueLit2;
@@ -644,13 +579,43 @@ class VariableState
   }
 
   /**
-   * Returns the absolute index of a random atom.
+   * Returns the absolute index of a random atom. If in lazy mode, a
+   * non-evidence atom which is not in memory could be picked. In this case,
+   * the atom is added to the set in memory and its index is returned.
    */
   int getIndexOfRandomAtom()
   {
-    int numAtoms = getNumAtoms();
-    if (numAtoms == 0) return NOVALUE;
-    return random()%numAtoms + 1;
+      // Lazy: pick a random non-evidence atom from domain
+    if (lazy_)
+    {
+      Predicate* pred = domain_->getNonEvidenceAtom(random() % numNonEvAtoms_);
+      GroundPredicate* gndPred = new GroundPredicate(pred);
+      delete pred;
+
+      int idx = gndPredHashArray_.find(gndPred);
+        // Already present, then return index
+      if (idx >= 0)
+      {
+        delete gndPred;
+        return idx + 1;
+      }
+        // Not present, add it to the state
+      else
+      {
+        gndPredHashArray_.append(gndPred);
+        bool initial = false;
+        addNewClauses(initial);
+          // index to return is the last element
+        return gndPredHashArray_.size();
+      }
+    }
+      // Eager: pick an atom from the state
+    else
+    {
+      int numAtoms = getNumAtoms();
+      if (numAtoms == 0) return NOVALUE;
+      return random()%numAtoms + 1;
+    }
   }
 
   /**
@@ -663,8 +628,16 @@ class VariableState
     if (numFalseClauses_ == 0) return NOVALUE;
     int clauseIdx = falseClause_[random()%numFalseClauses_];
       // Pos. clause: return index of random atom
-    if (clauseCost_[clauseIdx] > 0)
-      return abs(clause_[clauseIdx][random()%getClauseSize(clauseIdx)]);
+    if (clauseCost_[clauseIdx] >= 0)
+    {
+        // Q: Can all atoms in a clause be fixed?
+      while (true)
+      {
+        int i = random()%getClauseSize(clauseIdx);
+        if (!fixedAtom_[abs(clause_[clauseIdx][i])])
+          return abs(clause_[clauseIdx][i]);
+      }
+    }
       // Neg. clause: find random true lit
     else
       return getRandomTrueLitInClause(clauseIdx);
@@ -726,30 +699,45 @@ class VariableState
    * 
    * @param atomIdx Index of atom whose value is to be set.
    * @param value Truth value being set.
+   * @param activate If true, atom is activated if not active.
+   * @param blockIdx Indicates which block the atom being flipped is in. If not
+   * in one, this is -1.
    */
-  void setValueOfAtom(const int& atomIdx, const bool& value)
+  void setValueOfAtom(const int& atomIdx, const bool& value,
+                      const bool& activate, const int& blockIdx)
   {
-    if (vsdebug) cout << "Setting value of atom " << atomIdx 
-                      << " to " << value << endl;
       // If atom already has this value, then do nothing
     if (atom_[atomIdx] == value) return;
-      // Propagate assigment to DB
+    if (vsdebug) cout << "Setting value of atom " << atomIdx 
+                      << " to " << value << endl;
+      // Propagate assignment to DB
     GroundPredicate* p = gndPredHashArray_[atomIdx - 1];
     if (value)
-    {
       domain_->getDB()->setValue(p, TRUE);
-    }
     else
-    {
       domain_->getDB()->setValue(p, FALSE);
-    }
+
       // If not active, then activate it
-    if (lazy_ && !isActive(atomIdx))
+    if (activate && lazy_ && !isActive(atomIdx))
     {
       bool ignoreActivePreds = false;
-      activateAtom(atomIdx, ignoreActivePreds);
+      bool groundOnly = false;
+      activateAtom(atomIdx, ignoreActivePreds, groundOnly);
     }
     atom_[atomIdx] = value;
+
+      // If in block and setting to true, tell the domain
+    if (blockIdx > -1 && value)
+    {
+      Predicate* pred = p->createEquivalentPredicate(domain_);
+      domain_->setTruePredInBlock(blockIdx, pred);
+      if (vsdebug)
+      {
+        cout << "Set true pred in block " << blockIdx << " to ";
+        pred->printWithStrVar(cout, domain_);
+        cout << endl;
+      }
+    }
   }
 
   /**
@@ -774,8 +762,9 @@ class VariableState
    * Flip the truth value of an atom and update info arrays.
    * 
    * @param toFlip Index of atom to be flipped.
+   * @param blockIdx Index of block in which atom is, or -1 if not in one.
    */
-  void flipAtom(const int& toFlip)
+  void flipAtom(const int& toFlip, const int& blockIdx)
   {
     bool toFlipValue = getValueOfAtom(toFlip);
     register int clauseIdx;
@@ -788,28 +777,27 @@ class VariableState
       sign = 0;
     oppSign = sign ^ 1;
 
-    flipAtomValue(toFlip);
-    
+    flipAtomValue(toFlip, blockIdx);
       // Update all clauses in which the atom occurs as a true literal
     litIdx = 2*toFlip - sign;
     Array<int>& posOccArray = getOccurenceArray(litIdx);
     for (int i = 0; i < posOccArray.size(); i++)
     {
       clauseIdx = posOccArray[i];
-        // Don't look at dead clauses
-      if (deadClause_[clauseIdx]) continue;
-        // The true lit became a false lit
-      int numTrueLits = decrementNumTrueLits(clauseIdx);
+        // Don't look at dead or satisfied clauses
+      if (deadClause_[clauseIdx] || isSatisfied_[clauseIdx]) continue;
+
+	  // The true lit became a false lit
+	  int numTrueLits = decrementNumTrueLits(clauseIdx);
       long double cost = getClauseCost(clauseIdx);
       int watch1 = getWatch1(clauseIdx);
       int watch2 = getWatch2(clauseIdx);
-
         // 1. If last true lit was flipped, then we have to update
         // the makecost / breakcost info accordingly        
       if (numTrueLits == 0)
       {
           // Pos. clause
-        if (cost > 0)
+        if (cost >= 0)
         {
             // Add this clause as false in the state
           addFalseClause(clauseIdx);
@@ -842,7 +830,7 @@ class VariableState
         }
 
           // Pos. clause: Increase toFlip's breakcost (add pos. cost)
-        if (cost > 0)
+        if (cost >= 0)
         {
           addBreakCost(watch1, cost);
         }
@@ -880,9 +868,10 @@ class VariableState
     for (int i = 0; i < negOccArray.size(); i++)
     {
       clauseIdx = negOccArray[i];
-        // Don't look at dead clauses
-      if (deadClause_[clauseIdx]) continue;
-        // The false lit became a true lit
+        // Don't look at dead or satisfied clauses
+      if (deadClause_[clauseIdx] || isSatisfied_[clauseIdx]) continue;
+
+	  // The false lit became a true lit
       int numTrueLits = incrementNumTrueLits(clauseIdx);
       long double cost = getClauseCost(clauseIdx);
       int watch1 = getWatch1(clauseIdx);
@@ -892,7 +881,7 @@ class VariableState
       if (numTrueLits == 1)
       {
           // Pos. clause
-        if (cost > 0)
+        if (cost >= 0)
         {
             // Remove this clause as false in the state
           removeFalseClause(clauseIdx);
@@ -920,7 +909,7 @@ class VariableState
       else
       if (numTrueLits == 2)
       {
-        if (cost > 0)
+        if (cost >= 0)
         {
             // Pos. clause
             // Decrease breakcost of first atom being watched (add neg. cost)
@@ -943,11 +932,15 @@ class VariableState
   /**
    * Flips the truth value of an atom. If in lazy mode, the truth value
    * is propagated to the database.
+   * 
+   * @param atomIdx Index of atom to be flipped.
+   * @param blockIdx Index of block in which the atom is in, or -1 if not in one.
    */  
-  void flipAtomValue(const int& atomIdx)
+  void flipAtomValue(const int& atomIdx, const int& blockIdx)
   {
     bool opposite = !atom_[atomIdx];
-    setValueOfAtom(atomIdx, opposite);
+    bool activate = true;
+    setValueOfAtom(atomIdx, opposite, activate, blockIdx);
   }
 
   /**
@@ -963,40 +956,707 @@ class VariableState
    */
   long double getImprovementByFlipping(const int& atomIdx)
   {
-    if (lazy_ && !isActive(atomIdx))
-    {
-        // First flip the atom to activate it, then flip it back
-      flipAtom(atomIdx);
-      flipAtom(atomIdx);
-    }
     long double improvement = makeCost_[atomIdx] - breakCost_[atomIdx];
     return improvement;
   }
   
   /**
+   * Set the active status of an atom to true in the database if in lazy mode.
+   * 
+   * @atomIdx Index of the atom to be set to active.
+   */
+  void setActive(const int& atomIdx)
+  {
+    if (lazy_)
+    {
+      Predicate* p =
+        gndPredHashArray_[atomIdx - 1]->createEquivalentPredicate(domain_);
+      domain_->getDB()->setActiveStatus(p, true);
+      activeAtoms_++;
+      delete p;
+    }
+  }
+
+  /**
    * If in lazy mode, an atom is activated and all clauses activated by this
    * atom are added to the state. If in eager mode, nothing happens.
    * 
    * @param atomIdx Index of atom to be activated.
+   * @param ignoreActivePreds If true, active atoms are ignored when getting
+   * active clauses (just gets unsatisfied clauses).
+   * @param groundOnly If true, atom itself is not activated, just its active
+   * clauses are retrieved.
    */
-  void activateAtom(const int& atomIdx, const bool& ignoreActivePreds)
+  bool activateAtom(const int& atomIdx, const bool& ignoreActivePreds,
+                    const bool& groundOnly)
   {
-      // Lazy version: if atom is not active, we need to activate clauses
-      // and take their cost into account
+    /***
+     * . [IF MCSAT] 
+     * - check neg-wt clauses
+     * . if alive, fix
+     * . else mark dead
+     * - if not fixed, add all pos-wt, killClauses
+     * - else add dead
+     * . [ELSE] add all
+     ***/
     if (lazy_ && !isActive(atomIdx))
     {
+      if (vsdebug)
+      {
+        cout << "\tActivating ";
+        gndPredHashArray_[atomIdx-1]->print(cout,domain_);
+        cout << " " <<
+        domain_->getDB()->getActiveStatus(gndPredHashArray_[atomIdx-1]) << endl;
+      }
+
+        // Set atom to true first, see if avoid getting clauses already active
+      bool needToFlipBack = false;
+      if (!atom_[atomIdx])
+      {
+        bool activate = false;
+        setValueOfAtom(atomIdx, true, activate, -1);
+        updateMakeBreakCostAfterFlip(atomIdx);
+        needToFlipBack = true;
+      } 
+
+        // gather active clauses
       Predicate* p =
         gndPredHashArray_[atomIdx - 1]->createEquivalentPredicate(domain_);
-      getActiveClauses(p, newClauses_, true, ignoreActivePreds);
+
+      bool isFixed = false;
+      Array<GroundClause*> unsatClauses;
+      Array<GroundClause*> deadClauses;
+      Array<GroundClause*> toAddClauses;
+
+        // Using newClauses_ causes problem since it's shared across the board
+      getActiveClauses(p, unsatClauses, true, ignoreActivePreds);
+
+        // if MC-SAT: check neg-wt or unit clauses and see if can fix		  
+      if (useThreshold_)
+      {
+          // first append deadClauses, then pos-wt
+        for (int ni = 0; ni < unsatClauses.size(); ni++)
+        {
+          GroundClause* c = unsatClauses[ni];
+          if (c->getWt() < 0)
+          {  // Neg. weighted clause
+              // since newClauses_ excludes clauses in memory, c must be
+              // goodInPrevious
+            double threshold = RAND_MAX*(1 - exp(c->getWt()));
+            if (random() <= threshold)
+            {
+                // fix
+              isFixed = true;
+
+                // append dead and fixed clauses first, so fixed atoms do not
+                // activate them unnecessarily
+              if (deadClauses.size() > 0)
+                addNewClauses(ADD_CLAUSE_DEAD, deadClauses);
+
+              Array<GroundClause*> fixedClauses;
+              fixedClauses.append(c);
+              addNewClauses(ADD_CLAUSE_SAT, fixedClauses);
+
+                // --- fix the atoms
+              for (int pi = 0; pi < c->getNumGroundPredicates(); pi++)
+              {
+                int lit = c->getGroundPredicateIndex(pi);
+                fixAtom(abs(lit), (lit < 0));
+              }
+
+                // - can quit now
+              break;
+            }
+            else
+            {
+                // dead
+              deadClauses.append(c);
+            }
+          }
+          else if (c->getNumGroundPredicates() == 1)
+          {  // Unit clause
+            double threshold = RAND_MAX*(1 - exp(-c->getWt()));
+            if (random() <= threshold)
+            {
+                // fix
+              isFixed = true;
+
+                // append dead and fixed clauses first, so fixed atoms do not
+                // activate them unnecessarily
+              if (deadClauses.size() > 0)
+                addNewClauses(ADD_CLAUSE_DEAD, deadClauses);
+
+              Array<GroundClause*> fixedClauses;
+              fixedClauses.append(c);
+              addNewClauses(ADD_CLAUSE_SAT, fixedClauses);
+
+                // --- fix the atoms
+              int lit = c->getGroundPredicateIndex(0);
+              fixAtom(abs(lit), (lit > 0)); // this is positive wt
+
+                // - can quit now
+              break;
+            }
+            else
+            {
+                // dead
+              deadClauses.append(c);
+            }
+          }
+          else toAddClauses.append(c);
+        }
+      }
+
         // Add the clauses and preds and fill info arrays
-      bool initial = false;
-      addNewClauses(initial);
-        // Set active status in db
-      domain_->getDB()->setActiveStatus(p, true);
-      activeAtoms_++;
+      if (!isFixed)
+      {
+        if (deadClauses.size() > 0)
+          addNewClauses(ADD_CLAUSE_DEAD, deadClauses);
+
+        if (useThreshold_)
+          addNewClauses(ADD_CLAUSE_REGULAR, toAddClauses);
+        else // lazy-sat
+          addNewClauses(ADD_CLAUSE_REGULAR, unsatClauses);
+
+          // To avoid append already-active: if not fixed, might need to
+          // flip back
+        if (needToFlipBack)
+        {
+          bool activate = false;
+          setValueOfAtom(atomIdx, false, activate, -1);
+          updateMakeBreakCostAfterFlip(atomIdx);
+        }
+
+        if (!groundOnly)
+        {
+            // Set active status in db
+          domain_->getDB()->setActiveStatus(p, true);
+          activeAtoms_++;
+        }
+      }
+
       delete p;
-    }        
+      unsatClauses.clear();
+      deadClauses.clear();
+      toAddClauses.clear();
+
+      return !isFixed; // if !isFixed, then activated
+    }
+    return true;
   }
+
+  /**
+   * Set the inference mode currently being used
+   */
+  void setInferenceMode(int mode)
+  {
+    if (mode == inferenceMode_) return;
+    inferenceMode_ = mode;
+    if (inferenceMode_ == MODE_MWS)
+    {		  
+      for (int i = 0; i < gndClauses_->size(); i++)
+      {
+        if ((*gndClauses_)[i]->isHardClause())
+          clauseCost_[i] = hardWt_;
+        else
+          clauseCost_[i] = (*gndClauses_)[i]->getWt();
+      }
+      initMakeBreakCostWatch();
+    }
+    else
+    {
+      if (inferenceMode_ == MODE_HARD) eliminateSoftClauses();
+      else if (inferenceMode_ == MODE_SAMPLESAT) makeUnitCosts();
+    }
+  }
+
+  /**
+   * Returns true, if an atom is fixed to true or false.
+   */
+  bool isFixedAtom(int atomIdx)
+  {
+    return fixedAtom_[atomIdx];
+  }
+
+  bool isSatisfiedClause(const int& clauseIdx) 
+  {
+    return isSatisfied_[clauseIdx];
+  }
+
+  void setSatisfiedClause(const int& clauseIdx) 
+  {
+    isSatisfied_[clauseIdx] = true;
+  }
+
+  // set prevStat array for mcsat test-M
+  void updatePrevSatisfied()
+  {
+    prevSatisfiedClause_.clearAndCompress();
+    prevSatisfiedClause_.growToSize(clause_.size(),false);
+    for (int i=0; i<clause_.size(); i++)
+	{
+      long double cost = clauseCost_[i];
+      bool isTrue = false;
+      for (int j = 0; j < getClauseSize(i); j++)
+      {
+        if (isTrueLiteral(clause_[i][j]))
+        { // ij is true lit
+          isTrue = true;
+          break;
+        }
+      }
+      prevSatisfiedClause_[i] = ((isTrue && cost>0) || (!isTrue && cost<0));
+    }
+  }
+
+  /**
+   * Perform unit propagation on the current clauses.
+   */
+  void unitPropagation()
+  {
+    // ---------------------------------- //
+    // check neg-wt clauses
+    // ---------------------------------- //
+    for (int i = 0; i < getNumClauses(); i++)
+    {
+        // Don't look at dead clauses
+        // pre_wt_unsat -> dead		
+      if (isDeadClause(i) || isSatisfiedClause(i) || getClauseCost(i) >= 0)
+        continue;
+
+        // fix all atoms
+      Array<int> atoms = getAtomsInClause(i);
+      for (int j = 0; j < atoms.size(); j++)
+      {
+        int lit = atoms[j];
+        bool value = (lit < 0)? true : false;
+        fixAtom(abs(lit), value);
+      }
+    }
+
+    // ---------------------------------- //
+    // prop among pos-wt clauses
+    // ---------------------------------- //
+    bool done = false;
+      // We are done when no new fixed atoms
+    while (!done)
+    {
+      if (vsdebug) cout << endl << endl;
+      done = true;
+
+        // Note that getNumClauses() could change between the runs
+        // for fixAtom may activate
+      for (int ci = 0; ci < getNumClauses(); ci++)
+      {
+          // skip if irrelevant
+        if (isDeadClause(ci) || isSatisfiedClause(ci) || getClauseCost(ci) <= 0)
+          continue;
+
+          // check if satisfied, and number of non-fixed atoms
+        int numNonfixedAtoms = 0;
+        int nonfixedAtom = 0;
+	  
+        bool isSat = false;
+        for (int li = 0; li < getClauseSize(ci); li++)
+        {
+          int lit = getAtomInClause(li,ci);
+          int fixedValue = fixedAtom_[abs(lit)];
+
+          if (fixedValue==0)
+          {
+            numNonfixedAtoms++;
+            nonfixedAtom = lit;
+            continue;
+          }
+
+          if ((fixedValue == 1 && lit > 0) || (fixedValue == -1 && lit < 0))
+          {
+            isSat = true;
+            break;
+          }
+        }
+        
+        if (isSat) setSatisfiedClause(ci);
+        else if (numNonfixedAtoms == 1)
+        {
+          fixAtom(abs(nonfixedAtom), (nonfixedAtom > 0) ? true : false);
+          done = false;
+        }
+      }
+    }
+      // Done with UP, save this state
+    saveLowState();
+    if (vsdebug) cout << ">>> [vs.unitpropagation] DONE" << endl;
+  }
+
+  /**
+   * Adds new clauses to the state.
+   * 
+   * @param addType How the clauses are being added (see ADD_CLAUSE_*)
+   * @param clauses Array of ground clauses to be added to the state.
+   */
+  void addNewClauses(int addType, Array<GroundClause*> & clauses)
+  {
+    if (vsdebug)
+      cout << "Adding " << clauses.size() << " new clauses.." << endl;
+
+      // Must be in mc-sat to add dead or sat
+    if (!useThreshold_ &&
+        (addType == ADD_CLAUSE_DEAD || addType == ADD_CLAUSE_SAT))
+    {
+      cout << ">>> [ERR] add_dead/sat but useThreshold_ is false" << endl;
+      exit(0);
+    }
+
+      // Store the old number of clauses and atoms
+    int oldNumClauses = getNumClauses();
+    int oldNumAtoms = getNumAtoms();
+
+      //gndClauses_->append(clauses);
+    for (int i = 0; i < clauses.size(); i++)
+    {
+      gndClauses_->append(clauses[i]);
+      clauses[i]->appendToGndPreds(&gndPredHashArray_);
+    }
+
+    gndPreds_->growToSize(gndPredHashArray_.size());
+
+    int numAtoms = getNumAtoms();
+    int numClauses = getNumClauses();
+      // If no new atoms or clauses have been added, then do nothing
+    if (numAtoms == oldNumAtoms && numClauses == oldNumClauses) return;
+
+    if (vsdebug) cout << "Clauses: " << numClauses << endl;
+      // atomIdx starts at 1
+    atom_.growToSize(numAtoms + 1, false);
+
+    makeCost_.growToSize(numAtoms + 1, 0.0);
+    breakCost_.growToSize(numAtoms + 1, 0.0);
+    lowAtom_.growToSize(numAtoms + 1, false);
+    fixedAtom_.growToSize(numAtoms + 1, 0);
+
+	  // Copy ground preds to gndPreds_ and set values in atom and lowAtom
+    for (int i = oldNumAtoms; i < gndPredHashArray_.size(); i++)
+    {
+      (*gndPreds_)[i] = gndPredHashArray_[i];
+
+      if (vsdebug)
+      {
+        cout << "New pred " << i + 1 << ": ";
+        (*gndPreds_)[i]->print(cout, domain_);
+        cout << endl;
+      }
+
+      lowAtom_[i + 1] = atom_[i + 1] = 
+        (domain_->getDB()->getValue((*gndPreds_)[i]) == TRUE) ? true : false;
+    }
+    clauses.clear();
+
+    clause_.growToSize(numClauses);
+    clauseCost_.growToSize(numClauses);
+    falseClause_.growToSize(numClauses);
+    whereFalse_.growToSize(numClauses);
+    numTrueLits_.growToSize(numClauses);
+    watch1_.growToSize(numClauses);
+    watch2_.growToSize(numClauses);
+    isSatisfied_.growToSize(numClauses, false);
+    deadClause_.growToSize(numClauses, false);
+    threshold_.growToSize(numClauses, false);
+  
+    occurence_.growToSize(2*numAtoms + 1);
+
+    for (int i = oldNumClauses; i < numClauses; i++)
+    {
+      GroundClause* gndClause = (*gndClauses_)[i];
+
+      if (vsdebug)
+      {
+        cout << "New clause " << i << ": ";
+        gndClause->print(cout, domain_, &gndPredHashArray_);
+        cout << endl;
+      }
+
+        // Set thresholds for clause selection
+      if (gndClause->isHardClause()) threshold_[i] = RAND_MAX;
+      else
+      {
+        double w = gndClause->getWt();
+        threshold_[i] = RAND_MAX*(1 - exp(-abs(w)));
+        if (vsdebug)
+        {
+          cout << "Weight: " << w << endl;            
+        }
+      }
+      if (vsdebug)
+        cout << "Threshold: " << threshold_[i] << endl;            
+
+      int numGndPreds = gndClause->getNumGroundPredicates();
+      clause_[i].growToSize(numGndPreds);
+      for (int j = 0; j < numGndPreds; j++) 
+      {
+        int lit = gndClause->getGroundPredicateIndex(j);
+        clause_[i][j] = lit;
+        int litIdx = 2*abs(lit) - (lit > 0);
+        occurence_[litIdx].append(i);
+      }
+
+        // Hard clause weight has been previously determined
+      if (inferenceMode_==MODE_SAMPLESAT)
+      {
+        if (gndClause->getWt()>0) clauseCost_[i] = 1;
+        else clauseCost_[i] = -1;
+      }
+      else if (gndClause->isHardClause())
+        clauseCost_[i] = hardWt_;
+      else
+        clauseCost_[i] = gndClause->getWt();
+
+        // filter hard clauses
+      if (inferenceMode_ == MODE_HARD && !gndClause->isHardClause())
+      {
+          // mark dead
+        deadClause_[i] = true;
+      }
+    }
+
+    if (addType == ADD_CLAUSE_DEAD)
+    {
+        // set to dead: no need for initMakeBreakCost, won't impact anyone
+      for (int i = oldNumClauses; i < numClauses; i++)
+      {
+        deadClause_[i] = true;
+      }
+    }
+    else if (addType == ADD_CLAUSE_SAT)
+    {
+        // set to dead: no need for initMakeBreakCost, won't impact anyone
+      for (int i = oldNumClauses; i < numClauses; i++)
+      {
+        isSatisfied_[i]=true;
+      }
+    }
+    else if (addType == ADD_CLAUSE_REGULAR)
+    {
+      if (useThreshold_)
+        killClauses(oldNumClauses);
+      else
+        initMakeBreakCostWatch(oldNumClauses);
+    }
+
+    if (vsdebug) 
+      cout << "Done adding new clauses.." << endl;
+  }
+
+  /**
+   * Updates isSatisfiedClause after an atom is fixed.
+   * ASSUME: fixed val already applied, and updateMakeBreakCost called
+   * 
+   * @param toFix Index of atom fixed
+   */
+  void updateSatisfiedClauses(const int& toFix)
+  {
+      // Already flipped
+    bool toFlipValue = getValueOfAtom(toFix);
+      
+    register int clauseIdx;
+    int sign;
+    int litIdx;
+    if (toFlipValue)
+      sign = 1;
+    else
+      sign = 0;
+
+      // Set isSatisfied: all clauses in which the atom occurs as a true literal
+    litIdx = 2*toFix - sign;
+    Array<int>& posOccArray = getOccurenceArray(litIdx);
+    for (int i = 0; i < posOccArray.size(); i++)
+    {
+      clauseIdx = posOccArray[i];
+        // Don't look at dead clauses
+        // ignore already sat
+      if (deadClause_[clauseIdx] || isSatisfied_[clauseIdx]) continue;
+
+      if (getClauseCost(clauseIdx) < 0) 
+      {
+        cout << "ERR: in MC-SAT, active neg-wt clause (" << clauseIdx
+             << ") is sat by fixed "<<endl;
+        exit(0);
+      }
+      isSatisfied_[clauseIdx] = true;  
+    }
+  }
+
+  /**
+   * Updates cost after flip.
+   * Assume: already activated and flipped.
+   * Called by flipAtom and fixAtom (if fixed to the opposite val)
+   */
+  void updateMakeBreakCostAfterFlip(const int& toFlip)
+  {	  
+      // Already flipped
+    bool toFlipValue = !getValueOfAtom(toFlip);
+
+    register int clauseIdx;
+    int sign;
+    int oppSign;
+    int litIdx;
+    if (toFlipValue)
+      sign = 1;
+    else
+      sign = 0;
+    oppSign = sign ^ 1;
+
+      // Update all clauses in which the atom occurs as a true literal
+    litIdx = 2*toFlip - sign;
+    Array<int>& posOccArray = getOccurenceArray(litIdx);
+
+    for (int i = 0; i < posOccArray.size(); i++)
+    {
+      clauseIdx = posOccArray[i];
+        // Don't look at dead clauses and sat clauses
+      if (deadClause_[clauseIdx] || isSatisfied_[clauseIdx]) continue;
+
+        // The true lit became a false lit
+      int numTrueLits = decrementNumTrueLits(clauseIdx);
+      long double cost = getClauseCost(clauseIdx);
+      int watch1 = getWatch1(clauseIdx);
+      int watch2 = getWatch2(clauseIdx);
+
+        // 1. If last true lit was flipped, then we have to update
+        // the makecost / breakcost info accordingly        
+      if (numTrueLits == 0)
+      {
+          // Pos. clause
+        if (cost >= 0)
+        {
+            // Add this clause as false in the state
+          addFalseClause(clauseIdx);
+            // Decrease toFlip's breakcost (add neg. cost)
+          addBreakCost(toFlip, -cost);
+            // Increase makecost of all vars in clause (add pos. cost)
+          addMakeCostToAtomsInClause(clauseIdx, cost);
+        }
+          // Neg. clause
+        else
+        {
+          assert(cost < 0);
+            // Remove this clause as false in the state
+          removeFalseClause(clauseIdx);
+            // Increase breakcost of all vars in clause (add pos. cost)
+          addBreakCostToAtomsInClause(clauseIdx, -cost);        
+            // Decrease toFlip's makecost (add neg. cost)
+          addMakeCost(toFlip, cost);
+        }
+      }
+        // 2. If there is now one true lit left, then move watch2
+        // up to watch1 and increase the breakcost / makecost of watch1
+      else if (numTrueLits == 1)
+      {
+        if (watch1 == toFlip)
+        {
+          assert(watch1 != watch2);
+          setWatch1(clauseIdx, watch2);
+          watch1 = getWatch1(clauseIdx);
+        }
+          // Pos. clause: Increase toFlip's breakcost (add pos. cost)
+        if (cost >= 0)
+        {
+          addBreakCost(watch1, cost);
+        }
+            // Neg. clause: Increase toFlip's makecost (add pos. cost)
+        else
+        {
+          assert(cost < 0);
+          addMakeCost(watch1, -cost);
+        }
+      }
+        // 3. If there are 2 or more true lits left, then we have to
+        // find a new true lit to watch if one was flipped
+      else
+      {
+          /* numtruelit[clauseIdx] >= 2 */
+          // If watch1[clauseIdx] has been flipped
+        if (watch1 == toFlip)
+        {
+            // find a different true literal to watch
+          int diffTrueLit = getTrueLiteralOtherThan(clauseIdx, watch1, watch2);
+          setWatch1(clauseIdx, diffTrueLit);
+        }
+          // If watch2[clauseIdx] has been flipped
+        else if (watch2 == toFlip)
+        {
+            // find a different true literal to watch
+          int diffTrueLit = getTrueLiteralOtherThan(clauseIdx, watch1, watch2);
+          setWatch2(clauseIdx, diffTrueLit);
+        }
+      }
+    }
+
+      // Update all clauses in which the atom occurs as a false literal
+    litIdx = 2*toFlip - oppSign;
+    Array<int>& negOccArray = getOccurenceArray(litIdx);
+    for (int i = 0; i < negOccArray.size(); i++)
+    {
+      clauseIdx = negOccArray[i];
+        // Don't look at dead clauses or satisfied clauses
+      if (deadClause_[clauseIdx] || isSatisfied_[clauseIdx]) continue;
+
+        // The false lit became a true lit
+      int numTrueLits = incrementNumTrueLits(clauseIdx);
+      long double cost = getClauseCost(clauseIdx);
+      int watch1 = getWatch1(clauseIdx);
+
+        // 1. If this is the only true lit, then we have to update
+        // the makecost / breakcost info accordingly        
+      if (numTrueLits == 1)
+      {
+          // Pos. clause
+        if (cost >= 0)
+        {
+            // Remove this clause as false in the state
+          removeFalseClause(clauseIdx);
+            // Increase toFlip's breakcost (add pos. cost)
+          addBreakCost(toFlip, cost);        
+            // Decrease makecost of all vars in clause (add neg. cost)
+          addMakeCostToAtomsInClause(clauseIdx, -cost);
+        }
+          // Neg. clause
+        else
+        {
+          assert(cost < 0);
+            // Add this clause as false in the state
+          addFalseClause(clauseIdx);
+            // Decrease breakcost of all vars in clause (add neg. cost)
+          addBreakCostToAtomsInClause(clauseIdx, cost);
+            // Increase toFlip's makecost (add pos. cost)
+          addMakeCost(toFlip, -cost);
+        }
+          // Watch this atom
+        setWatch1(clauseIdx, toFlip);
+      }
+        // 2. If there are now exactly 2 true lits, then watch second atom
+        // and update breakcost
+      else if (numTrueLits == 2)
+      {
+        if (cost >= 0)
+        {
+            // Pos. clause
+            // Decrease breakcost of first atom being watched (add neg. cost)
+          addBreakCost(watch1, -cost);
+        }
+        else
+        {
+            // Neg. clause
+          assert(cost < 0);
+            // Decrease makecost of first atom being watched (add neg. cost)
+          addMakeCost(watch1, cost);
+        }
+          // Watch second atom
+        setWatch2(clauseIdx, toFlip);
+      }
+    }
+  }
+
 
   /**
    * Checks if an atom is active.
@@ -1317,50 +1977,16 @@ class VariableState
     watch2_[clauseIdx] = atomIdx;
   }
   
-  const bool isBlockEvidence(const int& blockIdx)
-  {
-    return (*blockEvidence_)[blockIdx];
-  }
-
-  const int getBlockSize(const int& blockIdx)
-  {
-      // Lazy: blocks are in domain
-    if (lazy_)
-      return domain_->getPredBlock(blockIdx)->size();
-    else
-      return (*blocks_)[blockIdx].size();
-  }
-  
   /** 
    * Returns the index of the block which the atom with index atomIdx
    * is in. If not in any, returns -1.
    */
   const int getBlockIndex(const int& atomIdx)
   {
-    for (int i = 0; i < blocks_->size(); i++)
-    {
-      int blockIdx = (*blocks_)[i].find(atomIdx);
-      if (blockIdx >= 0)
-        return i;
-    }
-    return -1;
-  }
-  
-  Array<int>& getBlockArray(const int& blockIdx)
-  {
-    return (*blocks_)[blockIdx];
+    const GroundPredicate* gndPred = (*gndPreds_)[atomIdx];
+    return domain_->getBlock(gndPred);
   }
 
-  bool getBlockEvidence(const int& blockIdx)
-  {
-    return (*blockEvidence_)[blockIdx];
-  }
-  
-  int getNumBlocks()
-  {
-    return blocks_->size();
-  }
-  
   /**
    * Returns the cost of bad clauses in the optimum state.
    */
@@ -1385,7 +2011,7 @@ class VariableState
   {
     for (int i = 0; i < clauseCost_.size(); i++)
     {
-      if (clauseCost_[i] > 0) clauseCost_[i] = 1.0;
+      if (clauseCost_[i] >= 0) clauseCost_[i] = 1.0;
       else
       {
         assert(clauseCost_[i] < 0);
@@ -1412,13 +2038,27 @@ class VariableState
   }
 
   /**
-   * Returns index in block if a true fixed atom is in block, otherwise -1    
+   * Returns index of an atom if it is true and fixed in block, otherwise -1    
    */
-  int getTrueFixedAtomInBlock(const int blockIdx)
+  int getTrueFixedAtomInBlock(const int& blockIdx)
   {
-    Array<int>& block = (*blocks_)[blockIdx];
-    for (int i = 0; i < block.size(); i++)
-      if (fixedAtom_[block[i] + 1] > 0) return i;
+    const Predicate* truePred = domain_->getTruePredInBlock(blockIdx);
+    if (truePred)
+    {
+      if (vsdebug)
+      {
+        cout << "True pred in block " << blockIdx << ": ";
+        truePred->printWithStrVar(cout, domain_);
+        cout << endl;
+      }
+    
+      GroundPredicate* trueGndPred = new GroundPredicate((Predicate*)truePred);
+
+      int atomIdx = gndPredHashArray_.find(trueGndPred);
+      delete trueGndPred;
+      if (atomIdx > -1 && fixedAtom_[atomIdx + 1] > 0)
+        return atomIdx;
+    }
     return -1;
   }
 
@@ -1611,25 +2251,54 @@ class VariableState
   /**
    * Sets the truth values of all atoms in a block except for the one given.
    * 
-   * @param atomIdx Index of atom in block exempt from being set to false.
+   * @param atomIdx Absolute index of atom in block exempt from being set to
+   * false.
    * @param blockIdx Index of block whose atoms are set to false.
    */
-  void setOthersInBlockToFalse(const int& atomIdx,
-                               const int& blockIdx)
+  void setOthersInBlockToFalse(const int& atomIdx, const int& blockIdx)
   {
-    Array<int>& block = (*blocks_)[blockIdx];
-    for (int i = 0; i < block.size(); i++)
+    if (vsdebug)
     {
-        // Atom not the one specified and not fixed
-      if (i != atomIdx && fixedAtom_[block[i] + 1] == 0)
-        setValueOfAtom(block[i] + 1, false);
+      cout << "Set all in block " << blockIdx << " to false except "
+           << atomIdx << endl;
+    }
+    int blockSize = domain_->getBlockSize(blockIdx);
+    for (int i = 0; i < blockSize; i++)
+    {
+      const Predicate* pred = domain_->getPredInBlock(i, blockIdx);
+      GroundPredicate* gndPred = new GroundPredicate((Predicate*)pred);      
+      int idx = gndPredHashArray_.find(gndPred);
+
+      if (vsdebug)
+      {
+        cout << "Gnd pred in block ";
+        gndPred->print(cout, domain_);
+        cout << " (idx " << idx << ")" << endl;
+      }
+
+      delete gndPred;
+      delete pred;
+      
+        // Pred already present: check that it's not fixed
+      if (idx >= 0)
+      {
+          // Atom not the one specified and not fixed
+        if (idx != atomIdx && fixedAtom_[idx + 1] == 0)
+        {
+          if (vsdebug)
+            cout << "Set " << idx + 1 << " to false" << endl;
+
+          bool activate = true;
+          setValueOfAtom(idx + 1, false, activate, -1);
+        }
+      }
     }
   }
 
 
   /**
    * Fixes an atom to a truth value. This means the atom can not change
-   * its truth values again. If the atom has already been fixed to the
+   * its truth value again. If the atom has already been fixed to the
    * opposite value, then we have a contradiction and the program terminates.
    * 
    * @param atomIdx Index of atom to be fixed.
@@ -1638,6 +2307,20 @@ class VariableState
   void fixAtom(const int& atomIdx, const bool& value)
   {
     assert(atomIdx > 0);
+    if (vsdebug)
+    {
+      cout << "Fixing ";
+      (*gndPreds_)[atomIdx - 1]->print(cout, domain_);
+      cout << " to " << value << endl;	  
+    }
+
+      // Must be in mc-sat
+    if (!useThreshold_)
+    {
+      cout << ">>> [ERR] useThreshold_ is false" << endl;
+      exit(0);
+    }
+
       // If already fixed to opp. sense, then contradiction
     if ((fixedAtom_[atomIdx] == 1 && value == false) ||
         (fixedAtom_[atomIdx] == -1 && value == true))
@@ -1647,15 +2330,95 @@ class VariableState
       exit(0);
     }
 
-    if (vsdebug)
+      // already fixed
+    if (fixedAtom_[atomIdx] != 0) return;
+
+    fixedAtom_[atomIdx] = (value) ? 1 : -1;	
+    if (atom_[atomIdx] != value) 
     {
-      cout << "Fixing ";
-      (*gndPreds_)[atomIdx - 1]->print(cout, domain_);
-      cout << " to " << value << endl;
+      bool activate = false;
+      int blockIdx =  getBlockIndex(atomIdx - 1);
+      setValueOfAtom(atomIdx, value, activate, blockIdx);
+      updateMakeBreakCostAfterFlip(atomIdx);
     }
     
-    setValueOfAtom(atomIdx, value);
-    fixedAtom_[atomIdx] = (value) ? 1 : -1;
+      // update isSat
+    updateSatisfiedClauses(atomIdx);
+
+      // If in a block and fixing to true, fix all others to false
+    if (value)
+    {
+      int blockIdx = getBlockIndex(atomIdx - 1);
+      if (blockIdx > -1)
+      {
+        int blockSize = domain_->getBlockSize(blockIdx);
+        for (int i = 0; i < blockSize; i++)
+        {
+          const Predicate* pred = domain_->getPredInBlock(i, blockIdx);
+          GroundPredicate* gndPred = new GroundPredicate((Predicate*)pred);      
+          int idx = gndPredHashArray_.find(gndPred);
+          delete gndPred;
+          delete pred;
+      
+            // Pred already present: check that it's not fixed
+          if (idx >= 0)
+          {
+              // Atom not the one specified
+            if (idx != (atomIdx - 1))
+            {
+                // If already fixed to true, then contradiction
+              if (fixedAtom_[idx + 1] == 1)
+              {
+                cout << "Contradiction: Tried to fix atom " << idx + 1 <<
+                " to true and false ... exiting." << endl;
+                exit(0);
+              }
+                // already fixed
+              if (fixedAtom_[idx + 1] == -1) continue;
+              if (vsdebug)
+              {
+                cout << "Fixing ";
+                (*gndPreds_)[idx]->print(cout, domain_);
+                cout << " to 0" << endl;
+              }
+              fixedAtom_[idx + 1] = -1; 
+              if (atom_[idx + 1] != false) 
+              {
+                bool activate = false;
+                setValueOfAtom(idx + 1, value, activate, blockIdx);
+                updateMakeBreakCostAfterFlip(idx + 1);
+              }
+                // update isSat
+              updateSatisfiedClauses(idx + 1);
+            }
+          }
+        }
+      }
+    }
+
+      // activate clauses falsified
+      // need to updateMakeBreakCost for new clauses only, which aren't sat
+    if (lazy_ && !isActive(atomIdx) && value)
+    {
+        // if inactive fixed to true, need to activate falsified
+        // inactive clauses gather active clauses
+      Predicate* p =
+        gndPredHashArray_[atomIdx - 1]->createEquivalentPredicate(domain_);
+		
+      bool ignoreActivePreds = false; // only get currently unsat ones
+      Array<GroundClause*> unsatClauses;
+      getActiveClauses(p, unsatClauses, true, ignoreActivePreds);		
+		
+        // filter out clauses already added (can also add directly, but
+        // will elicit warning)
+      addNewClauses(ADD_CLAUSE_REGULAR, unsatClauses);
+
+        // Set active status in db
+      domain_->getDB()->setActiveStatus(p, true);
+      activeAtoms_++;
+
+      delete p;
+    }
   }
 
   /**
@@ -1677,16 +2440,16 @@ class VariableState
 
       // Keeps track of pos. clause being satisfied or 
       // neg. clause being unsatisfied due to fixed atoms
-    bool isGood = (clauseCost_[clauseIdx] > 0) ? false : true;
+    bool isGood = (clauseCost_[clauseIdx] >= 0) ? false : true;
       // Keeps track of all atoms being fixed to false in a pos. clause
-    bool allFalseAtoms = (clauseCost_[clauseIdx] > 0) ? true : false;
+    bool allFalseAtoms = (clauseCost_[clauseIdx] >= 0) ? true : false;
       // Check each literal in clause
     for (int i = 0; i < getClauseSize(clauseIdx); i++)
     {
       int lit = clause_[clauseIdx][i];
       int fixedValue = fixedAtom_[abs(lit)];
 
-      if (clauseCost_[clauseIdx] > 0)
+      if (clauseCost_[clauseIdx] >= 0)
       { // Pos. clause: check if clause is satisfied
         if ((fixedValue == 1 && lit > 0) ||
             (fixedValue == -1 && lit < 0))
@@ -1754,8 +2517,9 @@ class VariableState
         atLeastOneDead = true;
         deadClause_[i] = true;
       }
-    }
-    if (atLeastOneDead) initMakeBreakCostWatch();
+    } 
+
+	if (atLeastOneDead) initMakeBreakCostWatch();
   }
  
   /**
@@ -1767,26 +2531,31 @@ class VariableState
    */
   void killClauses(const int& startClause)
   {
-    for (int i = startClause; i < getNumClauses(); i++)
+      // for hard init, no need to killClauses
+    if (inferenceMode_ != MODE_HARD)
     {
-      GroundClause* clause = (*gndClauses_)[i];
-      if ((clauseGoodInPrevious(i)) &&
-          (clause->isHardClause() || random() <= threshold_[i]))
+      for (int i = startClause; i < getNumClauses(); i++)
       {
-        if (vsdebug)
+        GroundClause* clause = (*gndClauses_)[i];
+        if ((clauseGoodInPrevious(i)) &&
+            (clause->isHardClause() || random() <= threshold_[i]))
         {
-          cout << "Keeping clause "<< i << " ";
-          clause->print(cout, domain_, &gndPredHashArray_);
-          cout << endl;
+          if (vsdebug)
+          {
+            cout << "Keeping clause "<< i << " ";
+            clause->print(cout, domain_, &gndPredHashArray_);
+            cout << endl;
+          }
+          deadClause_[i] = false;
         }
-        deadClause_[i] = false;
-      }
-      else
-      {
-        deadClause_[i] = true;
+        else
+        {
+          deadClause_[i] = true;
+        }
       }
     }
-    initMakeBreakCostWatch();
+    
+    initMakeBreakCostWatch(startClause);
   }
 
   
@@ -1799,14 +2568,9 @@ class VariableState
    */
   const bool clauseGoodInPrevious(const int& clauseIdx)
   {
-    //GroundClause* clause = (*gndClauses_)[clauseIdx];
-    int numSatLits = numTrueLits_[clauseIdx];
-      // Num. of satisfied lits in previous iteration is stored in clause
-    if ((numSatLits > 0 && clauseCost_[clauseIdx] > 0.0) ||
-        (numSatLits == 0 && clauseCost_[clauseIdx] < 0.0))
-      return true;
-    else
-      return false;
+      // satisfied: wt-sat
+    return (clauseIdx >= prevSatisfiedClause_.size() ||
+            prevSatisfiedClause_[clauseIdx]);
   }
 
   /**
@@ -1868,6 +2632,17 @@ class VariableState
   }
 
   /**
+   * Finds and returns the index of a ground predicate.
+   * 
+   * @param gndPred GroundPredicate to be found.
+   * @return Index of the ground predicate, if present; otherwise, -1.
+   */
+  int getIndexOfGroundPredicate(GroundPredicate* const & gndPred)
+  {
+    return gndPredHashArray_.find(gndPred);
+  }
+  
+  /**
    * Sets a GroundPredicate to be evidence and sets its truth value. If it is
    * already present as evidence with the given truth value, then nothing
    * happens. If the predicate was a query, then additional clauses may be
@@ -1904,7 +2679,12 @@ class VariableState
     else
     {
       Array<int> gndClauseIndexes;      
+      int deleted;
       gndClauseIndexes = getNegOccurenceArray(atomIdx + 1);
+      gndClauseIndexes.bubbleSort();
+        // Keep track of how many clauses deleted, because the indices are
+        // are adjusted when we remove an element from HashArray
+      deleted = 0;
       for (int i = 0; i < gndClauseIndexes.size(); i++)
       {
           // Atom appears neg. in these clauses, so remove the atom from
@@ -1915,8 +2695,11 @@ class VariableState
         {          
           if (vsdebug)
             cout << "Deleting ground clause " << gndClauseIndexes[i] << endl;
-          delete (*gndClauses_)[gndClauseIndexes[i]];
-          (*gndClauses_)[gndClauseIndexes[i]] = NULL;
+            // Real index is old index adjusted one lower for every element
+            // deleted up until now
+          delete (*gndClauses_)[gndClauseIndexes[i] - deleted];
+          gndClauses_->removeItem(gndClauseIndexes[i] - deleted);
+          deleted++;
         }
         else
         {
@@ -1930,6 +2713,10 @@ class VariableState
       }
 
       gndClauseIndexes = getPosOccurenceArray(atomIdx + 1);
+      gndClauseIndexes.bubbleSort();
+        // Keep track of how many clauses deleted, because the indices are
+        // are adjusted when we remove an element from HashArray
+      deleted = 0;
       for (int i = 0; i < gndClauseIndexes.size(); i++)
       {
           // Atom appears pos. in these clauses, so remove the atom from
@@ -1940,8 +2727,11 @@ class VariableState
         {
           if (vsdebug)
             cout << "Deleting ground clause " << gndClauseIndexes[i] << endl;
-          delete (*gndClauses_)[gndClauseIndexes[i]];
-          (*gndClauses_)[gndClauseIndexes[i]] = NULL;
+            // Real index is old index adjusted one lower for every element
+            // deleted up until now
+          delete (*gndClauses_)[gndClauseIndexes[i] - deleted];
+          gndClauses_->removeItem(gndClauseIndexes[i] - deleted);
+          deleted++;
         }
         else
         {
@@ -1963,7 +2753,6 @@ class VariableState
         // in all clauses
       int oldIdx = gndPredHashArray_.size();
       replaceAtomIndexInAllClauses(oldIdx, atomIdx);      
-      gndClauses_->removeAllNull();
     }
   }
 
@@ -2087,6 +2876,9 @@ class VariableState
                         bool const & active,
                         bool const & ignoreActivePreds)
   {
+    Timer timer;
+    double currTime;
+
     Clause *fclause;
     GroundClause* newClause;
     int clauseCnt;
@@ -2112,6 +2904,7 @@ class VariableState
 
       // Look at each first-order clause and get active groundings
     int clauseno = 0;
+
     while (clauseno < clauseCnt)
     {
       if (inputPred)
@@ -2125,8 +2918,9 @@ class VariableState
         fclause->print(cout, domain_);
         cout << endl;
       }
-      
-      long double wt = fclause->getWt();
+
+      currTime = timer.time();
+
       const double* parentWtPtr = NULL;
       if (!fclause->isHardClause()) parentWtPtr = fclause->getWtPtr();
       const int clauseId = mln_->findClauseIdx(fclause);
@@ -2134,10 +2928,36 @@ class VariableState
 
       fclause->getActiveClauses(inputPred, domain_, newClauses,
                                 &gndPredHashArray_, ignoreActivePreds);
-
       for (int i = 0; i < newClauses->size(); i++)
       {
+        long double wt = fclause->getWt();
         newClause = (*newClauses)[i];
+
+          // If already active, ignore; assume all gndClauses_ are active
+        if (gndClauses_->find(newClause) >= 0)
+        {
+          delete newClause;
+          continue;
+        }
+
+
+          // We want to normalize soft unit clauses to all be positives
+        if (!fclause->isHardClause() &&
+            newClause->getNumGroundPredicates() == 1 &&
+            !newClause->getGroundPredicateSense(0))
+        {
+          newClause->setGroundPredicateSense(0, true);
+          newClause->setWt(-newClause->getWt());
+          wt = -wt;
+          int addToIndex = gndClauses_->find(newClause);
+          if (addToIndex >= 0)
+          {
+            (*gndClauses_)[addToIndex]->addWt(wt);
+            delete newClause;
+            continue;
+          }
+        }
+
         int pos = clauseHashArray.find(newClause);
           // If clause already present, then just add weight
         if (pos >= 0)
@@ -2160,7 +2980,6 @@ class VariableState
 
           // If here, then clause is not yet present        
         newClause->setWt(wt);
-        newClause->appendToGndPreds(&gndPredHashArray_);
         if (parentWtPtr)
         {
           newClause->appendParentWtPtr(parentWtPtr);
@@ -2177,6 +2996,7 @@ class VariableState
         clauseHashArray.append(newClause);
       }
       clauseno++; 
+
     } //while (clauseno < clauseCnt)
 
     for (int i = 0; i < clauseHashArray.size(); i++)
@@ -2184,7 +3004,11 @@ class VariableState
       newClause = clauseHashArray[i];
       activeClauses.append(newClause);
     }
+
+    newClauses->clear();
     delete newClauses;
+
+    clauseHashArray.clear();
   }
 
   /**
@@ -2203,108 +3027,6 @@ class VariableState
   int getNumActiveAtoms()
   {
     return activeAtoms_; 
-  }
-
-  /**
-   * Selects one atom in each block in the domain and adds it to the block
-   * here and sets it to true.
-   */
-  void addOneAtomToEachBlock()
-  {
-    assert(lazy_);
-      // For each block: select one to set to true
-    for (int i = 0; i < blocks_->size(); i++)
-    {
-        // If evidence atom exists, then all others are false
-      if ((*blockEvidence_)[i])
-      {
-          // If first argument is -1, then all are set to false
-        setOthersInBlockToFalse(-1, i);
-        continue;
-      }
-
-        // Assumption is initLazyBlocks has been called
-        // Pick one ground pred from the block in the domain
-      const Array<Predicate*>* block = domain_->getPredBlock(i);
-
-      int chosen = random() % block->size();
-      Predicate* pred = (*block)[chosen];
-      GroundPredicate* groundPred = new GroundPredicate(pred);
-
-        // If chosen pred is not yet present, then add it, otherwise delete it
-      int index = gndPredHashArray_.find(groundPred);
-      if (index < 0)
-      {
-          // Pred not yet present
-        index = gndPredHashArray_.append(groundPred);
-        (*blocks_)[i].append(index);
-        chosen = (*blocks_)[i].size() - 1;
-          // addNewClauses adds the predicate to the state and updates
-          // info arrays
-        bool initial = false;
-        addNewClauses(initial);
-      }
-      else
-      {
-        delete groundPred;
-        chosen = (*blocks_)[i].find(index);
-      }
-      setValueOfAtom(index + 1, true);
-      setOthersInBlockToFalse(chosen, i);
-    }
-  }
-
-  /**
-   * Initializes the block structures for the lazy version.
-   */
-  void initLazyBlocks()
-  {
-    assert(lazy_);
-    blocks_ = new Array<Array<int> >;
-    blocks_->growToSize(domain_->getNumPredBlocks());
-    blockEvidence_ = new Array<bool>(*(domain_->getBlockEvidenceArray()));
-  }
-
-  /**
-   * Fills the blocks with the predicates in the domain blocks.
-   */
-  void fillLazyBlocks()
-  {
-    assert(lazy_);
-    const Array<Array<Predicate*>*>* blocks = domain_->getPredBlocks();
-    for (int i = 0; i < blocks->size(); i++)
-    {
-      if (vsdebug) cout << "Block " << i << endl;
-      Array<Predicate*>* block = (*blocks)[i];
-      for (int j = 0; j < block->size(); j++)
-      {
-        Predicate* pred = (*block)[j];
-        if (vsdebug)
-        {
-          cout << "\tPred: ";
-          pred->printWithStrVar(cout, domain_);
-          cout << endl;
-        }
-          // Add all non-evid preds in blocks to the state
-        if (domain_->getDB()->getEvidenceStatus(pred))
-          continue;
-        GroundPredicate* groundPred = new GroundPredicate(pred);
-
-          // Add pred if not yet present, otherwise delete it
-        int index = gndPredHashArray_.find(groundPred);
-        if (index < 0)
-          index = gndPredHashArray_.append(groundPred);
-        else
-          delete groundPred;
-
-          // Append the atom to the block if not yet there
-        if (!(*blocks_)[i].contains(index))
-          (*blocks_)[i].append(index);
-      }
-    }
-      // addNewClauses adds the predicates to the state and updates info arrays
-    bool initial = true;
-    addNewClauses(initial);
   }
 
   ////////////// END: Lazy Functions //////////////
@@ -2370,8 +3092,19 @@ class VariableState
     }
   }
 
- private:
+ public:
+   // Inference mode: decide how getActiveClauses and addNewClauses
+   // filter and set cost
+  const static int MODE_MWS = 0;
+  const static int MODE_HARD = 1;
+  const static int MODE_SAMPLESAT = 2;
 
+  const static int ADD_CLAUSE_INITIAL = 0;
+  const static int ADD_CLAUSE_REGULAR = 1;
+  const static int ADD_CLAUSE_DEAD = 2;
+  const static int ADD_CLAUSE_SAT = 3;    // the clauses are sat by fixed atoms
+
+ private:
     // If true, this is a lazy variable state, else eager.
   bool lazy_;
 
@@ -2386,7 +3119,9 @@ class VariableState
     // Eager version: Pointer to gndPreds_ and gndClauses_ in MRF
     // Lazy version: Holds active atoms and clauses
   Array<GroundPredicate*>* gndPreds_;
-  Array<GroundClause*>* gndClauses_;
+  
+  //Array<GroundClause*>* gndClauses_;
+  GroundClauseHashArray* gndClauses_;
   
     // Predicates corresponding to the groundings of the unknown non-evidence
     // predicates
@@ -2448,6 +3183,7 @@ class VariableState
     // watch2_[c] contains the id of the second atom which c is watching
   Array<int> watch2_;
     // Which clauses are satisfied by fixed atoms
+    // wt_sat (pos-wt & sat || neg-wt & unsat)
   Array<bool> isSatisfied_;
     // Clauses which are not to be considered
   Array<bool> deadClause_;
@@ -2482,16 +3218,19 @@ class VariableState
     // Cost associated with the number of false clauses
   long double costOfFalseClauses_;
   
-    // For block inference: blocks_ and blockEvidence_
-    // All atom indices in (*blocks_)[i] are to be treated as in one block
-  Array<Array<int> >* blocks_;
-    // (*blockEvidence_)[i] states whether block i has true evidence and
-    // thus all should be false
-  Array<bool >* blockEvidence_;
-
     // Number of active atoms in state.  
   int activeAtoms_;
+
+    // For MC-SAT: True if clause satisfied in last iteration
+  Array<bool> prevSatisfiedClause_;
   
+    // Number of non-evidence atoms in the domain
+  int numNonEvAtoms_;
+
+   // Inference mode: decide how getActiveClauses and addNewClauses
+   // filter and set cost
+  int inferenceMode_;
+
 };
 
 #endif /*VARIABLESTATE_H_*/

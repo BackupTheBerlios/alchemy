@@ -309,7 +309,8 @@ bool createComLineQueryPreds(const string& queryPredsStr,
       ArraysAccessor<int> acc;
       for (int i = 1; i < vtiArr->size(); i++)
       {
-        const Array<int>* cons=domain->getConstantsByType((*vtiArr)[i]->typeId);
+        const Array<int>* cons =
+          domain->getConstantsByType((*vtiArr)[i]->typeId);
         acc.appendArray(cons);
       } 
 
@@ -855,7 +856,9 @@ void setPredsToGivenValues(const StringHashArray& predNames, Domain *domain,
  * @param inference Inference built from the files and parameters.
  * @return -1, if an error occurred; otherwise 1
  */
-int buildInference(Inference*& inference, Domain*& domain)
+int buildInference(Inference*& inference, Domain*& domain,
+                   bool const &aisQueryEvidence, Array<Predicate *> &queryPreds,
+                   Array<TruthValue> &queryPredValues)
 {
   string inMLNFile, wkMLNFile, evidenceFile;
 
@@ -866,8 +869,6 @@ int buildInference(Inference*& inference, Domain*& domain)
   Array<string> constFilesArr;
   Array<string> evidenceFilesArr;
 
-  Array<Predicate *> queryPreds;
-  Array<TruthValue> queryPredValues;
   
   //the second .mln file to the last one in ainMLNFiles _may_ be used 
   //to hold constants, so they are held in constFilesArr. They will be
@@ -894,8 +895,11 @@ int buildInference(Inference*& inference, Domain*& domain)
 
   if (!asimtpInfer && !amapPos && !amapAll && !agibbsInfer && !amcsatInfer)
   {
-    cout << "ERROR: must specify one of -ms/-simtp/-m/-a/-p flags." << endl;
-    return -1;
+      // If nothing specified, use MC-SAT
+    amcsatInfer = true;
+    
+    //cout << "ERROR: must specify one of -ms/-simtp/-m/-a/-p flags." << endl;
+    //return -1;
   }
 
     //extract names of all query predicates
@@ -967,7 +971,7 @@ int buildInference(Inference*& inference, Domain*& domain)
   msparams->minSteps           = amcmcMinSteps;
   msparams->maxSteps           = amcmcMaxSteps;
   msparams->maxSeconds         = amcmcMaxSeconds;
-  msparams->numStepsEveryMCSat = amcsatNumStepsEveryMCSat;
+  //msparams->numStepsEveryMCSat = amcsatNumStepsEveryMCSat;
 
     // Set Gibbs parameters
   GibbsParams* gibbsparams = new GibbsParams;
@@ -1027,7 +1031,7 @@ int buildInference(Inference*& inference, Domain*& domain)
     // Parse as if lazy inference is set to true to set evidence atoms in DB
     // If lazy is not used, this is removed from DB
   if (!runYYParser(mln, domain, wkMLNFile.c_str(), allPredsExceptQueriesAreCW, 
-                   &owPredNames, &queryPredNames, addUnitClauses, 
+                   &owPredNames, &cwPredNames, &queryPredNames, addUnitClauses, 
                    warnAboutDupGndPreds, 0, mustHaveWtOrFullStop, 
                    forCheckingPlusTypes, true, flipWtsOfFlippedClause))
   {
@@ -1036,6 +1040,13 @@ int buildInference(Inference*& inference, Domain*& domain)
   }
 
   unlink(wkMLNFile.c_str());
+
+  if (aisQueryEvidence)
+  {
+    readPredValuesAndSetToUnknown(queryPredNames, domain, queryPreds,
+                                  queryPredValues, aisQueryEvidence);
+  }
+
 
     //////////////////////////// run inference /////////////////////////////////
 
@@ -1058,17 +1069,41 @@ int buildInference(Inference*& inference, Domain*& domain)
     allPredGndingsAreQueries.growToSize(domain->getNumPredicates(), false);
     if (queryPredsStr.length() > 0)
     {
-      cout << "Creating query predicates that are specified on command line..." 
-           << endl;
-      bool ok = createComLineQueryPreds(queryPredsStr, domain, domain->getDB(), 
-                                        &queries, &knownQueries, 
-                                        &allPredGndingsAreQueries);
-      if (!ok) { cout<<"Failed to create query predicates."<<endl; exit(-1); }
+      if (aisQueryEvidence)
+      {
+        // If first order query pred groundings are allowed to be evidence
+        // - we assume all the predicates not in db to be false
+        // evidence - need a better way to code this.
+
+        // Note that knownQueries and queries are flipped in the
+        // argument order here.  This is intentional!  Anything known
+        // in the database is actually going to be a query, while anything
+        // unknown is actually false evidence.
+        bool ok = createComLineQueryPreds(queryPredsStr, domain, 
+                                    domain->getDB(), &knownQueries, &queries, 
+                                    &allPredGndingsAreQueries);
+        if (!ok) { cout<<"Failed to create query predicates."<<endl; exit(-1); }
+
+        // All unknown queries are false evidence
+        for (int predno = 0; predno < queries.size(); predno++) 
+          domain->getDB()->setValue(queries[predno], UNKNOWN);
+
+        // All known queries should actually be unknown
+        for (int predno = 0; predno < knownQueries.size(); predno++) 
+          domain->getDB()->setValue(knownQueries[predno], FALSE);
+      }
+      else
+      {
+        bool ok = createComLineQueryPreds(queryPredsStr, domain, 
+                                    domain->getDB(), &queries, &knownQueries, 
+                                    &allPredGndingsAreQueries);
+        if (!ok) { cout<<"Failed to create query predicates."<<endl; exit(-1); }
+      }
     }
   }
 
     // Create inference algorithm and state based on queries and mln / domain
-  bool markHardGndClauses = false;
+  bool markHardGndClauses = true;
   bool trackParentClauseWts = false;
     // Lazy version: queries and allPredGndingsAreQueries are empty,
     // markHardGndClause and trackParentClauseWts are not used

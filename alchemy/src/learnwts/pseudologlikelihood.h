@@ -76,6 +76,12 @@
 
 //NOTE: "domain index" and "database index" are used interchangeably
 
+// expl and logl aren't available in cygwin / windows, so use exp and log
+#ifndef expl
+# define expl exp
+# define logl log
+#endif
+
 ////////////////////////// helper data structures //////////////////////////////
 
   //LogPseudolikelihood is used in weight learning which makes the closed-world
@@ -696,7 +702,7 @@ class PseudoLogLikelihood
         ArraysAccessor<int> acc;
         createAllPossiblePredsGroundings(&gndPred, domain, acc);
 
-          //for each grounding of pred
+          // for each grounding of pred
         int g = -1; //gth grounding
         while (acc.hasNextCombination())
         {
@@ -716,6 +722,7 @@ class PseudoLogLikelihood
           else
             removeCounts(clauseIdxInMLN, predId, g, domainIdx, undoInfos);
         } //for each grounding of pred 
+        //acc.deleteArraysAndClear();
       }
       else
       {  //there are constant terms or repeated variables
@@ -791,6 +798,7 @@ class PseudoLogLikelihood
           }
         }
 
+        //groundings.deleteArraysAndClear();
         for (int j = 0; j < varIdToMults.size(); j++) delete varIdToMults[j];
       } //there are constant terms or repeated variables
     } //for each pred that clause contains
@@ -839,8 +847,7 @@ class PseudoLogLikelihood
       // For each valid assignment of vars in block
     for (int c = 0; c < gndings->size(); c++)
     {
-      Array<IndexAndCount*>* clauseIndexesAndCounts 
-        = (*gndings)[c];
+      Array<IndexAndCount*>* clauseIndexesAndCounts = (*gndings)[c];
       assert(noRepeatedIndex(clauseIndexesAndCounts));
     
       int numClausesUnifyWith = clauseIndexesAndCounts->size();
@@ -1019,11 +1026,7 @@ class PseudoLogLikelihood
       
     int blockIdx = (*domains_)[domainIdx]->getBlock(gndPred);
     if (blockIdx >= 0)
-    {
-      const Array<Predicate*>* block =
-        (*domains_)[domainIdx]->getPredBlock(blockIdx);
-      numCombInBlock = block->size() - 1;
-    }
+      numCombInBlock = (*domains_)[domainIdx]->getBlockSize(blockIdx) - 1;
       
     comboClauseIndexesAndCounts->growToSize(numCombInBlock, NULL);
     for (int c = 0; c < numCombInBlock; c++)
@@ -1234,7 +1237,6 @@ class PseudoLogLikelihood
           groundings.appendArray(constants);
         }
         varIdToMults[id]->append(pair<int,Term*>(multipliers[j], (Term*)t));
-        
       }
       else
       if (t->getType() == Term::CONSTANT)
@@ -1246,9 +1248,15 @@ class PseudoLogLikelihood
         assert(constants->size() > 0);
           //ASSUMPTION: constants of the same type are consecutively numbered in
           //the constants array
-        int firstConstId = (*constants)[0];
-        assert(id >= firstConstId);
-        offsetDueToConstants += (id-firstConstId)*multipliers[j];
+        for (int i = 0; i < constants->size(); i++)
+        {
+          if ((*constants)[i] == id)
+          {
+            offsetDueToConstants += i*multipliers[j];
+            break;
+          }
+        }
+        //delete constants;
       }
       else
       {
@@ -1300,6 +1308,7 @@ class PseudoLogLikelihood
       if (tv == TRUE) trueGndings.append(g);
       else if (tv == FALSE) falseGndings.append(g);      
     }
+    //acc.deleteArraysAndClear();
 
     sampledGndings->totalTrue = trueGndings.size();
     sampledGndings->totalFalse = falseGndings.size();

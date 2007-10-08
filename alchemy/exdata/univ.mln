@@ -6,19 +6,14 @@ publication(title, person)
 inPhase(person, phase)
 hasPosition(person, position)
 
-//function declarations
-person motherOf(person)
-
 //formulas
-professor(motherOf(p)) => professor(p)
-
 professor(p) <=> !student(p)
 
 advisedBy(s,p) => student(s) ^ professor(p)
 
-inPhase(s, Pre_Quals) v inPhase(s, Post_Quals) => student(s)
+inPhase(s, +ph) => student(s)
 
-hasPosition(p, Faculty) v hasPosition(p, Faculty_emeritus) => professor(p)
+hasPosition(p, +pos) => professor(p)
 
 publication(t,p) ^ publication(t,s) ^ professor(p) ^ student(s) ^ !(s = p) =>
   advisedBy(s,p)
@@ -26,8 +21,6 @@ publication(t,p) ^ publication(t,s) ^ professor(p) ^ student(s) ^ !(s = p) =>
 advisedBy(s,p) ^ hasPosition(p,+q) => inPhase(s, +r)
 
 *inPhase(s, Pre_Quals) v *inPhase(s, Post_Quals)
-
-
 
 /******************** more examples  ******************/
 /*

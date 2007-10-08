@@ -77,7 +77,7 @@
 struct MCSatParams : MCMCParams
 {
   MaxWalksatParams* mwsParams;
-  int numStepsEveryMCSat;
+  //int numStepsEveryMCSat;
 };
 
 #endif /*MCSATPARAMS_H_*/

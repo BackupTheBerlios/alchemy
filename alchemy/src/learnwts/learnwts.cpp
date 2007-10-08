@@ -69,7 +69,7 @@
 #include "arguments.h"
 #include "inferenceargs.h"
 #include "lbfgsb.h"
-#include "votedperceptron.h"
+#include "discriminativelearner.h"
 #include "learnwts.h"
 #include "maxwalksat.h"
 #include "mcsat.h"
@@ -80,7 +80,7 @@
   //generative learning
 bool PRINT_CLAUSE_DURING_COUNT = true;
 
-const double DISC_DEFAULT_STD_DEV = 1;
+const double DISC_DEFAULT_STD_DEV = 2;
 const double GEN_DEFAULT_STD_DEV = 100;
 
   // Variables for holding inference command line args are in inferenceargs.h
@@ -91,8 +91,10 @@ char* dbFiles = NULL;
 char* nonEvidPredsStr = NULL;
 bool noAddUnitClauses = false;
 bool multipleDatabases = false;
-bool initToZero = false;
+bool initWithLogOdds = false;
 bool isQueryEvidence = false;
+
+bool aPeriodicMLNs = false;
 
 bool noPrior = false;
 double priorMean = 0;
@@ -104,12 +106,22 @@ double convThresh = 1e-5;
 bool noEqualPredWt = false;
 
   // Discriminative learning args
-int numIter = 200;
+int numIter = 100;
+double maxSec  = 0;
+double maxMin  = 0;
+double maxHour = 0;
 double learningRate = 0.001;
 double momentum = 0.0;
-bool rescaleGradient = false;
 bool withEM = false;
 char* aInferStr = NULL;
+bool noUsePerWeight = false;
+bool useNewton = false;
+bool useCG = false;
+bool useVP = false;
+int  discMethod = DiscriminativeLearner::CG;
+double cg_lambda = 100;
+double cg_max_lambda = DBL_MAX;
+bool   cg_noprecond = false;
 int amwsMaxSubsequentSteps = -1;
 
 
@@ -139,64 +151,79 @@ ARGS ARGS::Args[] =
 
     // BEGIN: Common inference arguments
   ARGS("m", ARGS::Tog, amapPos, 
+       "(Embed in -infer argument) "
        "Run MAP inference and return only positive query atoms."),
 
   ARGS("a", ARGS::Tog, amapAll, 
+       "(Embed in -infer argument) "
        "Run MAP inference and show 0/1 results for all query atoms."),
 
   ARGS("p", ARGS::Tog, agibbsInfer, 
+       "(Embed in -infer argument) "
        "Run inference using MCMC (Gibbs sampling) and return probabilities "
        "for all query atoms."),
   
   ARGS("ms", ARGS::Tog, amcsatInfer,
+       "(Embed in -infer argument) "
        "Run inference using MC-SAT and return probabilities "
        "for all query atoms"),
 
   ARGS("simtp", ARGS::Tog, asimtpInfer,
+       "(Embed in -infer argument) "
        "Run inference using simulated tempering and return probabilities "
        "for all query atoms"),
 
   ARGS("seed", ARGS::Opt, aSeed,
-       "[random] Seed used to initialize the randomizer in the inference "
-       "algorithm. If not set, seed is initialized from the current date and "
-       "time."),
+       "(Embed in -infer argument) "
+       "[2350877] Seed used to initialize the randomizer in the inference "
+       "algorithm. If not set, seed is initialized from a fixed random number."),
 
   ARGS("lazy", ARGS::Opt, aLazy, 
+       "(Embed in -infer argument) "
        "[false] Run lazy version of inference if this flag is set."),
   
   ARGS("lazyNoApprox", ARGS::Opt, aLazyNoApprox, 
+       "(Embed in -infer argument) "
        "[false] Lazy version of inference will not approximate by deactivating "
        "atoms to save memory. This flag is ignored if -lazy is not set."),
   
   ARGS("memLimit", ARGS::Opt, aMemLimit, 
+       "(Embed in -infer argument) "
        "[-1] Maximum limit in kbytes which should be used for inference. "
        "-1 means main memory available on system is used."),
     // END: Common inference arguments
 
     // BEGIN: MaxWalkSat args
   ARGS("mwsMaxSteps", ARGS::Opt, amwsMaxSteps,
-       "[1000000] (MaxWalkSat) The max number of steps taken."),
+       "(Embed in -infer argument) "
+       "[100000] (MaxWalkSat) The max number of steps taken."),
 
   ARGS("tries", ARGS::Opt, amwsTries, 
+       "(Embed in -infer argument) "
        "[1] (MaxWalkSat) The max number of attempts taken to find a solution."),
 
   ARGS("targetWt", ARGS::Opt, amwsTargetWt,
+       "(Embed in -infer argument) "
        "[the best possible] (MaxWalkSat) MaxWalkSat tries to find a solution "
        "with weight <= specified weight."),
 
   ARGS("hard", ARGS::Opt, amwsHard, 
+       "(Embed in -infer argument) "
        "[false] (MaxWalkSat) MaxWalkSat never breaks a hard clause in order to "
        "satisfy a soft one."),
   
   ARGS("heuristic", ARGS::Opt, amwsHeuristic,
-       "[1] (MaxWalkSat) Heuristic used in MaxWalkSat (0 = RANDOM, 1 = BEST, "
+       "(Embed in -infer argument) "
+       "[2] (MaxWalkSat) Heuristic used in MaxWalkSat (0 = RANDOM, 1 = BEST, "
        "2 = TABU, 3 = SAMPLESAT)."),
   
   ARGS("tabuLength", ARGS::Opt, amwsTabuLength,
+       "(Embed in -infer argument) "
        "[5] (MaxWalkSat) Minimum number of flips between flipping the same "
        "atom when using the tabu heuristic in MaxWalkSat." ),
 
   ARGS("lazyLowState", ARGS::Opt, amwsLazyLowState, 
+       "(Embed in -infer argument) "
        "[false] (MaxWalkSat) If false, the naive way of saving low states "
        "(each time a low state is found, the whole state is saved) is used; "
        "otherwise, a list of variables flipped since the last low state is "
@@ -206,85 +233,100 @@ ARGS ARGS::Args[] =
 
     // BEGIN: MCMC args
   ARGS("burnMinSteps", ARGS::Opt, amcmcBurnMinSteps,
-       "[100] (MCMC) Minimun number of burn in steps (-1: no minimum)."),
+       "(Embed in -infer argument) "
+       "[0] (MCMC) Minimun number of burn in steps (-1: no minimum)."),
 
   ARGS("burnMaxSteps", ARGS::Opt, amcmcBurnMaxSteps,
-       "[100] (MCMC) Maximum number of burn-in steps (-1: no maximum)."),
+       "(Embed in -infer argument) "
+       "[0] (MCMC) Maximum number of burn-in steps (-1: no maximum)."),
 
   ARGS("minSteps", ARGS::Opt, amcmcMinSteps, 
-       "[-1] (MCMC) Minimum number of Gibbs sampling steps."),
+       "(Embed in -infer argument) "
+       "[-1] (MCMC) Minimum number of MCMC sampling steps."),
 
   ARGS("maxSteps", ARGS::Opt, amcmcMaxSteps, 
-       "[1000] (MCMC) Maximum number of Gibbs sampling steps."),
+       "(Embed in -infer argument) "
+       "[optimal] (MCMC) Maximum number of MCMC sampling steps."),
 
   ARGS("maxSeconds", ARGS::Opt, amcmcMaxSeconds, 
+       "(Embed in -infer argument) "
        "[-1] (MCMC) Max number of seconds to run MCMC (-1: no maximum)."),
     // END: MCMC args
   
     // BEGIN: Simulated tempering args
   ARGS("subInterval", ARGS::Opt, asimtpSubInterval,
+       "(Embed in -infer argument) "
         "[2] (Simulated Tempering) Selection interval between swap attempts"),
 
   ARGS("numRuns", ARGS::Opt, asimtpNumST,
+       "(Embed in -infer argument) "
         "[3] (Simulated Tempering) Number of simulated tempering runs"),
 
   ARGS("numSwap", ARGS::Opt, asimtpNumSwap,
+       "(Embed in -infer argument) "
         "[10] (Simulated Tempering) Number of swapping chains"),
     // END: Simulated tempering args
 
-    // BEGIN: MC-SAT args
-  ARGS("numStepsEveryMCSat", ARGS::Opt, amcsatNumStepsEveryMCSat,
-       "[1] (MC-SAT) Number of total steps (mcsat + gibbs) for every mcsat "
-       "step"),
-    // END: MC-SAT args
-
     // BEGIN: SampleSat args
   ARGS("numSolutions", ARGS::Opt, amwsNumSolutions,
+       "(Embed in -infer argument) "
        "[10] (MC-SAT) Return nth SAT solution in SampleSat"),
 
   ARGS("saRatio", ARGS::Opt, assSaRatio,
+       "(Embed in -infer argument) "
        "[50] (MC-SAT) Ratio of sim. annealing steps mixed with WalkSAT in "
        "MC-SAT"),
 
   ARGS("saTemperature", ARGS::Opt, assSaTemp,
+       "(Embed in -infer argument) "
         "[10] (MC-SAT) Temperature (/100) for sim. annealing step in "
         "SampleSat"),
 
   ARGS("lateSa", ARGS::Tog, assLateSa,
+       "(Embed in -infer argument) "
        "[false] Run simulated annealing from the start in SampleSat"),
     // END: SampleSat args
 
     // BEGIN: Gibbs sampling args
   ARGS("numChains", ARGS::Opt, amcmcNumChains, 
+       "(Embed in -infer argument) "
        "[10] (Gibbs) Number of MCMC chains for Gibbs sampling (there must be "
        "at least 2)."),
 
   ARGS("delta", ARGS::Opt, agibbsDelta,
+       "(Embed in -infer argument) "
        "[0.05] (Gibbs) During Gibbs sampling, probabilty that epsilon error is "
        "exceeded is less than this value."),
 
   ARGS("epsilonError", ARGS::Opt, agibbsEpsilonError,
+       "(Embed in -infer argument) "
        "[0.01] (Gibbs) Fractional error from true probability."),
 
   ARGS("fracConverged", ARGS::Opt, agibbsFracConverged, 
+       "(Embed in -infer argument) "
        "[0.95] (Gibbs) Fraction of ground atoms with probabilities that "
        "have converged."),
 
   ARGS("walksatType", ARGS::Opt, agibbsWalksatType, 
+       "(Embed in -infer argument) "
        "[1] (Gibbs) Use Max Walksat to initialize ground atoms' truth values "
        "in Gibbs sampling (1: use Max Walksat, 0: random initialization)."),
 
   ARGS("samplesPerTest", ARGS::Opt, agibbsSamplesPerTest, 
+       "(Embed in -infer argument) "
        "[100] Perform convergence test once after this many number of samples "
        "per chain."),
     // END: Gibbs sampling args
 
     // BEGIN: Weight learning specific args
+  ARGS("periodic", ARGS::Tog, aPeriodicMLNs,
+       "Write out MLNs after 1, 2, 5, 10, 20, 50, etc. iterations"),
+
   ARGS("infer", ARGS::Opt, aInferStr,
        "Specified inference parameters when using discriminative learning. "
        "The arguments are to be encapsulated in \"\" and the syntax is "
        "identical to the infer command (run infer with no commands to see "
-       "this). If not specified, MaxWalkSat with default parameters is used."),
+       "this). If not specified, 5 steps of MC-SAT with no burn-in is used."),
 
   ARGS("d", ARGS::Tog, discLearn, "Discriminative weight learning."),
 
@@ -318,28 +360,60 @@ ARGS ARGS::Args[] =
        "otherwise missing truth values are set to false."),
 
   ARGS("dNumIter", ARGS::Opt, numIter, 
-       "[200] (For discriminative learning only.) "
-       "Number of iterations to run voted perceptron."),
+       "[100] (For discriminative learning only.) "
+       "Number of iterations to run discriminative learning method."),
+
+  ARGS("dMaxSec", ARGS::Opt, maxSec,
+       "[-1] Maximum number of seconds to spend learning"),
+
+  ARGS("dMaxMin", ARGS::Opt, maxMin,
+       "[-1] Maximum number of minutes to spend learning"),
+
+  ARGS("dMaxHour", ARGS::Opt, maxHour,
+       "[-1] Maximum number of hours to spend learning"),
   
   ARGS("dLearningRate", ARGS::Opt, learningRate, 
        "[0.001] (For discriminative learning only) "
-       "Learning rate for the gradient descent in voted perceptron algorithm."),
+       "Learning rate for the gradient descent in disc. learning algorithm."),
 
   ARGS("dMomentum", ARGS::Opt, momentum, 
        "[0.0] (For discriminative learning only) "
-       "Momentum term for the gradient descent in voted perceptron algorithm."),
+       "Momentum term for the gradient descent in disc. learning algorithm."),
+       
+  ARGS("dNoPW", ARGS::Tog, noUsePerWeight,
+       "[false] (For voted perceptron only.) "
+       "Do not use per-weight learning rates, based on the number of true "
+       "groundings per weight."),
+  
+  ARGS("dVP", ARGS::Tog, useVP,
+       "[false] (For discriminative learning only) "
+       "Use voted perceptron to learn the weights."),
+
+  ARGS("dNewton", ARGS::Tog, useNewton,
+       "[false] (For discriminative learning only) "
+       "Use diagonalized Newton's method to learn the weights."),
+
+  ARGS("dCG", ARGS::Tog, useCG,
+       "[false] (For discriminative learning only) "
+       "Use rescaled conjugate gradient to learn the weights."),
+
+  ARGS("cgLambda", ARGS::Opt, cg_lambda,
+       "[100] (For CG only) (For CG only) Starting value of parameter to limit "
+       "step size"),
+
+  ARGS("cgMaxLambda", ARGS::Opt, cg_max_lambda,
+       "[no limit] (For CG only) Maximum value of parameter to limit step size"),
+
+  ARGS("cgNoPrecond", ARGS::Tog, cg_noprecond,
+       "[false] (For CG only) precondition with the diagonal Hessian"),
        
   ARGS("queryEvidence", ARGS::Tog, isQueryEvidence, 
-       "If this flag is set, then all the groundings of query preds not in db "
-       "are assumed false evidence."),
-       
-  ARGS("dRescale", ARGS::Tog, rescaleGradient, 
-       "(For discriminative learning only.) "
-       "Rescale the gradient by the number of true groundings per weight."),
+       "[false] If this flag is set, then all the groundings of query preds not "
+       "in db are assumed false evidence."),
 
-  ARGS("dZeroInit", ARGS::Tog, initToZero,
-       "(For discriminative learning only.) "
-       "Initialize clause weights to zero instead of their log odds."),
+  ARGS("dInitWithLogOdds", ARGS::Tog, initWithLogOdds,
+       "[false] (For discriminative learning only.) "
+       "Initialize clause weights to their log odds instead of zero."),
 
   ARGS("dMwsMaxSubsequentSteps", ARGS::Opt, amwsMaxSubsequentSteps,
        "[Same as mwsMaxSteps] (For discriminative learning only.) The max "
@@ -358,7 +432,7 @@ ARGS ARGS::Args[] =
        "L-BFGS-B terminates."),
 
   ARGS("gNoEqualPredWt", ARGS::Opt, noEqualPredWt, 
-       "(For generative learning only.) "
+       "[false] (For generative learning only.) "
        "If specified, the predicates are not weighted equally in the "
        "pseudo-log-likelihood computation; otherwise they are."),
   
@@ -371,7 +445,7 @@ ARGS ARGS::Args[] =
        "This mean applies if no weight is given in the .mln file."),
 
   ARGS("priorStdDev", ARGS::Opt, priorStdDev, 
-       "[1 for discriminative learning. 100 for generative learning] "
+       "[2 for discriminative learning. 100 for generative learning] "
        "Standard deviations of Gaussian priors on clause weights."),
 
   ARGS()
@@ -385,9 +459,12 @@ int main(int argc, char* argv[])
 
   if (!discLearn && !genLearn) 
   { 
-    cout << "must specify either -d or -g "
-         <<"(discriminative or generative learning) " << endl; 
-    return -1; 
+      // If nothing specified, then use disc. learning
+    discLearn = true;
+    
+    //cout << "must specify either -d or -g "
+    //     <<"(discriminative or generative learning) " << endl; 
+    //return -1;
   }
 
   Timer timer;
@@ -425,7 +502,7 @@ int main(int argc, char* argv[])
   if (priorStdDev <= 0) { cout << "priorStdDev must be > 0" << endl; return -1;}
 
   if (amwsMaxSteps <= 0)
-  { cout << "ERROR: maxSteps must be positive" << endl; return -1; }
+  { cout << "ERROR: mwsMaxSteps must be positive" << endl; return -1; }
   
     // If max. subsequent steps not specified, use amwsMaxSteps
   if (amwsMaxSubsequentSteps <= 0) amwsMaxSubsequentSteps = amwsMaxSteps;
@@ -453,10 +530,23 @@ int main(int argc, char* argv[])
     // Parse the inference parameters, if given
   if (discLearn)
   {
-      // If no inference method indicated, then use MAP
+      // If no method given, then use CG
+    if (!useVP && !useCG && !useNewton)
+      useCG = true;
+      // Per-weight can not be used with SCG or Newton
+    if ((useCG || useNewton) && !noUsePerWeight)
+    {
+      noUsePerWeight = true;
+    }
+
+      // maxSteps is optimized after domains are built
+    amcmcMaxSteps = -1;
+    amcmcBurnMaxSteps = -1;
     if (!aInferStr)
     {
-      amapPos = true;
+        // Set defaults of inference inside disc. weight learning:
+        // MC-SAT with no burn-in, 5 steps
+      amcsatInfer = true;
     }
       // If inference method given, we need to parse the parameters
     else
@@ -487,6 +577,12 @@ int main(int argc, char* argv[])
       }
       delete[] inferArgv; 
     }
+    
+    if (!asimtpInfer && !amapPos && !amapAll && !agibbsInfer && !amcsatInfer)
+    {
+        // If nothing specified, use MC-SAT
+      amcsatInfer = true;
+    }    
   }
 
 
@@ -522,7 +618,7 @@ int main(int argc, char* argv[])
   StringHashArray nonEvidPredNames;
   if (nonEvidPredsStr)
   {
-    if(!extractPredNames(nonEvidPredsStr, NULL, nonEvidPredNames))
+    if (!extractPredNames(nonEvidPredsStr, NULL, nonEvidPredNames))
     {
       cout << "ERROR: failed to extract non-evidence predicate names." << endl;
       return -1;
@@ -567,7 +663,7 @@ int main(int argc, char* argv[])
   createDomainsAndMLNs(domains, mlns, multipleDatabases, inMLNFile, 
                        constFilesArr, dbFilesArr, nePredNames,
                        !noAddUnitClauses, priorMean, true,
-                       allPredsExceptQueriesAreCW, &owPredNames);
+                       allPredsExceptQueriesAreCW, &owPredNames, &cwPredNames);
   cout << "Parsing MLN and creating domains took "; 
   Timer::printTime(cout, timer.time() - begSec); cout << endl;
 
@@ -595,7 +691,6 @@ int main(int argc, char* argv[])
   if (indexTrans) 
     cout << endl << "the weights of clauses in the CNFs of existential"
          << " formulas will be tied" << endl;
-
 
   Array<double> priorMeans, priorStdDevs;
   if (!noPrior)
@@ -667,7 +762,6 @@ int main(int argc, char* argv[])
     msparams->minSteps           = amcmcMinSteps;
     msparams->maxSteps           = amcmcMaxSteps;
     msparams->maxSeconds         = amcmcMaxSeconds;
-    msparams->numStepsEveryMCSat = amcsatNumStepsEveryMCSat;
 
       // Set Gibbs parameters
     GibbsParams* gibbsparams = new GibbsParams;
@@ -713,6 +807,27 @@ int main(int argc, char* argv[])
     {
       Domain* domain = domains[i];
       MLN* mln = mlns[i];
+        // Domains have been built: If user doesn't provide number of MC-SAT
+        // steps, then use 10,000 / (min # of gndings of any clause), but not
+        // less than 5. This is to insure 10,000 samples of all clauses
+      if (amcmcMaxSteps <= 0)
+      {
+        int minSize = INT_MAX;
+        
+        for (int c = 0; c < mln->getNumClauses(); c++)
+        {
+          Clause* clause = (Clause*)mln->getClause(c);
+          double size = clause->getNumGroundings(domain);
+          if (size < minSize) minSize = (int)size;
+        }
+        int steps = 10000 / minSize;
+        if (steps < 5) steps = 5;
+        cout << "Setting number of MCMC steps to " << steps << endl;
+        amcmcMaxSteps = steps;
+        msparams->maxSteps = amcmcMaxSteps;
+        gibbsparams->maxSteps = amcmcMaxSteps;
+        stparams->maxSteps = amcmcMaxSteps;        
+      }
 
         // Remove evidence atoms structure from DBs
       if (!aLazy)
@@ -758,18 +873,35 @@ int main(int argc, char* argv[])
           // unknown, knePreds contains known non-evidence
 
           // Set known NE to unknown for building state
+          // and set blockEvidence to false if this was the true evidence
         knePredValues->growToSize(knePreds->size(), FALSE);
-        for (int predno = 0; predno < knePreds->size(); predno++) 
+        for (int predno = 0; predno < knePreds->size(); predno++)
+        {
+            // If this was the true evidence in block, then erase this info
+          int blockIdx = domain->getBlock((*knePreds)[predno]);
+          if (blockIdx > -1 &&
+              domain->getDB()->getValue((*knePreds)[predno]) == TRUE)
+          {
+            domain->setBlockEvidence(blockIdx, false);
+          }
+            // Set value to unknown
           (*knePredValues)[predno] =
             domain->getDB()->setValue((*knePreds)[predno], UNKNOWN);
+        }
 
           // If first order query pred groundings are allowed to be evidence
           // - we assume all the predicates not in db to be false
-          // evidence - need a better way code this.
+          // evidence - need a better way to code this.
         if (isQueryEvidence)
+        {
             // Set unknown NE to false
-          for (int predno = 0; predno < unePreds->size(); predno++) 
+          for (int predno = 0; predno < unePreds->size(); predno++)
+          {
             domain->getDB()->setValue((*unePreds)[predno], FALSE);
+            delete (*unePreds)[predno];
+          }
+          unePreds->clear();
+        }
       }
       
         // Create state for inferred counts using unknown and known (set to
@@ -777,6 +909,7 @@ int main(int argc, char* argv[])
       cout << endl << "constructing state for domain " << i << "..." << endl;
       bool markHardGndClauses = false;
       bool trackParentClauseWts = true;
+
       VariableState*& state = states[i];
       state = new VariableState(unePreds, knePreds, knePredValues,
                                 &allPredGndingsAreNonEvid, markHardGndClauses,
@@ -829,18 +962,29 @@ int main(int argc, char* argv[])
     }
     cout << endl << "done constructing variable states" << endl << endl;
     
-    VotedPerceptron vp(inferences, nonEvidPredNames, indexTrans, aLazy,
-                       rescaleGradient, withEM);
+    if (useVP)
+      discMethod = DiscriminativeLearner::SIMPLE;
+    else if (useNewton)
+      discMethod = DiscriminativeLearner::DN;
+    else
+      discMethod = DiscriminativeLearner::CG;
+
+    DiscriminativeLearner dl(inferences, nonEvidPredNames, indexTrans, aLazy,
+                             withEM, !noUsePerWeight, discMethod, cg_lambda,
+                             !cg_noprecond, cg_max_lambda);
+
     if (!noPrior) 
-      vp.setMeansStdDevs(numClausesFormulas, priorMeans.getItems(),
+      dl.setMeansStdDevs(numClausesFormulas, priorMeans.getItems(),
                          priorStdDevs.getItems());
     else
-      vp.setMeansStdDevs(-1, NULL, NULL);
+      dl.setMeansStdDevs(-1, NULL, NULL);
 	 
     begSec = timer.time();
     cout << "learning (discriminative) weights .. " << endl;
-    vp.learnWeights(wwts, wts.size()-1, numIter, learningRate, momentum,
-                    !initToZero, amwsMaxSubsequentSteps);
+    double maxTime = maxSec + 60*maxMin + 3600*maxHour;
+    dl.learnWeights(wwts, wts.size()-1, numIter, maxTime, learningRate, 
+                    momentum, initWithLogOdds, amwsMaxSubsequentSteps,
+                    aPeriodicMLNs);
     cout << endl << endl << "Done learning discriminative weights. "<< endl;
     cout << "Time Taken for learning = ";
     Timer::printTime(cout, (timer.time() - begSec)); cout << endl;
@@ -961,7 +1105,20 @@ int main(int argc, char* argv[])
 
   /////////////////////////////// clean up ///////////////////////////////////
   deleteDomains(domains);
-  for (int i = 0; i < mlns.size(); i++) delete mlns[i];
+
+  for (int i = 0; i < mlns.size(); i++)
+  {
+    if (DOMAINS_SHARE_DATA_STRUCT && i > 0)
+    {
+      mlns[i]->setClauses(NULL);
+      mlns[i]->setMLNClauseInfos(NULL);
+      mlns[i]->setPredIdToClausesMap(NULL);
+      mlns[i]->setFormulaAndClausesArray(NULL);
+      mlns[i]->setExternalClause(NULL);
+    }
+    delete mlns[i];
+  }
+
   PowerSet::deletePowerSet();
   if (indexTrans) delete indexTrans;
 

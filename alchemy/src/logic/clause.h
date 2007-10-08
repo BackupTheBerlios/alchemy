@@ -86,6 +86,8 @@ using namespace std;
 #include "clausehelper.h"
 
 const bool useInverseIndex = true;
+const bool clausedebug = false;
+
 
 /******************************************************************************/
 /** Need to define this type in the beginning as it is used in this file */
@@ -97,7 +99,7 @@ typedef HashArray<Clause*, HashClause, EqualClause> ClauseHashArray;
 class AddGroundClauseStruct;
 
 
-  //Ensure that the dirty_ bit is consistently updated.
+  // Ensure that the dirty_ bit is consistently updated.
 class Clause
 {
   friend class ClauseSampler;
@@ -768,8 +770,8 @@ class Clause
 
     int last = l;
     for (int i = l+1; i <= r; i++)
-    if (comparePredicatesByIdAndSenseAndTerms((*predicates_)[i],
-                                              (*predicates_)[l], vgtArr) < 0)
+      if (comparePredicatesByIdAndSenseAndTerms((*predicates_)[i],
+                                                (*predicates_)[l], vgtArr) < 0)
       {
         ++last;
         tmp = (*predicates_)[last];
@@ -787,7 +789,7 @@ class Clause
 
     //l and r must have the same id and sense
   static int comparePredicatesByTerms(const Predicate* const & l,
-                               const Predicate* const & r)
+                                      const Predicate* const & r)
   {
     assert(l->getId() == r->getId());
     assert(l->getSense() == r->getSense());
@@ -884,10 +886,15 @@ class Clause
                          const GroundPredicate* const & groundPred,
                          const AddGroundClauseStruct* const & agcs)
   {
+    if (clausedebug)
+    {
+      cout << "In Clause::addUnknownClauses()" << endl;
+    }
     createVarIdToVarsGroundedType(domain);
     if (gndPredIdx >= 0) groundPredVars(gndPredIdx, groundPred);
     countNumTrueGroundings(domain, db, true, false, gndPredIdx, groundPred, 
-                           NULL, NULL, NULL, NULL, agcs);
+                           NULL, NULL, NULL, NULL, agcs, NULL, NULL, NULL,
+                           true, false);
     restoreVars();
     deleteVarIdToVarsGroundedType();
   }
@@ -907,7 +914,8 @@ class Clause
       else  { assert(gndPred); groundPredVars(gndPredIdx, (Predicate*)gndPred);}
     }
     countNumTrueGroundings(domain, db, true, false, gndPredIdx, groundPred, 
-                           gndPred, unknownGndClauses,unknownClauses,NULL,NULL);
+                           gndPred, unknownGndClauses, unknownClauses, NULL,
+                           NULL, NULL, NULL, NULL, true, false);
     restoreVars();
     deleteVarIdToVarsGroundedType();
   }
@@ -919,7 +927,8 @@ class Clause
     createVarIdToVarsGroundedType(domain);
 
     double i = countNumTrueGroundings(domain, db, hasUnknownPreds ,true,
-                                      -1, NULL, NULL, NULL, NULL, NULL, NULL);
+                                      -1, NULL, NULL, NULL, NULL, NULL, NULL,
+                                      NULL, NULL, NULL, true, false);
     restoreVars();
     deleteVarIdToVarsGroundedType();
     return (i > 0);
@@ -942,7 +951,8 @@ class Clause
   {
     createVarIdToVarsGroundedType(domain);
     double n = countNumTrueGroundings(domain, db, hasUnknownPreds, false, 
-                                      -1, NULL, NULL, NULL, NULL, NULL,NULL);
+                                      -1, NULL, NULL, NULL, NULL, NULL, NULL,
+                                      NULL, NULL, NULL, true, false);
     restoreVars();
     deleteVarIdToVarsGroundedType();
     return n;
@@ -957,7 +967,7 @@ class Clause
     createVarIdToVarsGroundedType(domain);
     numTrue = countNumTrueGroundings(domain, db, hasUnknownPreds, false, 
                                      -1, NULL, NULL, NULL, NULL, &numUnknown,
-                                     NULL);
+                                     NULL, NULL, NULL, NULL, true, false);
     restoreVars();
     deleteVarIdToVarsGroundedType();
   }
@@ -1022,53 +1032,62 @@ class Clause
     
       //count # true groundings when gndPred is held to opposite value
     double numTrueGndOpp = 0.0;
-    flipped = true;
     
     int blockIdx = domain->getBlock(gndPred);
     if (blockIdx >= 0)
     {
         // Pred in block: We have to look at combination c
         // of other preds in block
-      const Array<Predicate*>* block = domain->getPredBlock(blockIdx);
-      assert(combo < block->size());
+      assert(combo < domain->getBlockSize(blockIdx));
+      
+      const Predicate* oldTruePred = domain->getTruePredInBlock(blockIdx);
 
       int oldTrueOne = 0;
-      for (int i = 0; i < block->size(); i++)
-      {
-        if (db->getValue((*block)[i]) == TRUE)
-        {
-          oldTrueOne = i;
-          break;
-        }
-      }
+      if (oldTruePred)
+        oldTrueOne = domain->getIndexOfPredInBlock(oldTruePred, blockIdx);
+//cout << "oldTrueOne " << oldTrueOne << endl;
+      assert(oldTrueOne > -1);
 
       int newTrueOne = (oldTrueOne <= combo) ? combo + 1 : combo;
-      
-      assert(db->getValue((*block)[oldTrueOne]) == TRUE);
-      assert(db->getValue((*block)[newTrueOne]) == FALSE);
-      
-      db->setValue((*block)[oldTrueOne], FALSE);
-      db->setValue((*block)[newTrueOne], TRUE);
-      
-   //numTrueGndOpp +=
-   //  countNumTrueGroundingsForAllComb(gndPredIndexes, gndPred, opp, flipped,
-   //                                   domain, hasUnknownPreds, sampleClauses);
+//cout << "newTrueOne " << newTrueOne << endl;
+      const Predicate* newTruePred =
+        domain->getPredInBlock(newTrueOne, blockIdx);
 
-      numTrueGndOpp +=
-        countNumTrueGroundingsForAllComb(gndPredIndexes, (*block)[oldTrueOne],
-                                         opp, flipped, domain, hasUnknownPreds,
-                                         sampleClauses);
-      numTrueGndOpp +=
-        countNumTrueGroundingsForAllComb(gndPredIndexes, (*block)[newTrueOne],
-                                         opp, flipped, domain, hasUnknownPreds,
-                                         sampleClauses);
+      bool isOldTrue =
+        oldTruePred ? gndPred->same((Predicate*)oldTruePred) : false;
+      bool isNewTrue = gndPred->same((Predicate*)newTruePred);      
+      TruthValue newTV =
+        ((!isOldTrue && isNewTrue) || (isOldTrue && !isNewTrue)) ? opp : actual;
       
-      db->setValue((*block)[oldTrueOne], TRUE);
-      db->setValue((*block)[newTrueOne], FALSE);
+      if (oldTruePred) assert(db->getValue(oldTruePred) == TRUE);
+      assert(db->getValue(newTruePred) == FALSE);
+      
+      if (oldTruePred) db->setValue(oldTruePred, FALSE);
+      db->setValue(newTruePred, TRUE);
+      
+      numTrueGndOpp +=
+        countNumTrueGroundingsForAllComb(gndPredIndexes, gndPred, newTV, 
+                                         newTV != actual, domain,
+                                         hasUnknownPreds, sampleClauses);
+
+      //numTrueGndOpp +=
+      //  countNumTrueGroundingsForAllComb(gndPredIndexes, (*block)[oldTrueOne],
+      //                                   opp, flipped, domain, hasUnknownPreds,
+      //                                   sampleClauses);
+      //numTrueGndOpp +=
+      //  countNumTrueGroundingsForAllComb(gndPredIndexes, (*block)[newTrueOne],
+      //                                   opp, flipped, domain, hasUnknownPreds,
+      //                                   sampleClauses);
+      
+      if (oldTruePred) db->setValue(oldTruePred, TRUE);
+      db->setValue(newTruePred, FALSE);
+      
+      delete newTruePred;
     }
     else
     {
         // Pred not in block: Count gndings with pred flipped
+      flipped = true;
 
         //set gndPred to have the opposite of its actual value
       db->setValue(gndPred, opp);
@@ -1362,21 +1381,39 @@ class Clause
   }
 
 
+  /**
+   * Adds variable ids and groundings to a LitIdxVarIdsGndings structure.
+   * 
+   * @param varId Id of variable being added.
+   * @param varType Type of variable being added.
+   * @param domain Domain in which this all takes place.
+   * @param ivg LitIdxVarIdsGndings to which the ids and groundings are
+   * being added.
+   */
   static void addVarIdAndGndings(const int& varId, const int& varType,
-                          const Domain* const & domain,
-                          LitIdxVarIdsGndings* const & ivg)
+                                 const Domain* const & domain,
+                                 LitIdxVarIdsGndings* const & ivg)
   {
     ivg->varIds.append(varId);
     const Array<int>* constants = domain->getConstantsByType(varType);
     ivg->varGndings.appendArray(constants);
   }
 
-    //Caller should delete the returned LitIdxVarsGndings*
-    //Returns NULL if the literal at litIdx is grounded 
-  static LitIdxVarIdsGndings* createLitIdxVarIdsGndings(
-                                             Predicate* const & lit,
-                                                 const unsigned int& litIdx,
-                                                 const Domain* const & domain)
+  /**
+   * Constructs a LitIdxVarIdsGndings structure for one literal.
+   * Caller should delete the returned LitIdxVarsGndings*.
+   * Returns NULL if the literal at litIdx is grounded.
+   * 
+   * @param lit Literal whose groundings are being constructed.
+   * @param litIdx Index of literal in the clause
+   * @param domain Domain in which the clause occurs
+   * 
+   * @return Structure containing the index, variable ids and groundings
+   * for the given literal.
+   */
+  static LitIdxVarIdsGndings* createLitIdxVarIdsGndings(Predicate* const & lit,
+                                                     const unsigned int& litIdx,
+                                                   const Domain* const & domain)
   {
     LitIdxVarIdsGndings* ivg = new LitIdxVarIdsGndings;
     ivg->litIdx = litIdx;
@@ -1397,7 +1434,17 @@ class Clause
     return ivg;
   }
 
-
+  /**
+   * Constructs a LitIdxVarIdsGndings structure for each literal in the
+   * clause.
+   * 
+   * @param clauseLits Array of literals for which the groundings are being
+   * constructed.
+   * @param ivgArr Array where the structures are put.
+   * @param domain Domain in which the clause occurs.
+   * @param setGroundedClausesToNull If true, grounded clauses are set to
+   * NULL; otherwise, they are not.
+   */
   void createAllLitIdxVarsGndings(Array<Predicate*>& clauseLits, 
                                   Array<LitIdxVarIdsGndings*>& ivgArr,
                                   const Domain* const & domain,
@@ -1405,12 +1452,19 @@ class Clause
   {
     assert(varIdToVarsGroundedType_); // this must already be created
     
-      //for each literal
+      // for each literal
     for (unsigned int i = 0; i < (unsigned int) clauseLits.size(); i++)
     {
         //the literal was grounded when a previous literal was grounded
       if (clauseLits[i] == NULL) continue;
-      
+
+      if (clausedebug)
+      {
+        cout << "createAllLitIdxVarsGndings lit before: ";
+        clauseLits[i]->printWithStrVar(cout, domain);
+        cout << endl;
+      }
+            
       ivgArr.append(createLitIdxVarIdsGndings(clauseLits[i], i, domain));
       
         //ground variables of the last literal we looked at throughout clause
@@ -1429,16 +1483,23 @@ class Clause
         //store subsequent literals that are grounded when literal i is grounded
       Array<Predicate*>& subseqGndLits = ivgArr.lastItem()->subseqGndLits;
 
-      for (int j = i+1; j < clauseLits.size(); j++)
+      for (int j = i + 1; j < clauseLits.size(); j++)
       {
         Predicate* subseqLit = clauseLits[j];
-        if (subseqLit==NULL) continue;
+        if (subseqLit == NULL) continue;
         if (subseqLit->isGrounded()) 
         {
           subseqGndLits.append(subseqLit);
           if (setGroundedClausesToNull) clauseLits[j] = NULL;
         }
       } //for each subsequent literal
+
+      if (clausedebug)
+      {
+        cout << "createAllLitIdxVarsGndings lit after: ";
+        clauseLits[i]->printWithStrVar(cout, domain);
+        cout << endl;
+      }
     } //for each literal
   }
 
@@ -1446,7 +1507,11 @@ class Clause
     // Also sets to -1 the ids of the parent terms of functions in ivgArr[i]. 
   static void deleteAllLitIdxVarsGndings(Array<LitIdxVarIdsGndings*>& ivgArr)
   { 
-    for (int i = 0; i < ivgArr.size(); i++) delete ivgArr[i]; 
+    for (int i = 0; i < ivgArr.size(); i++)
+    {
+      //ivgArr[i]->varGndings.deleteArraysAndClear();
+      delete ivgArr[i];
+    }
   }
 
 
@@ -1547,7 +1612,7 @@ class Clause
   }
 
 
-  bool hasTwoLiteralsWithOppSense() const
+  bool hasTwoLiteralsWithOppSense(const Database* const & db) const
   {    
     PredicateSet predSet; // used to detect duplicates
     PredicateSet::iterator iter;
@@ -1556,9 +1621,9 @@ class Clause
     {
       Predicate* predicate = (*predicates_)[i];
       assert(predicate->isGrounded());
-      if (predicate->getTruthValue() == UNKNOWN)
+      if (db->getValue(predicate) == UNKNOWN)
       {
-        if ( (iter=predSet.find(predicate)) != predSet.end() )
+        if ( (iter = predSet.find(predicate)) != predSet.end() )
         {
             // the two gnd preds are of opp sense, so clause must be satisfied
           if ((*iter)->getSense() !=  predicate->getSense()) return true;
@@ -1577,7 +1642,8 @@ class Clause
   bool createAndAddUnknownClause(Array<GroundClause*>* const& unknownGndClauses,
                                  Array<Clause*>* const& unknownClauses,
                                  double* const & numUnknownClauses,
-                                 const AddGroundClauseStruct* const & agcs);
+                                 const AddGroundClauseStruct* const & agcs,
+                                 const Database* const & db);
 
   bool groundPredicates(const Array<int>* const & set,
                         const Array<int>& gndPredIndexes,
@@ -1687,8 +1753,8 @@ class Clause
 
 
   static void createBannedPreds(Array<Predicate*>& clauseLits,
-                         Array<LitIdxVarIdsGndings*>& ivgArr,
-                         Array<Predicate*>& bannedPreds)
+                                Array<LitIdxVarIdsGndings*>& ivgArr,
+                                Array<Predicate*>& bannedPreds)
   {
     if (bannedPreds.size() == 0) return;
 
@@ -1761,19 +1827,38 @@ class Clause
                                 const Database* const & db,
                                 const bool& hasUnknownPreds,
                                 const bool& checkSatOnly,
-                                  //params below: find unknown clauses
+                                  // params below: find unknown clauses
                                 const int& gndPredIdx,
                                 const GroundPredicate* const & groundPred,
                                 const Predicate* const & gndPred,
                                 Array<GroundClause*>* const & unknownGndClauses,
                                 Array<Clause*>* const & unknownClauses,
                                 double* const & numUnknownClauses,
-                                  //params below: add unknown clauses to MRF
-                                const AddGroundClauseStruct* const & agcs)
+                                  // params below: add unknown clauses to MRF
+                                const AddGroundClauseStruct* const & agcs,
+                                  // params below: get active clauses and count
+                            Array<GroundClause *> * const & activeGroundClauses,
+                                int* const & activeClauseCnt,
+                                GroundPredicateHashArray* const& seenGndPreds,
+                                bool const & ignoreActivePreds,
+                                bool const & getSatisfied)                                
   {
     assert(unknownGndClauses == NULL || unknownClauses == NULL);
     assert(groundPred == NULL || gndPred == NULL);
+      // Assert if activeGroundClauses isn't NULL, then others are and
+      // vice versa
+    if (activeGroundClauses)
+    {
+      assert(unknownGndClauses == NULL && unknownClauses == NULL &&
+             agcs == NULL);
+    }
+    if (unknownGndClauses || unknownClauses || agcs)
+    {
+      assert(activeGroundClauses == NULL);
+    }
+    bool getActiveClauses = (activeGroundClauses || activeClauseCnt);
 
+    if (activeClauseCnt) *activeClauseCnt = 0;
     if (numUnknownClauses) *numUnknownClauses = 0;
 
     bool findUnknownClauses = (unknownGndClauses || unknownClauses || 
@@ -1787,119 +1872,290 @@ class Clause
     
       //Copy the literals so that their original order in the clause is
       //not affected by the subsequent sorting
-    Array<Predicate*> clauseLits(*predicates_);
+    Array<Predicate*>* origClauseLits = new Array<Predicate*>(*predicates_);
 
-      //Sort preds in decreasing order of #TrueGndOfLiteral/#numOfGroundings.
-      //The larger the number of true groundings of a literal, the more likely
-      //it is to be true, so put it in front so that we can decide whether the
-      //clause is true early.The larger the number of groundings of the literal,
-      //the larger the savings when we decide that preceding literals are true.
-    sortLiteralsByTrueDivTotalGroundings(clauseLits, domain, db);
+      // Array of partially grounded clauses achieved by using the inverted
+      // index
+    Array<Array<Predicate*>* > partGroundedClauses;
 
-      //simulate a stack, back/front corresponds to top/bottom
-      //ivg stands for index, varIds, groundings
-    Array<LitIdxVarIdsGndings*> ivgArr;
-    createAllLitIdxVarsGndings(clauseLits, ivgArr, domain, true);
-    if (findUnknownClauses) createBannedPreds(clauseLits, ivgArr, bannedPreds);
-    int ivgArrIdx = 0; //store current position in ivgArr
-    bool lookAtNextLit = false;
-    
-      // while stack is not empty
-    while (ivgArrIdx >= 0)
+    if ((findUnknownClauses || getActiveClauses) && useInverseIndex)
     {
-        //get variable groundings at top of stack
-      LitIdxVarIdsGndings* ivg = ivgArr[ivgArrIdx];
-      Predicate* lit = clauseLits[ivg->litIdx];
-      Array<int>& varIds = ivg->varIds;
-      ArraysAccessor<int>& varGndings = ivg->varGndings;
-      bool& litUnseen = ivg->litUnseen;
-      bool hasComb;
+      bool newIgnoreActivePreds = ignoreActivePreds;
+        // If in a neg. clause, then we can only index on evidence
+      if (wt_ < 0) newIgnoreActivePreds = true;
+      
+        // Put the indexable literals first and ground them
+      sortLiteralsByNegationAndArity(*origClauseLits, newIgnoreActivePreds, db);
+      groundIndexableLiterals(domain, db, *origClauseLits, partGroundedClauses,
+                              ignoreActivePreds);
+    }
+    else
+    {
+        //Sort preds in decreasing order of #TrueGndOfLiteral/#numOfGroundings.
+        //The larger the number of true groundings of a literal, the more likely
+        //it is to be true, so put it in front so that we can decide whether the
+        //clause is true early.The larger the number of groundings of the
+        //literal, the larger the savings when we decide that preceding literals
+        //are true.
+      sortLiteralsByTrueDivTotalGroundings(*origClauseLits, domain, db);
+        // Put the original clause as the only clause into partGroundedClauses
+      Array<Predicate*>* clauseLitsCopy = new Array<Predicate*>;
+      clauseLitsCopy->growToSize(origClauseLits->size());
+      for (int i = 0; i < origClauseLits->size(); i++)
+        (*clauseLitsCopy)[i] = new Predicate(*(*origClauseLits)[i]);
+      partGroundedClauses.append(clauseLitsCopy);
+    }
 
-        // while there are groundings of literal's variables
-      while ((hasComb=varGndings.hasNextCombination()) || litUnseen)
+      // At this point partGroundedClauses holds the nodes of the branch and
+      // bound algorithm. This means nothing more is indexed and we must ground
+      // out the rest of the predicates
+    if (clausedebug)
+    {
+      cout << "Partially grounded clauses to be completed: " << endl;
+      for (int pgcIdx = 0; pgcIdx < partGroundedClauses.size(); pgcIdx++)
       {
-          // there may be no combinations if the literal is fully grounded
-        if (litUnseen) litUnseen = false;
-
-        if (hasComb)
+        cout << "\t";
+        for (int i = 0; i < partGroundedClauses[pgcIdx]->size(); i++)
         {
-            //ground the literal's variables throughout the clause
-          int constId;
-          int v = 0; // index of varIds
-            //for each variable in literal
-          while(varGndings.nextItemInCombination(constId))
+          (*partGroundedClauses[pgcIdx])[i]->printWithStrVar(cout, domain);
+          cout << " ";
+        }
+        cout << endl;
+      }
+    }
+
+      // Go through each clause in partGroundedClauses (nodes of the branch and
+      // bound algorithm if using inverted index; otherwise, the original
+      // clause), ground them out and check truth values
+    for (int pgcIdx = 0; pgcIdx < partGroundedClauses.size(); pgcIdx++)
+    {
+        // clauseLits is a sorted copy of predicates_
+      Array<Predicate*> clauseLits = *(partGroundedClauses[pgcIdx]);
+      assert(clauseLits.size() == origClauseLits->size());
+        // Set the var to groundings in this clause to be those in clauseLits
+      Array<int>* origVarIds = new Array<int>;
+      
+      for (int i = 0; i < clauseLits.size(); i++)
+      {
+        assert(clauseLits[i]->getNumTerms() ==
+               (*origClauseLits)[i]->getNumTerms());
+          // Ground variables throughout clause
+        for (int j = 0; j < (*origClauseLits)[i]->getNumTerms(); j++)
+        {
+          const Term* oldTerm = (*origClauseLits)[i]->getTerm(j);
+          const Term* newTerm = clauseLits[i]->getTerm(j);
+          if (oldTerm->getType() == Term::VARIABLE &&
+              newTerm->getType() == Term::CONSTANT)
           {
-            Array<Term*>& vars =(*varIdToVarsGroundedType_)[-varIds[v++]]->vars;
-            for (int i = 0; i < vars.size(); i++) vars[i]->setId(constId);
+            int varId = oldTerm->getId();
+            origVarIds->append(varId);
+            int constId = newTerm->getId();
+            assert(constId >= 0);
+            Array<Term*>& vars = (*varIdToVarsGroundedType_)[-varId]->vars;
+            for (int k = 0; k < vars.size(); k++) vars[k]->setId(constId);
           }
-          
-          //return values of grounded functions are assigned to their parent
-          //terms in literalOrSubsequentLiteralsAreTrue()
+        }
+          // Set the preds in clauseLits to point to the original predicates_
+        delete clauseLits[i];
+        clauseLits[i] = (*origClauseLits)[i];
+      }
+      
+        //simulate a stack, back/front corresponds to top/bottom
+        //ivg stands for index, varIds, groundings
+      Array<LitIdxVarIdsGndings*> ivgArr;
+      createAllLitIdxVarsGndings(clauseLits, ivgArr, domain, true);
+      if (findUnknownClauses)
+        createBannedPreds(clauseLits, ivgArr, bannedPreds);
+      int ivgArrIdx = 0; //store current position in ivgArr
+      bool lookAtNextLit = false;
+    
+        // while stack is not empty
+      while (ivgArrIdx >= 0)
+      {
+          // get variable groundings at top of stack
+        LitIdxVarIdsGndings* ivg = ivgArr[ivgArrIdx];
+        //Predicate* lit = clauseLits[ivg->litIdx];
+        Predicate* lit = (*origClauseLits)[ivg->litIdx];
+        Array<int>& varIds = ivg->varIds;
+        ArraysAccessor<int>& varGndings = ivg->varGndings;
+        bool& litUnseen = ivg->litUnseen;
+        bool hasComb;
+
+        if (clausedebug)
+        {
+          cout << "Looking at lit: ";
+          lit->printWithStrVar(cout, domain);
+          cout << endl;
         }
 
-          //if literal or subsequent grounded literals are true,
-        if (literalOrSubsequentLiteralsAreTrue(lit, ivg->subseqGndLits, db))
+          // while there are groundings of literal's variables
+        while ((hasComb = varGndings.hasNextCombination()) || litUnseen)
         {
-          if (checkSatOnly) return 1;
-            //count the number of combinations of remaining variables
-          double numComb = 1;
-          for (int i = ivgArrIdx+1; i < ivgArr.size(); i++)
-          {
-            int numVar = ivgArr[i]->varGndings.getNumArrays();
-            for (int j = 0; j < numVar; j++)
-              numComb *= ivgArr[i]->varGndings.getArray(j)->size();
-          }
-          numTrueGndings += numComb;
-        }
-        else
-        if (findUnknownClauses && 
-            bannedPredsAreGndedAsGndPred(ivg->bannedPreds, groundPred, gndPred))
-        {
-          //do nothing, will move down stack later
-        }
-        else
-        {
-            // if there are more literals
-          if (ivgArrIdx+1 < ivgArr.size())
-          {
-            lookAtNextLit = true;
-            ivgArrIdx++; // move up stack
-            break;
-          }
-            //At this point all the literals are grounded, and they are either
-            //unknown or false (have truth values opposite of their senses).
+            // there may be no combinations if the literal is fully grounded
+          if (litUnseen) litUnseen = false;
 
-          bool twoLitWithOppSense = false;
-          if (hasUnknownPreds)
+          if (hasComb)
           {
-            if (hasTwoLiteralsWithOppSense()) 
+              //ground the literal's variables throughout the clause
+            int constId;
+            int v = 0; // index of varIds
+              //for each variable in literal
+            while (varGndings.nextItemInCombination(constId))
             {
-              twoLitWithOppSense = true;
-              ++numTrueGndings;
-              if (checkSatOnly) return 1;
+              Array<Term*>& vars =
+                (*varIdToVarsGroundedType_)[-varIds[v++]]->vars;
+              for (int i = 0; i < vars.size(); i++) vars[i]->setId(constId);
             }
           }
 
-          if (!twoLitWithOppSense && findUnknownClauses)
+            // Getting active clauses / counts
+          if (getActiveClauses)
           {
-            assert(!containsGndPredBeforeIdx(gndPredIdx, groundPred, gndPred));
+              // proceed further only if:
+              // 1. positive weight and partially gnded clause is unsatisfied or
+              // 2. negative weight and partially gnded clause is satisfied
+            bool proceed = true;
+            if (wt_ >= 0 && !getSatisfied)
+              proceed = isUnsatisfiedGivenActivePreds(lit, ivg->subseqGndLits,
+                                                      db, ignoreActivePreds);
 
-              //Create a new clause by appending unknown predicates to it.
-            createAndAddUnknownClause(unknownGndClauses, unknownClauses, 
-                                      numUnknownClauses, agcs);
+            if (clausedebug)
+            {
+              cout << "Clause: ";
+              printWithWtAndStrVar(cout, domain);
+              cout << endl;
+              cout << " proceed " << proceed << endl;
+            }
+
+            if (proceed)
+            {
+                // if there are more literals
+              if (ivgArrIdx + 1 < ivgArr.size())
+              {
+                lookAtNextLit = true;
+                ivgArrIdx++; // move up stack
+                break;
+              }
+
+                // Now we can check neg. clauses: if not satisfied (no true
+                // literals) or satisfied with evidence atom, then do not
+                // activate
+              if (wt_ < 0 && !getSatisfied &&
+                  !isSatisfiedGivenActivePreds(db, ignoreActivePreds))
+              {
+                if (clausedebug) cout << "continuing..." << endl;
+                continue;
+              }
+          
+                // At this point all the literals are grounded
+                // and does not have any true literal. To make sure that
+                // it is active, need to check the following two conditions:
+                // 1. It may have the same literal appearing in opposite senses
+                // => satisfied (and hence not active)
+                // 2. It may be empty when evidence is pruned away => not active
+              bool active;
+              bool accumulateClauses = activeGroundClauses;
+              if (!accumulateClauses)
+                active = isActive(db);
+              else
+                active = createAndAddActiveClause(activeGroundClauses,
+                                                  seenGndPreds, db,
+                                                  getSatisfied);
+            
+              if (clausedebug) cout << "Active " << active << endl;
+              if (active) (*activeClauseCnt)++;
+            }
           }
-        }
-      } //while there are groundings of literal's variables
+            // Getting unknown clauses / counts
+          else
+          {
+            if (clausedebug)
+            {
+              cout << "Getting unknown clauses / counts for " ;
+              printWithWtAndStrVar(cout, domain);
+              cout << endl;
+            }
+            
+              // if literal or subsequent grounded literals are true,
+            if (literalOrSubsequentLiteralsAreTrue(lit, ivg->subseqGndLits, db))
+            {
+              if (checkSatOnly) return 1;
+                //count the number of combinations of remaining variables
+              double numComb = 1;
+              for (int i = ivgArrIdx+1; i < ivgArr.size(); i++)
+              {
+                int numVar = ivgArr[i]->varGndings.getNumArrays();
+                for (int j = 0; j < numVar; j++)
+                  numComb *= ivgArr[i]->varGndings.getArray(j)->size();
+              }
+              numTrueGndings += numComb;
+            }
+            else
+            if (findUnknownClauses && 
+                bannedPredsAreGndedAsGndPred(ivg->bannedPreds, groundPred,
+                                             gndPred))
+            {
+              //do nothing, will move down stack later
+            }
+            else
+            {
+                // if there are more literals
+              if (ivgArrIdx + 1 < ivgArr.size())
+              {
+                lookAtNextLit = true;
+                ivgArrIdx++; // move up stack
+                break;
+              }
+                //At this point all the literals are grounded, and they are
+                //either unknown or false (have truth values opposite of their
+                //senses).
+              bool twoLitWithOppSense = false;
+              if (hasUnknownPreds)
+              {
+                if (hasTwoLiteralsWithOppSense(db)) 
+                {
+                  twoLitWithOppSense = true;
+                  ++numTrueGndings;
+                  if (checkSatOnly) return 1;
+                }
+              }
 
-        //if we exit the while loop in order to look at next literal 
-        //(i.e. without considering all groundings of current literal)
-      if (lookAtNextLit) { lookAtNextLit = false; }
-      else { varGndings.reset(); litUnseen = true; ivgArrIdx--; }//mv down stack
+              if (!twoLitWithOppSense && findUnknownClauses)
+              {
+                assert(!containsGndPredBeforeIdx(gndPredIdx, groundPred,
+                                                 gndPred));
 
-    } // while stack is not empty
+                  //Create a new clause by appending unknown predicates to it.
+                createAndAddUnknownClause(unknownGndClauses, unknownClauses, 
+                                          numUnknownClauses, agcs, db);
+              }
+            }
+          }
+        } //while there are groundings of literal's variables
 
-    deleteAllLitIdxVarsGndings(ivgArr);
+          //if we exit the while loop in order to look at next literal 
+          //(i.e. without considering all groundings of current literal)
+        if (lookAtNextLit) { lookAtNextLit = false; }
+          //mv down stack
+        else { varGndings.reset(); litUnseen = true; ivgArrIdx--; }
 
+      } // while stack is not empty
+
+        // Restore variables
+      for (int i = 0; i < origVarIds->size(); i++)
+      {
+        int varId = (*origVarIds)[i];
+        assert(varId < 0);
+        Array<Term*>& vars = (*varIdToVarsGroundedType_)[-varId]->vars;
+        for (int j = 0; j < vars.size(); j++) vars[j]->setId(varId);
+        (*varIdToVarsGroundedType_)[-varId]->isGrounded = false;
+      }
+      delete origVarIds;
+
+      deleteAllLitIdxVarsGndings(ivgArr);
+      delete partGroundedClauses[pgcIdx];
+    }
+    delete origClauseLits;
     return numTrueGndings;
   }
 
@@ -1939,7 +2195,7 @@ class Clause
     ps->prepareAccess(gndPredIndexes.size(), false);
 
     const Array<int>* set;
-    while(ps->getNextSet(set))
+    while (ps->getNextSet(set))
     {
         //ground the predicates in current combination
       bool sameTruthValueAndSense; //a ground pred has the same tv and sense
@@ -1980,7 +2236,8 @@ class Clause
         }
         else
           cnt = countNumTrueGroundings(domain, db, hasUnknownPreds, false,
-                                       -1, NULL, NULL, NULL, NULL, NULL, NULL);
+                                       -1, NULL, NULL, NULL, NULL, NULL, NULL,
+                                       NULL, NULL, NULL, true, false);
       }
 
         // add cnt to that of current combination
@@ -2048,349 +2305,347 @@ class Clause
     return !isEmpty;
   }
 
-  // Assumption: clause has pos. weight
-bool isUnsatisfiedGivenActivePreds(Predicate* const & lit,
-                             	   const Array<Predicate*>& subseqLits,
-                             	   const Database* const & db,
-							 	   bool const & ignoreActivePreds)
-{
-	// If atom has been deactivated, then we don't want any clauses that it's in
+    // Assumption: clause has pos. weight
+  bool isUnsatisfiedGivenActivePreds(Predicate* const & lit,
+                                     const Array<Predicate*>& subseqLits,
+                                     const Database* const & db,
+                                     bool const & ignoreActivePreds)
+  {
 //cout << "ignoreActivePreds " << ignoreActivePreds << endl;
 //cout << "lit "; lit->printWithStrVar(cout, db->getDomain()); cout << endl;
-  if (db->getDeactivatedStatus(lit)) return false;
-  bool active = false;
-  if(!ignoreActivePreds)
-	active = db->getActiveStatus(lit);
+      // If atom has been deactivated, then we don't want any clauses that
+      // it's in
+    if (db->getDeactivatedStatus(lit)) return false;
+    bool active = false;
+    if (!ignoreActivePreds)
+      active = db->getActiveStatus(lit);
 //cout << "active " << active << endl;
-  TruthValue tv = db->getValue(lit);
-  lit->setTruthValue(tv);
+    TruthValue tv = db->getValue(lit);
+    lit->setTruthValue(tv);
 //cout << "tv  " << tv << endl;
-  if (!active && db->sameTruthValueAndSense(tv, lit->getSense())) return false;
-    //cout<<"okies *** came here.."<<endl;
-  for (int i = 0; i < subseqLits.size(); i++)
-  {
+    if (!active && db->sameTruthValueAndSense(tv, lit->getSense()))
+      return false;
+
+    for (int i = 0; i < subseqLits.size(); i++)
+    {
 //cout << "subseqLit " << i << " ";
 //subseqLits[i]->printWithStrVar(cout, db->getDomain());
 //cout << endl;
     if (!ignoreActivePreds)
-	  active = db->getActiveStatus(subseqLits[i]);
+      active = db->getActiveStatus(subseqLits[i]);
 //cout << "active " << active << endl;
     tv = db->getValue(subseqLits[i]);
     subseqLits[i]->setTruthValue(tv);
 //cout << "tv  " << tv << endl;
     if (!active && db->sameTruthValueAndSense(tv,subseqLits[i]->getSense()))
       return false;
+    }
+    return true;
   }
-  return true;
-}
 
 
-  // Assumption: clause has neg. weight
-bool isSatisfiedGivenActivePreds(const Database* const & db,
-                                 bool const & ignoreActivePreds)
-{
-  bool isSatisfied = false;
-  for (int i = 0; i < predicates_->size(); i++)
+    // Assumption: clause has neg. weight
+  bool isSatisfiedGivenActivePreds(const Database* const & db,
+                                   bool const & ignoreActivePreds)
   {
-    Predicate* lit = getPredicate(i);
-    assert(lit->isGrounded());
-      // If atom has been deactivated, then we don't want any clauses
-      // that it's in
-    if (db->getDeactivatedStatus(lit)) return false;
-    bool active = false;
-    bool evidence = false;
-    if(!ignoreActivePreds)
-      active = db->getActiveStatus(lit);
+    bool isSatisfied = false;
+    for (int i = 0; i < predicates_->size(); i++)
+    {
+      Predicate* lit = getPredicate(i);
+      assert(lit->isGrounded());
+        // If atom has been deactivated, then we don't want any clauses
+        // that it's in
+      if (db->getDeactivatedStatus(lit)) return false;
+      bool active = false;
+      bool evidence = false;
+      if (!ignoreActivePreds)
+        active = db->getActiveStatus(lit);
     
-    TruthValue tv = db->getValue(lit);
-    lit->setTruthValue(tv);
-      // If true evidence atom is in clause, then clause is always satisfied
-      // and we want to ignore it.
-    evidence = db->getEvidenceStatus(lit);
+      TruthValue tv = db->getValue(lit);
+      lit->setTruthValue(tv);
+        // If true evidence atom is in clause, then clause is always satisfied
+        // and we want to ignore it.
+      evidence = db->getEvidenceStatus(lit);
 
 //cout << "Lit: ";
 //lit->printWithStrVar(cout, db->getDomain());
 //cout << " ev. " << evidence << " act. " << active << " stvas "
-//       << db->sameTruthValueAndSense(tv, lit->getSense()) << endl;
-    if (evidence && db->sameTruthValueAndSense(tv, lit->getSense()))
-      return false;
-      // Any active atom in clause or any true non-active atom
-      // means it is candidate for active clause
-    if (active || db->sameTruthValueAndSense(tv, lit->getSense()))
-      isSatisfied = true;
-  }
-  return isSatisfied;
-}
-
-
-  // Sort literals for use by the inverted index.
-  // For pos. clauses: negative literals first, then of increasing arity
-  // For neg. clauses: positive literals first, then of increasing arity
-void sortLiteralsByNegationAndArity(Array<Predicate*>& clauseLits)
-{
-  //cout << "Sorting lits by neg. and arity:" << endl;
-  assert(predicates_->size() == clauseLits.size());
-
-  Array<pair<double, Predicate*> > arr;
-  for (int i = 0; i < clauseLits.size(); i++)
-  {
-    Predicate* lit = clauseLits[i];
-    
-      // Put all the grounded literals in the front
-    if (lit->isGrounded()) 
-    {
-      arr.append(pair<double,Predicate*>(DBL_MAX, lit));
-      continue;
+//<< db->sameTruthValueAndSense(tv, lit->getSense()) << endl;
+      if (evidence && db->sameTruthValueAndSense(tv, lit->getSense()))
+        return false;
+        // Any active atom in clause or any true non-active atom
+        // means it is candidate for active clause
+      if (active || db->sameTruthValueAndSense(tv, lit->getSense()))
+        isSatisfied = true;
     }
-/*
-	  // Pos. clause: negative literals of arity two next
-	if (!lit->getSense())
-	{
-	  if (wt_ >= 0 && lit->getNumTerms() == 2)
-	  	arr.append(pair<double,Predicate*>((double)lit->getNumTerms(), lit));
-	  else
-	  	arr.append(pair<double,Predicate*>(-(double)lit->getNumTerms(), lit));	  	
-	  continue;
-	}
+    return isSatisfied;
+  }
 
-      // Neg. clause: positive literals of arity two next
-    if (lit->getSense())
+
+  /**
+   * Sort literals for use by the inverted index.
+   * For pos. clauses: negative literals first, then of increasing arity.
+   * For neg. clauses: positive literals first, then of increasing arity.
+   * 
+   * @param clauseLits Array of Predicate* to be sorted.
+   * @param ignoreActivePreds If true, active preds are not indexed, which
+   * means only evidence preds are indexed (sorted to the front). This is used
+   * in eager inference.
+   */
+  void sortLiteralsByNegationAndArity(Array<Predicate*>& clauseLits,
+                                      const bool& ignoreActivePreds,
+                                      const Database* const & db) const
+  {
+    assert(predicates_->size() == clauseLits.size());
+
+    Array<pair<double, Predicate*> > arr;
+    for (int i = 0; i < clauseLits.size(); i++)
     {
-      if (wt_ < 0 && lit->getNumTerms() == 2)
-        arr.append(pair<double,Predicate*>((double)lit->getNumTerms(), lit));
-      else
-        arr.append(pair<double,Predicate*>(-(double)lit->getNumTerms(), lit));      
-    }
-*/
-    if (lit->isIndexable(wt_ >= 0))
-      arr.append(pair<double,Predicate*>((double)lit->getNumTerms(), lit));
-    else
-      arr.append(pair<double,Predicate*>(-(double)lit->getNumTerms(), lit));      
-  }
-  
-  quicksortLiterals((pair<double,Predicate*>*) arr.getItems(),0,arr.size()-1);
-  assert(arr.size() == clauseLits.size());
-  for (int i = 0; i < arr.size(); i++)
-  {
-  	clauseLits[i] = arr[i].second;
-  	//cout << clauseLits[i]->getSense() << " " << clauseLits[i]->getName()
-    //     << endl;
-  }
-}
-
-
-  //Assumes clauseLits is ordered so that indexable lits are in the front
-void groundIndexableLiterals(const Domain* const & domain,
-                             Array<GroundClause *> * const & activeGroundClauses,
-                             int & activeClauseCnt,
-                             GroundPredicateHashArray* const& seenGndPreds,
-                             Array<Predicate*>& clauseLits,
-                             int litIdx, bool const & ignoreActivePreds,
-                             bool const & getSatisfied)
-{
-  const Database* db = domain->getDB();
-//cout << "litIdx " << litIdx << endl;
-//cout << "clauseLits size " << clauseLits.size() << endl;
-//cout << "clauseLits start ";
-/*
-for (int i = 0; i < clauseLits.size(); i++)
-{
-  if (clauseLits[i])
-  {
-  cout << i << " ";
-  clauseLits[i]->printWithStrVar(cout, db->getDomain());
-  cout << " ";
-  }
-}
-*/
-//cout << endl;
-//cout << "LIT ";
-//clauseLits[litIdx]->printWithStrVar(cout, db->getDomain());
-//cout << endl;
-  bool posClause = (wt_ >= 0) ? true : false;
-  if (clauseLits[litIdx]->isIndexable(posClause))
-  {
-	  // Branch and bound on indexable literals
-	Array<Predicate *>* indexedGndings = new Array<Predicate *>;
-	  // Bound
-	((Database *)db)->getIndexedGndings(indexedGndings, clauseLits[litIdx],
-                                        ignoreActivePreds);
-/*
-cout << "indexedGndings: " << endl;
-for (int i = 0; i < indexedGndings->size(); i ++)
-{
-  cout << "\t";
-  (*indexedGndings)[i]->printWithStrVar(cout, domain);
-  cout << endl;
-}
-*/
-      // Branch on the indexed groundings
-    for (int i = 0; i < indexedGndings->size(); i++)
-    {
-      Array<int>* origVarIds = new Array<int>;
-        // Ground variables throughout clause
-      for (int j = 0; j < clauseLits[litIdx]->getNumTerms(); j++)
-      {
-        const Term* term = clauseLits[litIdx]->getTerm(j);
-        if (term->getType() == Term::VARIABLE)
-        {
-          int varId = term->getId();
-          origVarIds->append(varId);
-          int constId = (*indexedGndings)[i]->getTerm(j)->getId();
-          assert(constId >= 0);
-          Array<Term*>& vars = (*varIdToVarsGroundedType_)[-varId]->vars;
-          for (int k = 0; k < vars.size(); k++) vars[k]->setId(constId);
-        }
-      }
-
-        // Save literal in tmp, then set to null
-      Predicate* tmpLit = clauseLits[litIdx];
-      clauseLits[litIdx] = NULL;
-      delete (*indexedGndings)[i];
+      Predicate* lit = clauseLits[i];
+      bool isIndexable = lit->isIndexable(wt_ >= 0);
       
-        // Move to next literal
-      if (litIdx + 1 < clauseLits.size())
-	    groundIndexableLiterals(domain, activeGroundClauses, activeClauseCnt,
-                                seenGndPreds, clauseLits, litIdx + 1,
-                                ignoreActivePreds, getSatisfied);
-
-	  	// Restore literal and variables
-	  clauseLits[litIdx] = tmpLit;
-      for (int i = 0; i < origVarIds->size(); i++)
+        // If lit is indexable, put it at the beginning
+      if (isIndexable)
       {
-      	int varId = (*origVarIds)[i];
-      	assert(varId < 0);
-      	Array<Term*>& vars = (*varIdToVarsGroundedType_)[-varId]->vars;
-      	for (int j = 0; j < vars.size(); j++) vars[j]->setId(varId);
-      	(*varIdToVarsGroundedType_)[-varId]->isGrounded = false;
+          // Evidence first
+        if (db->isClosedWorld(lit->getId()))
+          arr.append(pair<double, Predicate*>(2, lit));
+          // Then non-evidence
+        else if (!ignoreActivePreds)
+          arr.append(pair<double, Predicate*>(1, lit));
+        else
+          arr.append(pair<double, Predicate*>(-(double)lit->getNumTerms(), lit));        
       }
-	  delete origVarIds;
-	}
-	delete indexedGndings;
-	return;
-  }
+      else
+        arr.append(pair<double, Predicate*>(-(double)lit->getNumTerms(), lit));
+    }
   
-	// All indexable literals are grounded, now deal with the others
-  Array<LitIdxVarIdsGndings*> ivgArr;
-    // RIGHT
-  createAllLitIdxVarsGndings(clauseLits, ivgArr, domain, false);
-    // WRONG
-  //createAllLitIdxVarsGndings(clauseLits, ivgArr, domain, true);
-  int ivgArrIdx = 0; //store current position in ivgArr
-  bool lookAtNextLit = false;
-
-    // while stack is not empty
-  while (ivgArrIdx >= 0)
-  {
-      //get variable groundings at top of stack
-    LitIdxVarIdsGndings* ivg = ivgArr[ivgArrIdx];
-    Predicate* lit = clauseLits[ivg->litIdx];
-/*
-cout << "LIT1 ";
-lit->printWithStrVar(cout, db->getDomain());
-cout << endl;
-cout << "clauseLits size " << clauseLits.size() << endl;
-cout << "Rest of clauseLits ";
-for (int i = 0; i < clauseLits.size(); i++)
-{
-  if (clauseLits[i])
-  {
-  cout << i << " ";
-  clauseLits[i]->printWithStrVar(cout, db->getDomain());
-  cout << " ";
-  }
-}
-cout << endl;
-cout << "Subseq. size " << ivg->subseqGndLits.size() << endl;
-*/
-    Array<int>& varIds = ivg->varIds;
-    ArraysAccessor<int>& varGndings = ivg->varGndings;
-    bool& litUnseen = ivg->litUnseen;
-    bool hasComb;
-
-      // while there are groundings of literal's variables
-    while ((hasComb=varGndings.hasNextCombination()) || litUnseen)
+    quicksortLiterals((pair<double,Predicate*>*) arr.getItems(),0,arr.size()-1);
+    assert(arr.size() == clauseLits.size());
+    for (int i = 0; i < arr.size(); i++)
     {
-        // there may be no combinations if the literal is fully grounded
-      if (litUnseen) litUnseen = false;
+  	  clauseLits[i] = arr[i].second;
+  	  //cout << clauseLits[i]->getSense() << " " << clauseLits[i]->getName()
+      //     << endl;
+    }
+  }
 
-      if (hasComb)
+
+  /**
+   * Uses the inverted index to ground literals starting from the first literal
+   * up to the last indexable literal.
+   * Assumes clauseLits is ordered so that indexable lits are in the front.
+   * 
+   * @param domain Domain in which this takes place.
+   * @param db Database containing the truth values / activity of the preds
+   * @param clauseLits Array of Predicate*s representing the first-order
+   * clause.
+   * @param resultingClauses Partially grounded clauses resulting from grounding
+   * indexable literals.
+   */
+  void groundIndexableLiterals(const Domain* const & domain,
+                               const Database* const & db,
+                               Array<Predicate*>& clauseLits,
+                               Array<Array<Predicate*>* >& resultingClauses,
+                               bool const & ignoreActivePreds)
+  {
+    if (clausedebug)
+    {
+      cout << "Grounding indexable literals for ";
+      for (int i = 0; i < clauseLits.size(); i++)
       {
-          //ground the literal's variables throughout the clause
-        int constId;
-        int v = 0; // index of varIds
-          //for each variable in literal
-        while (varGndings.nextItemInCombination(constId))
+        clauseLits[i]->printWithStrVar(cout, domain);
+        cout << " ";
+      }
+      cout << endl;
+    }
+    assert(clauseLits.size() > 0);
+    bool posClause = (wt_ >= 0) ? true : false;
+
+      // Initially, resultingClauses holds only copies of the original clause
+    Array<Predicate*>* clauseLitsCopy = new Array<Predicate*>;
+    clauseLitsCopy->growToSize(clauseLits.size());
+    for (int i = 0; i < clauseLits.size(); i++)
+      (*clauseLitsCopy)[i] = new Predicate(*clauseLits[i]);
+    resultingClauses.append(clauseLitsCopy);
+      // Go through each literal and, if indexable, branch and bound on it
+    for (int litIdx = 0; litIdx < clauseLits.size(); litIdx++)
+    {
+        // Indexable lit
+      if (clauseLits[litIdx]->isIndexable(posClause) &&
+          (!ignoreActivePreds||db->isClosedWorld(clauseLits[litIdx]->getId())))
+      {
+          // tmpClauses holds the partially grounded clauses in one level of the
+          // tree
+        Array<Array<Predicate*>* > tmpClauses;
+        if (clausedebug)
         {
-          Array<Term*>& vars = (*varIdToVarsGroundedType_)[-varIds[v++]]->vars;
-          for (int i = 0; i < vars.size(); i++) vars[i]->setId(constId);
+          cout << "Resulting clauses size before: " << resultingClauses.size()
+               << endl;
         }
+          // pgc = partially grounded clause
+        for (int pgcIdx = 0; pgcIdx < resultingClauses.size(); pgcIdx++)
+        {
+          if (clausedebug)
+          {
+            cout << "Resulting clause before " << pgcIdx << ": ";
+            for (int i = 0; i < resultingClauses[pgcIdx]->size(); i++)
+            {
+              (*resultingClauses[pgcIdx])[i]->printWithStrVar(cout, domain);
+              cout << " ";
+            }
+            cout << endl;
+            cout << "Looking at literal " << litIdx << endl;
+          }
+	        // Branch and bound on indexable literals
+	      Array<Predicate *>* indexedGndings = new Array<Predicate *>;
+	        // Bound
+	      ((Database *)db)->getIndexedGndings(indexedGndings,
+                                            (*resultingClauses[pgcIdx])[litIdx],
+                                              ignoreActivePreds);
+          if (clausedebug)
+          {
+            cout << "indexedGndings: " << endl;
+            for (int i = 0; i < indexedGndings->size(); i ++)
+            {
+              cout << "\t";
+              (*indexedGndings)[i]->printWithStrVar(cout, domain);
+              cout << endl;
+            }
+          }
+            // Branch on the indexed groundings: No. of gndings is the no.
+            // of new branches
+          int oldTmpSize = tmpClauses.size();
+          tmpClauses.growToSize(oldTmpSize + indexedGndings->size());
+          if (clausedebug)
+          {
+            cout << "tmpClause size old: " << oldTmpSize << " new: "
+                 << tmpClauses.size() << endl;
+          }
+          
+          for (int i = 0; i < indexedGndings->size(); i++)
+          {
+              // Reference clause is what was branched on. First, copy this
+              // into tmpClauses. Later, variables are replaced with the
+              // constants from the indexed grounding
+            tmpClauses[oldTmpSize + i] =
+              new Array<Predicate*>(resultingClauses[pgcIdx]->size());
+            tmpClauses[oldTmpSize + i]->
+              growToSize(resultingClauses[pgcIdx]->size());
+            if (clausedebug)
+              cout << "Tmp clause before " << oldTmpSize + i << ": ";
+            for (int predNo = 0; predNo < tmpClauses[oldTmpSize + i]->size();
+                 predNo++)
+            {
+              (*tmpClauses[oldTmpSize + i])[predNo] =
+                new Predicate(*((*resultingClauses[pgcIdx])[predNo]));
+              if (clausedebug)
+              {
+                (*tmpClauses[oldTmpSize + i])[predNo]->
+                  printWithStrVar(cout, domain);
+                cout << " ";
+              }
+            }
+            if (clausedebug) cout << endl;
+
+              // Ground variables throughout clause
+            for (int j = 0; 
+                 j < (*resultingClauses[pgcIdx])[litIdx]->getNumTerms(); j++)
+            {
+              const Term* term =
+                (*resultingClauses[pgcIdx])[litIdx]->getTerm(j);
+                // Was a variable that has now been grounded
+              if (term->getType() == Term::VARIABLE)
+              {
+                int varId = term->getId();
+                int constId = (*indexedGndings)[i]->getTerm(j)->getId();
+                assert(constId >= 0);
+                  // Ground this var in lit and subsequent lits
+                for (int k = litIdx; k < tmpClauses[oldTmpSize + i]->size();
+                     k++)
+                {
+                  Predicate* pred = (*tmpClauses[oldTmpSize + i])[k];
+                  for (int l = 0; l < pred->getNumTerms(); l++)
+                  {
+                      // Matching variable
+                    if (pred->getTerm(l)->getId() == varId)
+                      pred->setTermToConstant(l, constId);
+                  }
+                }
+              }
+            }
+              // Indexed grounding can be deleted
+            delete (*indexedGndings)[i];
+            if (clausedebug)
+            {
+              cout << "Tmp clause after " << oldTmpSize + i << ": ";
+              for (int d = 0; d < tmpClauses[oldTmpSize + i]->size(); d++)
+              {
+                (*tmpClauses[oldTmpSize + i])[d]->printWithStrVar(cout, domain);
+                cout << " ";
+              }
+              cout << endl;
+            }
+          }
+          delete indexedGndings;
+        }
+          // Replace the clauses in previous level with the new level
+          // First, get rid of the old ones
+        for (int pgcIdx = 0; pgcIdx < resultingClauses.size(); pgcIdx++)
+        {
+          for (int i = 0; i < resultingClauses[pgcIdx]->size(); i++)
+            delete (*resultingClauses[pgcIdx])[i];
+          delete resultingClauses[pgcIdx];
       }
         
-        //proceed further only if:
-        // 1. positive weight and partially grounded clause is unsatisfied or
-        // 2. negative weight and partially grounded clause is satisfied
-      bool proceed = true;
-      if (wt_ >= 0)
-        proceed = isUnsatisfiedGivenActivePreds(lit, ivg->subseqGndLits, db,
-                                                ignoreActivePreds);
-
-//cout << "Clause: ";
-//printWithWtAndStrVar(cout, domain);
-//cout << endl;
-//cout << " proceed " << proceed << endl;
-
-      if (proceed)
-      {
-		// if there are more literals
-        if (ivgArrIdx + 1 < ivgArr.size())
+        if (clausedebug)
         {
-          lookAtNextLit = true;
-          ivgArrIdx++; // move up stack
-          break;
+          cout << "Resulting clauses size after: " << resultingClauses.size()
+               << endl;
+          cout << "tmpClauses size: " << tmpClauses.size() << endl;
         }
-          // Now we can check neg. clauses: if not satisfied (no true literals)
-          // or satisfied with evidence atom, then do not activate
-        if (wt_ < 0 &&
-            !isSatisfiedGivenActivePreds(db, ignoreActivePreds))
+        
+          // Expand or shrink resultingClauses depending on the no. of new ones
+        if (tmpClauses.size() > resultingClauses.size())
         {
-          continue;
+          resultingClauses.growToSize(tmpClauses.size());
         }
-		  
-          // At this point all the literals are grounded
-		  // and does not have any true literal. To make sure that
-		  // it is active, need to check the following two conditions:
-		  // 1. It may have the same literal appearing in opposite senses =>
-          // satisfied (and hence not active)
-		  // 2. It may be empty when evidence is pruned away => not active
-    
-        bool active;
-        bool accumulateClauses = activeGroundClauses;
-        if (!accumulateClauses)
+        else if (resultingClauses.size() > tmpClauses.size())
         {
-          active = isActive(db);
+          resultingClauses.shrinkToSize(tmpClauses.size());
         }
-        else
+          // Copy the new ones into resultingClauses
+        for (int i = 0; i < tmpClauses.size(); i++)
         {
-          active = createAndAddActiveClause(activeGroundClauses, seenGndPreds,
-                                            db, getSatisfied);
+          resultingClauses[i] = tmpClauses[i];
         }
-//cout << "Active " << active << endl;
-        if (active) activeClauseCnt++;
       }
-    } //while there are groundings of literal's variables
+        // Reached first non-indexable literal
+      else
+      {
+        break;
+      }
+    }
+    if (clausedebug)
+    {
+      cout << "Resulting clauses returned from grounding indexables: " << endl;
+      for (int pgcIdx = 0; pgcIdx < resultingClauses.size(); pgcIdx++)
+      {
+        cout << "\t";
+        for (int i = 0; i < resultingClauses[pgcIdx]->size(); i++)
+        {
+          (*resultingClauses[pgcIdx])[i]->printWithStrVar(cout, domain);
+          cout << " ";
+        }
+        cout << endl;
+      }
+    }
 
-      //if we exit the while loop in order to look at next literal 
-      //(i.e. without considering all groundings of current literal)
-    if (lookAtNextLit) { lookAtNextLit = false; }
-    else { varGndings.reset(); litUnseen = true; ivgArrIdx--; }//mv down stack
-
-  } // while stack is not empty
-  deleteAllLitIdxVarsGndings(ivgArr);
-}
+    return;
+  }
 
 
-
+/*
 void getActiveClausesAndCnt(const Domain* const & domain,
                             Array<GroundClause *> * const & activeGroundClauses,
                             int & activeClauseCnt,
@@ -2441,7 +2696,7 @@ void getActiveClausesAndCnt(const Domain* const & domain,
       bool hasComb;
 
       	// while there are groundings of literal's variables
-      while ((hasComb=varGndings.hasNextCombination()) || litUnseen)
+      while ((hasComb = varGndings.hasNextCombination()) || litUnseen)
       {
           // there may be no combinations if the literal is fully grounded
       	if (litUnseen) litUnseen = false;
@@ -2460,7 +2715,7 @@ void getActiveClausesAndCnt(const Domain* const & domain,
           }
       	}
        
-   	 	  //proceed further only if:
+   	 	  // proceed further only if:
           // 1. positive weight and partially grounded clause is unsatisfied or
           // 2. negative weight and partially grounded clause is satisfied
         bool proceed = true;
@@ -2468,10 +2723,13 @@ void getActiveClausesAndCnt(const Domain* const & domain,
           proceed = isUnsatisfiedGivenActivePreds(lit, ivg->subseqGndLits, db,
                                                   ignoreActivePreds);
 
-//cout << "Clause: ";
-//printWithWtAndStrVar(cout, domain);
-//cout << endl;
-//cout << " proceed " << proceed << endl;
+        if (clausedebug)
+        {
+          cout << "Clause: ";
+          printWithWtAndStrVar(cout, domain);
+          cout << endl;
+          cout << " proceed " << proceed << endl;
+        }
 
         if (proceed)
       	{
@@ -2482,16 +2740,20 @@ void getActiveClausesAndCnt(const Domain* const & domain,
           	ivgArrIdx++; // move up stack
           	break;
           }
-		  
-//cout << "Clause: ";
-//printWithWtAndStrVar(cout, domain);
-//cout << endl;
+
+          if (clausedebug)
+          {
+            cout << "Clause: ";
+            printWithWtAndStrVar(cout, domain);
+            cout << endl;
+          }
+          
             // Now we can check neg. clauses: if not satisfied (no true
             // literals) or satisfied with evidence atom, then do not activate
           if (wt_ < 0 && !getSatisfied &&
               !isSatisfiedGivenActivePreds(db, ignoreActivePreds))
           {
-            //cout << "continuing..." << endl;
+            if (clausedebug) cout << "continuing..." << endl;
             continue;
           }
           
@@ -2509,7 +2771,7 @@ void getActiveClausesAndCnt(const Domain* const & domain,
             active = createAndAddActiveClause(activeGroundClauses, seenGndPreds,
                                               db, getSatisfied);
             
-//cout << "Active " << active << endl;
+          if (clausedebug) cout << "Active " << active << endl;
           if (active) activeClauseCnt++;
         }
       } //while there are groundings of literal's variables
@@ -2523,7 +2785,7 @@ void getActiveClausesAndCnt(const Domain* const & domain,
     deleteAllLitIdxVarsGndings(ivgArr);
   }
 }
-
+*/
  
   //get Active Clauses unifying with the given predicate - if ignoreActivePreds 
   //is true, this is equivalent to getting all the unsatisfied clauses
@@ -2534,14 +2796,18 @@ void getActiveClausesAndCnt(Predicate*  const & gndPred,
                             GroundPredicateHashArray* const& seenGndPreds,
                             bool const & ignoreActivePreds,
                             bool const & getSatisfied)
-{
+{  
     //create mapping of variable ids (e.g. -1) to variable addresses,
     //note whether they have been grounded, and store their types   
   createVarIdToVarsGroundedType(domain); 
   if (gndPred == NULL)
   {
-    getActiveClausesAndCnt(domain, activeGroundClauses, activeClauseCnt,
-                           seenGndPreds, ignoreActivePreds, getSatisfied);
+    countNumTrueGroundings(domain, domain->getDB(), false, false, -1, NULL,
+                           NULL, NULL, NULL, NULL, NULL, activeGroundClauses,
+                           &activeClauseCnt, seenGndPreds, ignoreActivePreds,
+                           getSatisfied);
+    //getActiveClausesAndCnt(domain, activeGroundClauses, activeClauseCnt,
+    //                       seenGndPreds, ignoreActivePreds, getSatisfied);
     restoreVars();
   }
   else
@@ -2567,11 +2833,15 @@ void getActiveClausesAndCnt(Predicate*  const & gndPred,
 	  	//cout<<"size of unary predicate set "<<unarySet.size()<<endl;
 	  	//cout<<"Element[0] = "<<unarySet[0]<<endl;
 	  groundPredicates(&unarySet, gndPredIndexes, gndPred,
-                       gndPred->getTruthValue(), db,sameTruthValueAndSense,
+                       db->getValue(gndPred), db, sameTruthValueAndSense,
                        gndPredPosSameSense);
       int cnt;
-	  getActiveClausesAndCnt(domain, activeGroundClauses, cnt, seenGndPreds,
-                             ignoreActivePreds, getSatisfied);
+      countNumTrueGroundings(domain, domain->getDB(), false, false, -1, NULL,
+                             NULL, NULL, NULL, NULL, NULL, activeGroundClauses,
+                             & cnt, seenGndPreds, ignoreActivePreds,
+                             getSatisfied);
+	  //getActiveClausesAndCnt(domain, activeGroundClauses, cnt, seenGndPreds,
+      //                       ignoreActivePreds, getSatisfied);
 	  activeClauseCnt += cnt;
 	  restoreVars();
 	}
@@ -2713,3 +2983,4 @@ typedef HashList<Clause*, HashClause, EqualClause> ClauseHashList;
 typedef HashArray<Clause*, HashClause, EqualClauseOp> ClauseOpHashArray;
 
 #endif
+

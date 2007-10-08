@@ -90,10 +90,19 @@ class MCSAT : public MCMC
         MCSatParams* mcsatParams)
     : MCMC(state, seed, trackClauseTrueCnts, mcsatParams)
   {
-    numStepsEveryMCSat_ = mcsatParams->numStepsEveryMCSat;
+	Timer timer1;
+
       // We don't need to track clause true counts in up and ss
-    up_ = new UnitPropagation(state_, seed, false);
+    //up_ = new UnitPropagation(state_, seed, false);
     mws_ = new MaxWalkSat(state_, seed, false, mcsatParams->mwsParams);
+
+    if (msdebug)
+    {
+      cout << "[MCSAT] ";
+      Timer::printTime(cout, timer1.time());
+      cout << endl;
+      timer1.reset();
+    }
   }
 
   /**
@@ -101,7 +110,7 @@ class MCSAT : public MCMC
    */
   ~MCSAT()
   {
-    delete up_;
+    //delete up_;
     delete mws_;
   }
   
@@ -110,10 +119,14 @@ class MCSAT : public MCMC
    */
   void init()
   {
+    Timer timer1;
     assert(numChains_ == 1);
 
     cout << "Initializing MC-SAT with MaxWalksat on hard clauses..." << endl;
+    
     state_->eliminateSoftClauses();
+    state_->setInferenceMode(state_->MODE_HARD);
+
       // Set num. of solutions temporarily to 1
     int numSolutions = mws_->getNumSolutions();
     mws_->setNumSolutions(1);
@@ -134,7 +147,17 @@ class MCSAT : public MCMC
     mws_->setNumSolutions(numSolutions);
     mws_->setTargetCost(0.0);
     state_->resetDeadClauses();
-    state_->makeUnitCosts();
+    
+	// state_->makeUnitCosts();
+    state_->setInferenceMode(state_->MODE_SAMPLESAT);	
+
+    if (msdebug)
+    {
+      cout << "[MCSAT.init] ";
+      Timer::printTime(cout, timer1.time());
+      cout << endl;
+      timer1.reset();
+    }
   }
 
   /**
@@ -142,21 +165,23 @@ class MCSAT : public MCMC
    */
   void infer()
   {
+  	Timer timer1;
+
     initNumTrue();
     Timer timer;
       // Burn-in only if burnMaxSteps positive
     bool burningIn = (burnMaxSteps_ > 0) ? true : false;
     double secondsElapsed = 0;
-    upSecondsElapsed_ = 0;
+    //upSecondsElapsed_ = 0;
     ssSecondsElapsed_ = 0;
     double startTimeSec = timer.time();
     double currentTimeSec;
     int samplesPerOutput = 100;
 
-      // If keeping track of true clause groundings, then init to zero
+      /* If keeping track of true clause groundings, then init to zero
     if (trackClauseTrueCnts_)
-      for (int clauseno = 0; clauseno < clauseTrueCnts_->size(); clauseno++)
-        (*clauseTrueCnts_)[clauseno] = 0;
+      resetCnts();
+      */
 
       // Holds the ground preds which have currently been affected
     GroundPredicateHashArray affectedGndPreds;
@@ -172,6 +197,14 @@ class MCSAT : public MCMC
     affectedGndPreds.clear();
     affectedGndPredIndices.clear();
 
+    if (msdebug)
+    {	
+      cout << "[MCSAT.infer.prep] "; 
+      Timer::printTime(cout, timer1.time());
+      cout << endl;
+      timer1.reset();
+    }
+
     cout << "Running MC-SAT sampling..." << endl;
       // Sampling loop
     int sample = 0;
@@ -180,21 +213,24 @@ class MCSAT : public MCMC
     while (!done)
     {
       ++sample;
-      bool mcSatStep = (sample % numStepsEveryMCSat_ == 0);
+      //bool mcSatStep = (sample % numStepsEveryMCSat_ == 0);
       if (sample % samplesPerOutput == 0)
       { 
         currentTimeSec = timer.time();
         secondsElapsed = currentTimeSec - startTimeSec;
         cout << "Sample (per pred) " << sample << ", time elapsed = ";
-        Timer::printTime(cout, secondsElapsed); cout << endl;
+        Timer::printTime(cout, secondsElapsed); 
+		cout << ", num. clauses = " << state_->getNumClauses();
+		cout << endl;		
       }
 
         // For each node, generate the node's new truth value
-      if (mcSatStep) performMCSatStep(burningIn);
+      //if (mcSatStep) performMCSatStep(burningIn);
+      performMCSatStep(burningIn);
         // Defined in MCMC. Chain is set to 0, but single chain is considered
         // in performGibbsStep
-      else performGibbsStep(0, burningIn, affectedGndPreds,
-                            affectedGndPredIndices);
+      //else performGibbsStep(0, burningIn, affectedGndPreds,
+      //                      affectedGndPredIndices);
         
       if (!burningIn) numSamplesPerPred++;
 
@@ -218,14 +254,16 @@ class MCSAT : public MCMC
           done = true;
         }
       }
-      cout.flush();
+	  cout.flush();
     } // while (!done)
+
+    cout << "Final ground clause number: " << state_->getNumClauses() << endl;
 
     cout<< "Time taken for MC-SAT sampling = "; 
     Timer::printTime(cout, timer.time() - startTimeSec); cout << endl;
 
-    cout<< "Time taken for unit propagation = "; 
-    Timer::printTime(cout, upSecondsElapsed_); cout << endl;
+    //cout<< "Time taken for unit propagation = "; 
+    //Timer::printTime(cout, upSecondsElapsed_); cout << endl;
 
     cout<< "Time taken for SampleSat = "; 
     Timer::printTime(cout, ssSecondsElapsed_); cout << endl;
@@ -234,14 +272,6 @@ class MCSAT : public MCMC
     for (int i = 0; i < state_->getNumAtoms(); i++)
     {
       setProbTrue(i, numTrue_[i] / numSamplesPerPred);
-    }
-
-      // If keeping track of true clause groundings
-    if (trackClauseTrueCnts_)
-    {
-        // Set the true counts to the average over all samples
-      for (int i = 0; i < clauseTrueCnts_->size(); i++)
-        (*clauseTrueCnts_)[i] = (*clauseTrueCnts_)[i] / numSamplesPerPred;
     }
   }
 
@@ -259,8 +289,13 @@ class MCSAT : public MCMC
     if (msdebug) cout << "Entering MC-SAT step" << endl;
       // Clause selection
     state_->setUseThreshold(true);
-    int start = 0;
-    state_->killClauses(start);
+    state_->updatePrevSatisfied();
+
+	int start = 0;
+    
+    state_->resetMakeBreakCostWatch();
+
+	state_->killClauses(start);
 
     if (msdebug)
     {
@@ -269,10 +304,10 @@ class MCSAT : public MCMC
     }
     
       // Unit propagation on the clauses
-    startTime = timer.time();
-    up_->init();
-    up_->infer();
-    upSecondsElapsed_ += (timer.time() - startTime);
+    startTime = timer.time();    
+	//up_->init();
+    //up_->infer();
+    //upSecondsElapsed_ += (timer.time() - startTime);
       // SampleSat on the clauses
     startTime = timer.time();
     mws_->init();
@@ -313,7 +348,7 @@ class MCSAT : public MCMC
     
       // If keeping track of true clause groundings
     if (!burningIn && trackClauseTrueCnts_)
-      state_->getNumClauseGndings(clauseTrueCnts_, true);
+      tallyCntsFromState();
     
     if (msdebug) cout << "Leaving MC-SAT step" << endl;
   }
@@ -360,15 +395,15 @@ class MCSAT : public MCMC
  private:
 
     // Number of total steps (MC-SAT & Gibbs) for each MC-SAT step
-  int numStepsEveryMCSat_;
+  //int numStepsEveryMCSat_;
 
     // Unit propagation is performed in MC-SAT  
-  UnitPropagation* up_;
+  //UnitPropagation* up_;
     // The base algorithm is SampleSat (MaxWalkSat with SS parameters)
   MaxWalkSat* mws_;
 
     // Time spent on UnitPropagation
-  double upSecondsElapsed_;
+  //double upSecondsElapsed_;
     // Time spent on SampleSat
   double ssSecondsElapsed_;
 };

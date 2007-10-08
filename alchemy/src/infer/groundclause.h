@@ -83,6 +83,7 @@ typedef IntPair::iterator IntPairItr;
 
 // Constants
 const double HARD_GROUNDCLAUSE_WT = DBL_MAX;
+const bool gcdebug = false;
 
 // Forward declarations
 class Domain;
@@ -101,7 +102,6 @@ typedef HashArray<GroundPredicate*, HashGroundPredicate, EqualGroundPredicate>
 class GroundClause
 {
  public:
-  //GroundClause(const Clause* const & c);
   GroundClause(const Clause* const & c, 
                GroundPredicateHashArray* const & gndPredHashArray);
 
@@ -158,6 +158,17 @@ class GroundClause
 
   bool getGroundPredicateSense(const int& i) const 
   { return ((*gndPredIndexes_)[i] > 0); }
+
+  void setGroundPredicateSense(const int& i, const bool& sense)
+  {
+      // Already the sense being set to, then return
+    if (sense && (*gndPredIndexes_)[i] > 0 ||
+        !sense && (*gndPredIndexes_)[i] < 0)
+      return;
+    
+    (*gndPredIndexes_)[i] = -(*gndPredIndexes_)[i];
+    rehash();
+  }
 
   void setGroundPredicateIndex(const int& i, const int& gndPredIdx) 
   { (*gndPredIndexes_)[i] = gndPredIdx; }

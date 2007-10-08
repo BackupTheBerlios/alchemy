@@ -78,7 +78,8 @@ bool Clause::createAndAddUnknownClause(
                                 Array<GroundClause*>* const& unknownGndClauses,
                                 Array<Clause*>* const& unknownClauses,
                                 double* const & numUnknownClauses,
-                                const AddGroundClauseStruct* const & agcs)
+                                const AddGroundClauseStruct* const & agcs,
+                                const Database* const & db)
 { 
   PredicateSet predSet; // used to detect duplicates
   PredicateSet::iterator iter;
@@ -88,10 +89,7 @@ bool Clause::createAndAddUnknownClause(
   {
 	Predicate* predicate = (*predicates_)[i];
     assert(predicate->isGrounded());
-//cout << "Pred: ";
-//cout << " " << predicate->getTruthValueAsStr();
-//cout << endl;
-    if (predicate->getTruthValue() == UNKNOWN)
+    if (db->getValue(predicate) == UNKNOWN)
     {
       if ( (iter=predSet.find(predicate)) != predSet.end() )
       {
@@ -210,9 +208,13 @@ bool Clause::createAndAddActiveClause(
       predSet.insert(predicate);
       
 	bool isEvidence = db->getEvidenceStatus(predicate);
-//cout << "isEvidence " << isEvidence << endl;
-//predicate->printWithStrVar(cout, db->getDomain());
-//cout << endl;
+    
+    if (clausedebug)
+    {
+      cout << "isEvidence " << isEvidence << endl;
+      predicate->printWithStrVar(cout, db->getDomain());
+      cout << endl;
+    }
 	if (!isEvidence)
       isEmpty = false;
 	  
@@ -232,7 +234,16 @@ bool Clause::createAndAddActiveClause(
         
 	  cpred = new Predicate(*predicate, clause);
       assert(cpred);
+      if (clausedebug)
+      {
+        cout << "Appending pred ";
+        predicate->printWithStrVar(cout, db->getDomain());
+        cout << " to clause ";
+        clause->print(cout, db->getDomain());
+        cout << endl;
+      }
 	  clause->appendPredicate(cpred);
+      if (clausedebug) cout << "Appended pred to clause" << endl;
 	}
   }
 
@@ -240,6 +251,7 @@ bool Clause::createAndAddActiveClause(
     // be discarded
   if (isEmpty)
   {
+    if (clausedebug) cout << "Clause is empty" << endl;
 	assert(!clause);
     return false;
   }
@@ -250,11 +262,13 @@ bool Clause::createAndAddActiveClause(
    	if (accumulateClauses)
    	{
       assert(clause);	
+      if (clausedebug) cout << "Canonicalizing clause" << endl;
       clause->canonicalizeWithoutVariables();
-      
+
       groundClause = new GroundClause(clause, seenGndPreds);
       if (isHardClause_)
         groundClause->setWtToHardWt();
+      if (clausedebug) cout << "Appending ground clause to active set" << endl;
       activeGroundClauses->append(groundClause);
       delete clause;
     }

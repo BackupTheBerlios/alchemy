@@ -84,6 +84,14 @@ class Array
     numItems_ = 0;
     if (initSize > 0) allocateMemory(initSize);
   }
+
+  Array(const int& initSize, const Type& fill)
+  {
+    items_    = NULL;
+    maxItems_ = 0;
+    numItems_ = 0;
+    growToSize(initSize, fill);
+  }
   
   
     // creates an array which points to this data

@@ -68,6 +68,9 @@
 
 #include "variablestate.h"
 
+  // Default seed when none specified (some random number)
+const long int DEFAULT_SEED = 2350877;
+
 /**
  * Abstract class from which all inference algorithms are derived.
  * At least one function is pure virtual making this an abstract class
@@ -90,24 +93,32 @@ class Inference
    */
   Inference(VariableState* state, long int seed,
             const bool& trackClauseTrueCnts)
+      : seed_(seed), state_(state), saveAllCounts_(false),
+        clauseTrueCnts_(NULL), clauseTrueSqCnts_(NULL),
+        numSamples_(0),
+        allClauseTrueCnts_(NULL), oldClauseTrueCnts_(NULL),
+        oldAllClauseTrueCnts_(NULL)
   {
-    this->state_ = state;
-    this->seed_ = seed;
-    if (seed_ <= 0)
-    {
-      struct timeval tv;
-      struct timezone tzp;
-      gettimeofday(&tv, &tzp);
-      seed_ = (long int)((( tv.tv_sec & 0177 ) * 1000000) + tv.tv_usec);
-    }
+//    if (seed_ <= 0)
+//    {
+//      struct timeval tv;
+//      struct timezone tzp;
+//      gettimeofday(&tv, &tzp);
+//      seed_ = (long int)((( tv.tv_sec & 0177 ) * 1000000) + tv.tv_usec);
+//    }
+      // If seed not specified, then init always to same random number
+    if (seed_ == -1) seed_ = DEFAULT_SEED;
     srandom(seed_);
 
     trackClauseTrueCnts_ = trackClauseTrueCnts;
     if (trackClauseTrueCnts_)
     {
-        // clauseTrueCnts_ will hold the true counts for each first-order clause
-      clauseTrueCnts_ = new Array<double>;
-      clauseTrueCnts_->growToSize(state_->getMLN()->getNumClauses(), 0);
+      int numClauses = state_->getMLN()->getNumClauses();
+
+        // clauseTrueCnts_ and clauseTrueSqCnts_ will hold the true 
+        // counts (and squared true counts) for each first-order clause
+      clauseTrueCnts_ = new Array<double>(numClauses, 0);
+      clauseTrueSqCnts_ = new Array<double>(numClauses, 0);
     }
   }
   
@@ -116,8 +127,35 @@ class Inference
    */
   virtual ~Inference()
   {
-    if (trackClauseTrueCnts_) delete clauseTrueCnts_;
+    delete clauseTrueCnts_;
+    delete clauseTrueSqCnts_;
+    delete allClauseTrueCnts_;
+
+    delete oldAllClauseTrueCnts_;
+    delete oldClauseTrueCnts_;
   }
+
+
+  void saveAllCounts(bool saveCounts=true)
+  {
+      if (saveAllCounts_ == saveCounts)
+        return;
+
+      saveAllCounts_ = saveCounts;
+      if (saveCounts)
+      {
+        allClauseTrueCnts_ = new Array<Array<double> >;
+        oldAllClauseTrueCnts_ = new Array<Array<double> >;
+      }
+      else
+      {
+        delete allClauseTrueCnts_;
+        delete oldAllClauseTrueCnts_;
+        allClauseTrueCnts_ = NULL;
+        oldAllClauseTrueCnts_ = NULL;
+      }
+  }
+
 
   /**
    * Initializes the inference algorithm.
@@ -162,7 +200,209 @@ class Inference
   VariableState* getState() { return state_; }
   void setState(VariableState* s) { state_ = s; }
   
-  const Array<double>* getClauseTrueCnts() { return clauseTrueCnts_; }
+  const Array<double>* getClauseTrueCnts()   { return clauseTrueCnts_; }
+  const Array<double>* getClauseTrueSqCnts() { return clauseTrueSqCnts_; }
+  int getNumSamples() const { return numSamples_; }
+
+  // Compute the full Hessian matrix from the stored inferred counts.
+  // Only works when saveAllCounts(true) has been called before inference.
+  // Caller is responsible for deleting Hessian.
+  //
+  // WARNING: The size of the Hessian is equal to the number of weights
+  // squared.  Therefore, this is not practical in a model with thousands
+  // of weights!
+  const Array<Array<double> >* getHessian()
+  {
+    int numClauses = state_->getMLN()->getNumClauses();
+    int numSamples = allClauseTrueCnts_->size();
+
+    // Allocate Hessian
+    Array<Array<double> >* hessian = new Array<Array<double> >(numClauses);
+    for (int i = 0; i < numClauses; i++)
+      (*hessian)[i].growToSize(numClauses);
+
+    // The i jth element is:
+    // E[n_i] E[n_j] - E[n_i * n_j]
+    // where n is the vector of all clause counts
+
+    for (int i = 0; i < numClauses; i++)
+    {
+      for (int j = 0; j < numClauses; j++)
+      {
+        double ni = 0.0;
+        double nj = 0.0;
+        double ninj = 0.0;
+        for (int s = 0; s < numSamples; s++)
+        {
+          ni += (*allClauseTrueCnts_)[s][i];
+          nj += (*allClauseTrueCnts_)[s][j];
+          ninj += (*allClauseTrueCnts_)[s][i] 
+                * (*allClauseTrueCnts_)[s][j]; 
+        }
+        double n = numSamples;
+        (*hessian)[i][j] = ni/n * nj/n - ninj/n;
+      }
+    }
+
+    return hessian;
+  }
+
+
+  // Alternate way to compute product of Hessian with vector
+  // WARNING: much less efficient!!
+  const Array<double>* getHessianVectorProduct2(Array<double>& v)
+  {
+    int numClauses = state_->getMLN()->getNumClauses();
+    const Array<Array<double> >* hessian = getHessian();
+    Array<double>* product = new Array<double>(numClauses,0);
+
+    for (int clauseno = 0; clauseno < numClauses; clauseno++)
+    {
+      (*product)[clauseno] = 0.0;
+      for (int i = 0; i < numClauses; i++)
+        (*product)[clauseno] += (*hessian)[clauseno][0] * v[i];
+    }
+
+    delete hessian;
+    return product;
+  }
+
+
+  const Array<double>* getHessianVectorProduct(const Array<double>& v)
+  {
+    int numClauses = state_->getMLN()->getNumClauses();
+    int numSamples = allClauseTrueCnts_->size();
+
+      // For minimizing the negative log likelihood, 
+      // the ith element of H v is:
+      //   E[n_i * vn] - E[n_i] E[vn]
+      // where n is the vector of all clause counts
+      // and vn is the dot product of v and n.
+
+    double sumVN = 0;
+    Array<double> sumN(numClauses, 0);
+    Array<double> sumNiVN(numClauses, 0);
+
+    // Get sufficient statistics from each sample, 
+    // so we can compute expectations
+    for (int s = 0; s < numSamples; s++) 
+    {
+      Array<double>& n = (*allClauseTrueCnts_)[s];
+
+      // Compute v * n
+      double vn = 0;
+      for (int i = 0; i < numClauses; i++)
+        vn += v[i] * n[i];
+      
+      // Tally v*n, n_i, and n_i v*n
+      sumVN += vn;
+      for (int i = 0; i < numClauses; i++)
+      {
+        sumN[i]    += n[i];
+        sumNiVN[i] += n[i] * vn;
+      }
+    }
+
+    // Compute actual product from the sufficient stats
+    Array<double>* product = new Array<double>(numClauses,0);
+    for (int clauseno = 0; clauseno < numClauses; clauseno++)
+    {
+      double E_vn = sumVN/numSamples;
+      double E_ni = sumN[clauseno]/numSamples;
+      double E_nivn = sumNiVN[clauseno]/numSamples;
+      (*product)[clauseno] = E_nivn - E_ni * E_vn;
+    }
+
+    return product;
+  }
+
+
+  void resetCnts() 
+  {
+    for (int clauseno = 0; clauseno < clauseTrueCnts_->size(); clauseno++)
+    {
+      (*clauseTrueCnts_)[clauseno]   = 0;
+      (*clauseTrueSqCnts_)[clauseno] = 0;
+    }
+    numSamples_ = 0;
+
+    if (saveAllCounts_)
+    {
+      delete allClauseTrueCnts_;
+      allClauseTrueCnts_ = new Array<Array<double> >;
+    }
+  }
+
+
+  void saveCnts()
+  {
+    if (!saveAllCounts_)
+      return;
+
+    // DEBUG
+    //cout << "Saving counts.  numSamples_ = " << numSamples_ << endl;
+
+    delete oldAllClauseTrueCnts_;
+    oldAllClauseTrueCnts_ = new Array<Array<double> > (*allClauseTrueCnts_);
+
+    /* DEBUG
+    cout << "old counts size: " << oldAllClauseTrueCnts_->size() << endl;
+    cout << "marker1: " << (*allClauseTrueCnts_)[0][0] << endl;
+    cout << "marker2: " << (*clauseTrueCnts_)[0] << endl;
+    */
+  }
+
+
+  void restoreCnts()
+  {
+    if (!saveAllCounts_)
+      return;
+
+    resetCnts();
+
+    *allClauseTrueCnts_ = *oldAllClauseTrueCnts_;
+    for (int i = 0; i < allClauseTrueCnts_->size(); i++) 
+    {
+      int numcounts = (*allClauseTrueCnts_)[i].size();
+      for (int j = 0; j < numcounts; j++)
+      {
+        double currcount = (*allClauseTrueCnts_)[i][j];
+        (*clauseTrueCnts_)[j]   += currcount;
+        (*clauseTrueSqCnts_)[j] += currcount * currcount;
+      }
+      numSamples_++;
+    }
+
+    /* DEBUG
+    cout << "marker1: " << (*allClauseTrueCnts_)[0][0] << endl;
+    cout << "marker2: " << (*clauseTrueCnts_)[0] << endl;
+    cout << "numSamples_ = " << numSamples_ << endl;
+    */
+  }
+
+
+  void tallyCntsFromState()
+  {
+    int numcounts = clauseTrueCnts_->size();
+    Array<double> currCounts(numcounts, 0.0);
+    state_->getNumClauseGndings(&currCounts, true);
+
+    if (saveAllCounts_)
+    {
+      allClauseTrueCnts_->append(Array<double>());
+      (*allClauseTrueCnts_)[numSamples_].growToSize(numcounts);
+    }
+
+    for (int i = 0; i < numcounts; i++)
+    {
+      if (saveAllCounts_)
+        (*allClauseTrueCnts_)[numSamples_][i] = currCounts[i];
+      
+      (*clauseTrueCnts_)[i]   += currCounts[i];
+      (*clauseTrueSqCnts_)[i] += currCounts[i] * currCounts[i];
+    }
+    numSamples_++;
+  }
 
  protected:
   
@@ -171,11 +411,23 @@ class Inference
     // State of atoms and clauses used during inference
     // Does not belong to inference (do not delete)
   VariableState* state_;
+    // Save all counts for all iterations
+  bool saveAllCounts_;
     // Holds the average number of true groundings of each first-order clause
     // in the mln associated with this inference
   Array<double>* clauseTrueCnts_;
+    // Holds the average number of true groundings squared of each 
+    // first-order clause in the mln associated with this inference
+  Array<double>* clauseTrueSqCnts_;
+    // Number of samples taken of the true counts
+  int numSamples_;
     // Indicates if true counts for each first-order clause are being kept
   bool trackClauseTrueCnts_;
+    // Where these counts are stored
+  Array<Array<double> >* allClauseTrueCnts_;
+
+  Array<double>* oldClauseTrueCnts_;
+  Array<Array<double> >* oldAllClauseTrueCnts_;
 };
 
 #endif /*INFERENCE_H_*/

@@ -157,7 +157,7 @@ class SimulatedTempering : public MCMC
     // *** Initialize temperature schedule ***
     double maxWt = state_->getMaxClauseWeight();
     double maxWtForEvenSchedule = 100.0;
-    double base = log(maxWt) / log(numSwap_);
+    double base = log(maxWt) / log((double)numSwap_);
     double* divs = new double[numSwap_];
     divs[0] = 1.0;
 
@@ -277,49 +277,75 @@ class SimulatedTempering : public MCMC
       for (int c = 0; c < numChains_; c++) 
       {
           // For each block: select one to set to true
-        for (int i = 0; i < state_->getNumBlocks(); i++)
+        for (int i = 0; i < state_->getDomain()->getNumPredBlocks(); i++)
         {
             // If evidence atom exists, then all others stay false
-          if (state_->getBlockEvidence(i)) continue;
+          if (state_->getDomain()->getBlockEvidence(i)) continue;
  
-          Array<int>& block = state_->getBlockArray(i);
           double invTemp =
             invTemps_[c/numSwap_][tempIds_[c/numSwap_][c%numSwap_]];
             // chosen is index in the block, block[chosen] is index in gndPreds_
-          int chosen = gibbsSampleFromBlock(c, block, invTemp);
-          bool truthValue = truthValues_[block[chosen]][c];
-            // If chosen pred was false, then need to set previous true
-            // one to false and update wts
-          if (!truthValue)
-          {
-            for (int j = 0; j < block.size(); j++)
-            {
-              bool otherTruthValue = truthValues_[block[j]][c];
-              if (otherTruthValue)
-              {
-                truthValues_[block[j]][c] = false;
-              
-                affectedGndPreds.clear();
-                affectedGndPredIndices.clear();
-                gndPredFlippedUpdates(block[j], c, affectedGndPreds,
-                                      affectedGndPredIndices);
-                updateWtsForGndPreds(affectedGndPreds, affectedGndPredIndices,
-                                     c);
-              }
-            }
-              // Set truth value and update wts for chosen atom
-            truthValues_[block[chosen]][c] = true;
-            affectedGndPreds.clear();
-            affectedGndPredIndices.clear();
-            gndPredFlippedUpdates(block[chosen], c, affectedGndPreds,
-                                  affectedGndPredIndices);
-            updateWtsForGndPreds(affectedGndPreds, affectedGndPredIndices, c);
-          }
+          int chosen = gibbsSampleFromBlock(c, i, invTemp);
 
-            // If in actual sampling phase, track the num of times
-            // the ground predicate is set to true
-          if (!burningIn && tempIds_[c/numSwap_][c%numSwap_] == 0)
-            numTrue_[block[chosen]]++;
+          const Predicate* pred =
+            state_->getDomain()->getPredInBlock(chosen, i);
+          GroundPredicate* gndPred = new GroundPredicate((Predicate*)pred);
+          int idx = state_->getIndexOfGroundPredicate(gndPred);
+
+          delete gndPred;
+          delete pred;
+      
+            // If gnd pred in state:
+          if (idx >= 0)
+          {
+            bool truthValue = truthValues_[idx][c];
+              // If chosen pred was false, then need to set previous true
+              // one to false and update wts
+            if (!truthValue)
+            {
+              int blockSize = state_->getDomain()->getBlockSize(i);
+              for (int j = 0; j < blockSize; j++)
+              {
+                const Predicate* otherPred = 
+                  state_->getDomain()->getPredInBlock(j, i);
+                GroundPredicate* otherGndPred =
+                  new GroundPredicate((Predicate*)otherPred);
+                int otherIdx = state_->getIndexOfGroundPredicate(gndPred);
+
+                delete otherGndPred;
+                delete otherPred;
+      
+                  // If gnd pred in state:
+                if (otherIdx >= 0)
+                {
+                  bool otherTruthValue = truthValues_[otherIdx][c];
+                  if (otherTruthValue)
+                  {
+                    truthValues_[otherIdx][c] = false;
+              
+                    affectedGndPreds.clear();
+                    affectedGndPredIndices.clear();
+                    gndPredFlippedUpdates(otherIdx, c, affectedGndPreds,
+                                          affectedGndPredIndices);
+                    updateWtsForGndPreds(affectedGndPreds,
+                                         affectedGndPredIndices, c);
+                  }
+                }
+              }
+                // Set truth value and update wts for chosen atom
+              truthValues_[idx][c] = true;
+              affectedGndPreds.clear();
+              affectedGndPredIndices.clear();
+              gndPredFlippedUpdates(idx, c, affectedGndPreds,
+                                    affectedGndPredIndices);
+              updateWtsForGndPreds(affectedGndPreds, affectedGndPredIndices, c);
+            }
+
+              // If in actual sampling phase, track the num of times
+              // the ground predicate is set to true
+            if (!burningIn && tempIds_[c/numSwap_][c%numSwap_] == 0)
+              numTrue_[idx]++;
+          }
         }
 
           // Now go through all preds not in blocks
@@ -331,11 +357,6 @@ class SimulatedTempering : public MCMC
           double invTemp =
             invTemps_[c/numSwap_][tempIds_[c/numSwap_][c%numSwap_]];
           double p = getProbabilityOfPred(i, c, invTemp);
-          //double p = 1.0 /
-          //           (1.0 + exp((wtsWhenFalse_[i][c] -
-          //                       wtsWhenTrue_[i][c]) *
-          //                       invTemps_[c/numSwap_]
-          //                                [tempIds_[c/numSwap_][c%numSwap_]]));
 
             // Flip updates
           bool newAssignment = genTruthValueForProb(p);

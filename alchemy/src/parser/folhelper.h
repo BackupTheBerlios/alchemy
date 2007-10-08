@@ -102,16 +102,6 @@
 const double HARD_WEIGHT_MULTIPLIER = 2;
 const double HARD_WEIGHT = DBL_MIN;
 
-  //Each clause derived from a unit formula with mutually exclusive and 
-  //exhaustive variables is given a weight that is 1.5 times
-  //that of the maximum soft clause weight. You can change this value by setting
-  //EXIST_UNIQUE_WEIGHT_MULTIPLIER below. If you wish to set the clause weight 
-  //to a specific value, you can set EXIST_UNIQUE_WEIGHT to that value below. 
-  //If EXIST_UNIQUE_WEIGHT is DBL_MIN, EXIST_UNIQUE_WEIGHT_MULTIPLIER is used 
-  //instead of EXIST_UNIQUE_WEIGHT; otherwise the latter is used.
-const double EXIST_UNIQUE_WEIGHT_MULTIPLIER = 1.5;
-const double EXIST_UNIQUE_WEIGHT = DBL_MIN;
-
   // If the variables are assigned some initial values, ensure they are are
   // similarly assigned in zzinit(). Also set any data structure to its initial 
   // state in zzinit()
@@ -178,7 +168,6 @@ char zztrueFalseUnknown;
 string zzformulaStr;
 string zzfuncConjStr;
 bool zzparseGroundPred;
-Array<int> zzuniqueVarIndexes; // index of unique variable in unit clause
 stack<ListObj*> zzformulaListObjs;  //used by formulas with connectives
 stack<ListObj*> zzpredFuncListObjs; // used by predicates and functions
 hash_map<int, PredicateHashArray*> zzpredIdToGndPredMap;
@@ -218,7 +207,7 @@ char* zzinfixPredName;
 // If an infix function is encountered then the name of it is stored here
 char* zzinfixFuncName;
 
-/////////// store '=' preds for which the types on both sides are unknown //////
+///////// store '=' preds for which the types on both sides are unknown //////
 struct ZZUnknownEqPredInfo
 {
   ZZUnknownEqPredInfo(const string& name, const string& lhs, const string& rhs)
@@ -230,7 +219,7 @@ struct ZZUnknownEqPredInfo
   string rhs_; 
 };
 
-/////////// store internal preds for which the types on both sides are unknown //////
+///// store internal preds for which the types on both sides are unknown //////
 struct ZZUnknownIntPredInfo
 {
   ZZUnknownIntPredInfo(const string& name, const string& lhs, const string& rhs)
@@ -242,7 +231,7 @@ struct ZZUnknownIntPredInfo
   string rhs_; 
 };
 
-/////////// store internal funcs for which at least one term type is unknown //////
+/////// store internal funcs for which at least one term type is unknown //////
 struct ZZUnknownIntFuncInfo
 {
   ZZUnknownIntFuncInfo(const string& name, const Array<string>& vnames)
@@ -255,9 +244,11 @@ struct ZZUnknownIntFuncInfo
 
   // counts the number of '=' predicates for which both LHS and RHS are unknown
 int zzeqTypeCounter; 
-  // counts the number of internal predicates for which both LHS and RHS are unknown
+  // counts the number of internal predicates for which both LHS and RHS are
+  // unknown
 int zzintPredTypeCounter; 
-  // counts the number of internal functions for which at least one term type is unknown
+  // counts the number of internal functions for which at least one term type is
+  // unknown
 int zzintFuncTypeCounter; 
 
   // list of '=' predicates for which both LHS and RHS are unknown
@@ -337,7 +328,7 @@ typedef hash_map<string, int, HashString, EqualString> StringToIntMap;
 StringToIntMap zzplusVarMap;
 
 
-/////////// store the information about a formula for later processsing ////////
+////////// store the information about a formula for later processsing ////////
 struct ZZFormulaInfo
 {
   ZZFormulaInfo(const ListObj* const & fformula, const string& fformulaStr,
@@ -345,7 +336,7 @@ struct ZZFormulaInfo
                 const double& ddefaultWt, const Domain* const& ddomain, 
                 MLN* const & mmln, const ZZVarNameToIdMap& vvarNameToIdMap,
                 const StringToIntMap& pplusVarMap, const int& nnumAsterisk,
-                const Array<int>& uuniqueVarIndexes, const bool& hhasFullStop, 
+                const bool& hhasFullStop, 
                 const bool& rreadHardClauseWts,
                 const bool& mmustHaveWtOrFullStop)
     : formula(fformula), formulaStr(fformulaStr), numPreds(nnumPreds), 
@@ -364,8 +355,6 @@ struct ZZFormulaInfo
     StringToIntMap::const_iterator itt = pplusVarMap.begin();
     for (; itt != pplusVarMap.end(); itt++)
       plusVarMap[(*itt).first] = (*itt).second;
-
-    uniqueVarIndexes.append(uuniqueVarIndexes);
   }
 
   ~ZZFormulaInfo() { if (wt) delete wt; }
@@ -380,7 +369,6 @@ struct ZZFormulaInfo
   ZZVarNameToIdMap varNameToIdMap;
   StringToIntMap plusVarMap;
   const int numAsterisk;
-  Array<int> uniqueVarIndexes;
   const bool hasFullStop;
   const bool readHardClauseWts;
   const bool mustHaveWtOrFullStop;
@@ -541,7 +529,7 @@ int zzgetVarId(const char* const& varName, const int& varTypeId,
 
     // search last element (which corresponds to the scope of the entire formula
   ZZVarNameToIdMap::iterator mit;
-  if ((mit=zzvarNameToIdMap.find(vname)) == zzvarNameToIdMap.end())
+  if ((mit = zzvarNameToIdMap.find(vname)) == zzvarNameToIdMap.end())
   {
     ZZVarIdType v(--zzvarCounter, varTypeId);
     zzvarNameToIdMap[vname] = v;
@@ -570,7 +558,7 @@ int zzgetVarId(const char* const& varName, const int& varTypeId,
 int zzgetVarTypeId(const char* const& varName)
 {
   ZZVarNameToIdMap::iterator mit;
-  if ((mit=zzvarNameToIdMap.find(string(varName))) != zzvarNameToIdMap.end())
+  if ((mit = zzvarNameToIdMap.find(string(varName))) != zzvarNameToIdMap.end())
     return (*mit).second.typeId_;
   return -1;
 }
@@ -646,7 +634,8 @@ bool zzisInternalFunction(const char* funcname)
   return false;
 }
 
-// Returns the index of internal function with name funcname if found, otherwise 0
+// Returns the index of internal function with name funcname if found,
+// otherwise 0
 int zzfindInternalFunction(const char* funcname)
 {
   for (int i = 0; i < zzinternalFunctions.size(); i++)
@@ -671,7 +660,8 @@ bool zzisInternalPredicate(const char* predname)
   return false;
 }
 
-// Returns the index of internal predicate with name predname if found, otherwise 0
+// Returns the index of internal predicate with name predname if found,
+// otherwise 0
 int zzfindInternalPredicate(const char* predname)
 {
   for (int i = 0; i < zzinternalPredicates.size(); i++)
@@ -722,7 +712,8 @@ void zzsetEqPredTypeName(const int& typeId)
 {  
   const char * typeName = zzdomain->getTypeName(typeId);
   string eqPredName = PredicateTemplate::createEqualPredTypeName(typeName);
-  const PredicateTemplate* t = zzdomain->getPredicateTemplate(eqPredName.c_str());
+  const PredicateTemplate* t =
+    zzdomain->getPredicateTemplate(eqPredName.c_str());
   zzpred->setTemplate((PredicateTemplate*)t);
   zzassert(t != NULL,
            "expect equal pred template != NULL");
@@ -828,7 +819,8 @@ void zzdetermineIntPredTypes(ListObj* const & formula)
                 lvarName.c_str(), rvarName.c_str());
         const char * typeName = zzdomain->getTypeName(lTypeId);
         string intPredName 
-          = PredicateTemplate::createInternalPredTypeName(baseName.c_str(), typeName);
+          = PredicateTemplate::createInternalPredTypeName(baseName.c_str(),
+                                                          typeName);
         formula->replace(uipi.name_.c_str(), intPredName.c_str());
         remIt = lit; lit++; zzintPredList.erase(remIt);        
       }
@@ -838,7 +830,8 @@ void zzdetermineIntPredTypes(ListObj* const & formula)
         int knownTypeId = (lTypeId>0) ? lTypeId : rTypeId;
         const char * typeName = zzdomain->getTypeName(knownTypeId);
         string intPredName 
-          = PredicateTemplate::createInternalPredTypeName(baseName.c_str(), typeName);
+          = PredicateTemplate::createInternalPredTypeName(baseName.c_str(),
+                                                          typeName);
         formula->replace(uipi.name_.c_str(), intPredName.c_str());
         const char* unknowVarName = (lTypeId>0) ?  rvarName.c_str() : 
                                                    lvarName.c_str();
@@ -892,7 +885,8 @@ void zzdetermineIntFuncTypes(ListObj* const & formula)
           typeNames.append(typeName);
         }
         string intPredFromFuncName 
-          = FunctionTemplate::createInternalFuncTypeName(baseName.c_str(), typeNames);
+          = FunctionTemplate::createInternalFuncTypeName(baseName.c_str(),
+                                                         typeNames);
         formula->replace(uifi.name_.c_str(), intPredFromFuncName.c_str());
         remIt = lit; lit++; zzintFuncList.erase(remIt);
       }
@@ -916,10 +910,10 @@ void zzdetermineIntFuncTypes(ListObj* const & formula)
 bool zzcheckRightTypeAndGetVarId(const int& typeId, const char* const& varName,
                                  int& varId)
 {
-  // check that the variable is of the right type
+    // check that the variable is of the right type
   int expectedTypeId = -1;
-  varId = zzgetVarId(varName,typeId,expectedTypeId);
-  if (varId==0) 
+  varId = zzgetVarId(varName, typeId, expectedTypeId);
+  if (varId == 0)
   {
     const char* expName = zzdomain->getTypeName(typeId);
     const char* unexpName = zzdomain->getTypeName(expectedTypeId);
@@ -977,7 +971,8 @@ int zzaddTypeToDomain(Domain* const & domain, const char* const & typeName)
     
       // create a PredicateTemplate for each internal pred. for this type
 /*
-    Array<string> ptNames = PredicateTemplate::createInternalPredTypeNames(typeName);
+    Array<string> ptNames =
+      PredicateTemplate::createInternalPredTypeNames(typeName);
 	for (int i = 0; i < ptNames.size(); i++)
 	{
 	  string ptName = ptNames[i];
@@ -1104,8 +1099,9 @@ void zzpredAppendConstant(Predicate* const& pred, const int& constId,
   }
 
     // if this is not '=' predicate with unknown types
-  if (!(strcmp(pred->getName(),PredicateTemplate::EQUAL_NAME)==0) &&
-  	  !(strcmp(pred->getTermTypeAsStr(pred->getNumTerms()),PredicateTemplate::ANY_TYPE_NAME)==0))
+  if (!(strcmp(pred->getName(),PredicateTemplate::EQUAL_NAME) == 0) &&
+  	  !(strcmp(pred->getTermTypeAsStr(pred->getNumTerms()),
+               PredicateTemplate::ANY_TYPE_NAME) == 0))
   {
       // Check that constant has same type as that of predicate term
     int typeId = pred->getTermTypeAsInt(pred->getNumTerms());
@@ -1285,7 +1281,8 @@ void zzfuncAppendConstant(Function* const& func, const int& constId,
     return;
   }
 
-  if (!(strcmp(func->getTermTypeAsStr(func->getNumTerms()),PredicateTemplate::ANY_TYPE_NAME)==0))
+  if (!(strcmp(func->getTermTypeAsStr(func->getNumTerms()),
+               PredicateTemplate::ANY_TYPE_NAME)==0))
   {
 	  // Check that constant has same type as that of predicate term
   	int typeId = func->getTermTypeAsInt(func->getNumTerms());
@@ -1567,178 +1564,100 @@ void zzcreateClauses(const ListObj* const & lo, Array<Clause*>& clauses,
 }
 
 
-  //create clauses from an existentially and uniquely quantified variables
-int zzcreateExistUniqueClauses(Array<Clause*>& clauses, 
-                               const Array<int>& uniqueVarIndexes,
-                               const Domain* const & domain)
+/**
+ * Creates blocks in a domain based on existentially and uniquely quantified
+ * variables (the ! operator). All predicates are examined if they have been marked
+ * as block predicates.
+ * 
+ * @param domain Domain in which the blocks are created.
+ * 
+ * @return Number of blocks created.
+ */
+int zzcreateBlocks(const Domain* const & domain)
 {
-  if (clauses.size() != 1 || uniqueVarIndexes.size() <= 0)
-    zzexit("ERROR: in zzcreateExistUniqueClauses. "
-           "clauses.size() != 1 || uniqueVarIndexes.size() <= 0");
-
-    //c has been canonicalized
-  Clause* c = clauses[0];
-  clauses.clear();
-  Predicate* pred = (Predicate*) c->getPredicate(0); 
- 
-  Array<int> nonUniqVarIndexes, nonUniqVarIds;
-  for (int i = 0; i < pred->getNumTerms(); i++)
+  int totalNumPreds = 0;
+  int numFOPreds = domain->getNumPredicates();
+  for (int p = 0; p < numFOPreds; p++)
   {
-    if (uniqueVarIndexes.contains(i)) continue;
-    nonUniqVarIndexes.append(i);
-    nonUniqVarIds.append(pred->getTerm(i)->getId());
-  }
+    const PredicateTemplate* pt = domain->getPredicateTemplate(p);
+    const Array<int>* uniqueVarIndexes = pt->getUniqueVarIndexes();
+      // If predicate has no blocked vars, then continue
+    if (uniqueVarIndexes->size() == 0) continue;
 
-  for (int i = 0; i < nonUniqVarIndexes.size(); i++)
-    ((Term*)pred->getTerm(nonUniqVarIndexes[i]))->setId(1);
- 
-  Array<Predicate*> predArr;
-  pred->createAllGroundings(domain, &predArr, NULL);
-  int numPreds = predArr.size();
-
-  for (int i = 0; i < numPreds; i++)
-  {
-    Predicate* newPred = predArr[i];
-    for (int j = 0; j < nonUniqVarIndexes.size(); j++)
+    Predicate* pred = domain->createPredicate(p, false);
+      // Save variable ids, set unique vars to dummy id, ground pred to generate
+      // blocks, then set var ids back to original and add as block to domain
+    Array<int> uniqueVarIds;
+      // Save var ids
+    for (int i = 0; i < pred->getNumTerms(); i++)
     {
-      Term* t = (Term*)newPred->getTerm(nonUniqVarIndexes[j]);
-      t->setId(nonUniqVarIds[j]);
+      if (uniqueVarIndexes->contains(i))
+        uniqueVarIds.append(pred->getTerm(i)->getId());
     }
-  }
-
-    // Commented out: Mut. excl. and exh. variables are handled
-    // internally by the learning and inference algorithms
-/*      
-    // At-least-one (ALO) clause
-  Clause* cc = new Clause;
-  for (int i = 0; i < numPreds; i++)
-  {
-    Predicate* newPred = new Predicate(*(predArr[i]));
-    newPred->setParent(cc);
-    cc->appendPredicate(newPred);
-  }
-  clauses.append(cc);
-
-    // At-most-one (AMO) clauses
-  for (int i = 0; i < numPreds; i++)
-    for (int j = i+1; j < numPreds; j++)
+      // Set dummy id
+    for (int i = 0; i < uniqueVarIndexes->size(); i++)
     {
-      Clause* cc = new Clause;
-      Predicate* newPred = new Predicate(*(predArr[i]));
-      newPred->setParent(cc);
-      newPred->setSense(false);
-      cc->appendPredicate(newPred);
-
-      Predicate* newPred2 = new Predicate(*(predArr[j]));
-      newPred2->setParent(cc);
-      newPred2->setSense(false);
-      cc->appendPredicate(newPred2);
-      clauses.append(cc);
+      ((Term*)pred->getTerm((*uniqueVarIndexes)[i]))->setId(0);
     }
-*/
-    // Add predicates to blocks
-  Array<Array<Predicate*>*>* predBlocks = new Array<Array<Predicate*>*>;
-  
-    // # blocks = (# const. of nonUniqVar 1) * (# const. of nonUniqVar 2) ...
-  int numBlocks = 1;
-  for (int i = 0; i < nonUniqVarIndexes.size(); i++)
-  {
-    int typeId = pred->getTermTypeAsInt(nonUniqVarIndexes[i]);
-    numBlocks *= domain->getNumConstantsByType(typeId);
-  }
-  predBlocks->growToSize(numBlocks);
+      // Ground pred to generate blocks 
+    Array<Predicate*> predArr;
+    pred->createAllGroundings(domain, predArr);
+    int numPreds = predArr.size();
+    totalNumPreds += numPreds;
 
-  for (int i = 0; i < numBlocks; i++)
-  {
-    Array<Predicate*>* predBlock = new Array<Predicate*>;
-    (*predBlocks)[i] = predBlock;
-  }
-  
-  for (int i = 0; i < numPreds; i++)
-  {
-    Predicate* newPred = new Predicate(*(predArr[i]));
-    Array<Predicate*> predGndings;
-    newPred->createAllGroundings(domain, &predGndings, NULL);
-
-    for (int j = 0; j < predGndings.size(); j++)
+    for (int i = 0; i < numPreds; i++)
     {
-      Predicate* predGnding = new Predicate(*(predGndings[j]));
-      (*predBlocks)[j]->append(predGnding);
-    }
-    predGndings.deleteItemsAndClear();
-    delete newPred;
-  }
+      Predicate* newPred = predArr[i];
+        // Set var ids back to original
+      for (int j = 0; j < uniqueVarIndexes->size(); j++)
+      {
+        Term* t = (Term*)newPred->getTerm((*uniqueVarIndexes)[j]);
+        t->setId(uniqueVarIds[j]);
+      }
+        // Add as block to domain
+      int blockIdx = domain->addPredBlock(newPred);
 
-  for (int i = 0; i < numBlocks; i++)
-  {
-    Array<Predicate*>* predBlock = (*predBlocks)[i];
-    int blockIdx = domain->addPredBlock(predBlock);
-    
-    for (int j = 0; j < predBlock->size(); j++)
-    {
-      Predicate* p = (*predBlock)[j];
-
-        // If groundings of this pred occur
+      bool trueOne = false;
+        // If groundings of this pred occur, then make sure exactly one is true
+        // and tell this to the domain
       if ((zzpredIdToGndPredMap.find(pred->getId())) != 
-           zzpredIdToGndPredMap.end())
+          zzpredIdToGndPredMap.end())
       {
         PredicateHashArray* pha = zzpredIdToGndPredMap[pred->getId()];
-        int a = pha->find(p);
-      
-          // Only one atom in a block can be true
-        if (a >= 0 && (*pha)[a]->getTruthValue() == TRUE)
+        for (int j = 0; j < pha->size(); j++)
         {
-          zzassert(!domain->getBlockEvidence(blockIdx),
-                   "More than one true atom found for mutually "
-                   "exclusive and exhaustive variables");
-          domain->setBlockEvidence(blockIdx, true);
+          Predicate* gndPred = (*pha)[j];
+            // Only one atom in a block can be true
+          if (gndPred->getTruthValue() == TRUE &&
+              newPred->canBeGroundedAs(gndPred))
+          {
+            if (domain->getBlockEvidence(blockIdx))
+              zzexit("More than one true atom found for mutually "
+                     "exclusive and exhaustive variables");
+            domain->setBlockEvidence(blockIdx, true);
+            domain->setTruePredInBlock(blockIdx, new Predicate(*gndPred));
+            trueOne = true;
+          }
         }
       }
+        // Query pred: There does not have to be a true one
+      else
+        trueOne = true;
+      
+        // One pred has to be true
+      if (!trueOne)
+      {
+        zzexit(": No true atom was found for mutually "
+               "exclusive and exhaustive variables");
+      }
     }
+    delete pred;
   }
-  delete predBlocks;
-
-  predArr.deleteItemsAndClear();
-  delete c;  
-  return numPreds;
+  return totalNumPreds;
 }
+
 
 //////////create formulas by grounding variables preceded by a plus///////////
-
-bool zzcheckPlusTypes(const char* const & typeName,
-                      const Domain* const & dom, const Domain* const & domain0)
-{
-  if (domain0 == NULL) return true;
-
-  const Array<int>* c = dom->getConstantsByType(typeName);
-  assert(c);
-  
-  const Array<int>* cc = domain0->getConstantsByType(typeName);
-  
-  if (cc == NULL || (c->size() != cc->size())) 
-  {
-    zzerr("the type (\"%s\") of variables to which '+' is applied must have "
-          "the same constants across all databases.", typeName);
-    return false;
-  }
-  
-  for (int k = 0; k < c->size(); k++)
-  {
-    const char* constName = dom->getConstantName((*c)[k]);      
-    int cconstId = domain0->getConstantId(constName);
-    const char* ttypeName = domain0->getConstantTypeName(cconstId);
-    
-    if (cconstId < 0 || strcmp(typeName,ttypeName) != 0)
-    {
-      zzerr("the type (\"%s\") of variables to which '+' is applied must have"
-            " the same constants across all databases.", typeName);
-      zzerr("constant %s not found or is of the wrong type", constName);
-      return false;
-    }
-  }
-  return true;
-}
-
 
 void zzgroundPlusVar(const ListObj* const & formula, const string& formulaStr,
                      const StringToIntMap& varNameToTypeIdMap, 
@@ -1763,26 +1682,8 @@ void zzgroundPlusVar(const ListObj* const & formula, const string& formulaStr,
     int typeId = (*mit).second;
     zzassert(typeId > 0, "expect typeId > 0");
 
-    const char* typeName = domain->getTypeName(typeId);
-    if (domain0 && !zzcheckPlusTypes(typeName, domain, domain0)) return;
-
     Array<int>* constArr;
-    if (domain0) 
-    {
-      constArr = new Array<int>;
-      cleanUp.append(constArr);
-      const Array<int>* carr = domain0->getConstantsByType(typeName);
-      constArr->growToSize(carr->size());
-      for (int i = 0; i < carr->size(); i++)
-      {
-        const char* constName = domain0->getConstantName((*carr)[i]);
-        int constId = domain->getConstantId(constName);
-        zzassert(constId >= 0, "failed to find constant in zzgroundPlusVar");
-        (*constArr)[i] = constId;
-      }
-    }
-    else         
-      constArr = (Array<int>*) domain->getConstantsByType(typeId);
+    constArr = (Array<int>*) domain->getConstantsByType(typeId);
 
     acc.appendArray(constArr);
     varNames.append((*mit).first);
@@ -1792,6 +1693,7 @@ void zzgroundPlusVar(const ListObj* const & formula, const string& formulaStr,
   while (acc.getNextCombination(constIds))
   {
     ListObj* gndFormula = new ListObj(formula);
+    string s = formulaStr;
 
     zzassert(constIds.size() == varNames.size(),
              "expect constIds.size() == varNames.size()");
@@ -1799,25 +1701,14 @@ void zzgroundPlusVar(const ListObj* const & formula, const string& formulaStr,
     {
       const char* constName = domain->getConstantName(constIds[i]);
       ListObj::replace(gndFormula, varNames[i].c_str(), constName, domain);
+      unsigned int a = s.find("+" + varNames[i]);
+      assert(a != string::npos);
+      s.replace(a, varNames[i].length() + 1, constName);
     }
     formulas.append(gndFormula);
-
-    string s = formulaStr;
-    for (int i = 0; i < constIds.size(); i++)
-    {
-      unsigned int a = s.find("+");
-      assert(a != string::npos);
-      unsigned int b = a+1;
-      while(s.at(b) != ',' && s.at(b) != ')') b++;
-      string front = s.substr(0, a);
-      string back = s.substr(b, s.length()-b);
-      s = front; 
-      s.append(domain->getConstantName(constIds[i]));
-      s.append(back);
-    }
-
     formulaStrs.append(s);
   }
+  //acc.deleteArraysAndClear();
 
   if (domain0) cleanUp.deleteItemsAndClear();
 }
@@ -1827,7 +1718,8 @@ void zzgroundPlusVar(const ListObj* const & formula, const string& formulaStr,
 
 void zzcreateListObjFromTop(stack<ListObj*>& stack, const char* const & op)
 {
-  zzassert(zzformulaListObjs.size()>=1, "expect zzformulaListObjs.size()>=1");  
+  //zzassert(zzformulaListObjs.size()>=1, "expect zzformulaListObjs.size()>=1");  
+  zzassert(stack.size() >= 1, "expect stack.size()>=1");  
   ListObj* lo1 = stack.top(); stack.pop();
   ListObj* lo = new ListObj; lo->append(op); lo->append(lo1);
   stack.push(lo);
@@ -1836,7 +1728,8 @@ void zzcreateListObjFromTop(stack<ListObj*>& stack, const char* const & op)
 
 void zzcreateListObjFromTopTwo(stack<ListObj*>& stack, const char* const & op)
 {
-  zzassert(zzformulaListObjs.size()>=2,"expect zzformulaListObjs.size()>=2");  
+  //zzassert(zzformulaListObjs.size()>=2,"expect zzformulaListObjs.size()>=2");  
+  zzassert(stack.size()>=2,"expect stack.size()>=2");  
   ListObj* lo1 = stack.top(); stack.pop();
   ListObj* lo2 = stack.top(); stack.pop();
 
@@ -1856,7 +1749,8 @@ void zzcreateListObjFromTopTwo(stack<ListObj*>& stack, const char* const & op)
 
 void zzcreateListObjFromTopThree(stack<ListObj*>& stack)
 {
-  zzassert(zzformulaListObjs.size()>=3, "expect zzformulaListObjs.size()>=3");  
+  //zzassert(zzformulaListObjs.size()>=3, "expect zzformulaListObjs.size()>=3");  
+  zzassert(stack.size()>=3, "expect stack.size()>=3");  
   ListObj* lo1 = stack.top(); stack.pop();
   ListObj* lo2 = stack.top(); stack.pop();
   ListObj* lo3 = stack.top(); stack.pop();
@@ -1937,7 +1831,7 @@ void zzaddGndPredsToDb(Database* const & db)
   hash_map<int, PredicateHashArray*>::iterator it;
   for (int i = 0; i < numPreds; i++)
   {
-    if ((it=zzpredIdToGndPredMap.find(i)) != zzpredIdToGndPredMap.end())
+    if ((it = zzpredIdToGndPredMap.find(i)) != zzpredIdToGndPredMap.end())
     {
       PredicateHashArray* predHashArray = (*it).second;
       for (int j = 0; j < predHashArray->size(); j++)
@@ -2029,7 +1923,8 @@ void zzaddConstantToPredFunc(const char* const & constName)
 }
 
 
-void zztermIsConstant(const char* const & constName)
+void zztermIsConstant(const char* const & constName,
+                      const char* const & constStr)
 {  
   int constId = zzdomain->getConstantId(constName);
     //commented out because a constant can be declared with its first appearance
@@ -2066,7 +1961,7 @@ void zztermIsConstant(const char* const & constName)
     zzassert(zzpredFuncListObjs.size()==1, 
              "expect zzpredFuncListObjs.size()==1");
     zzpredFuncListObjs.top()->append(constName);
-    zzformulaStr.append(constName);
+    zzformulaStr.append(constStr);
   }
   else 
     zzexit("No function or predicate to hold constant %s", constName);
@@ -2081,7 +1976,7 @@ void zztermIsConstant(const char* const & constName)
 void zzputVariableInPred(const char* varName, const bool& folDbg)
 {
   if (folDbg >= 1) printf("v_%s ", varName); 
-    
+
   ++zzfdnumVars;
   string newVarName = zzgetNewVarName(varName);
       
@@ -2092,8 +1987,8 @@ void zzputVariableInPred(const char* varName, const bool& folDbg)
     int exp, unexp;
       
       // check that we have not exceeded the number of terms
-    if ((unexp=zzpred->getNumTerms()) ==
-       	(exp=zzpred->getTemplate()->getNumTerms()))
+    if ((unexp = zzpred->getNumTerms()) ==
+       	(exp = zzpred->getTemplate()->getNumTerms()))
     {
       rightNumTerms = false;
       zzerr("Wrong number of terms for predicate %s. "
@@ -2105,8 +2000,7 @@ void zzputVariableInPred(const char* varName, const bool& folDbg)
     {
         // check that the variable is of the right type
       int typeId = zzpred->getTermTypeAsInt(zzpred->getNumTerms());
-      rightType = zzcheckRightTypeAndGetVarId(typeId, newVarName.c_str(),
-       										  varId);
+      rightType = zzcheckRightTypeAndGetVarId(typeId, newVarName.c_str(), varId);
     }
       
     if (rightNumTerms && rightType)
@@ -2125,15 +2019,14 @@ void zztermIsVariable(const bool& folDbg)
 {
   const char* varName = zztokenList.removeLast();
   
-  // if it is a constant (starts in uppercase or a string)
-  //if (isupper(varName[0])) 
+    // if it is a constant (starts in uppercase or a string)
   if (zzisConstant(varName)) 
   {
     if (folDbg >= 1) printf("c2_%s ", varName); 
     
     if (zzconstantMustBeDeclared)
       zzerr("Constant %s must be declared before it is used", varName);
-    zztermIsConstant(varName); 
+    zztermIsConstant(varName, varName);
     delete [] varName;
   }
   else
@@ -2151,8 +2044,8 @@ void zztermIsVariable(const bool& folDbg)
       int exp, unexp;
       
         // check that we have not exceeded the number of terms
-      if ((unexp=zzfunc->getNumTerms()) ==
-          (exp=zzfunc->getTemplate()->getNumTerms()))
+      if ((unexp = zzfunc->getNumTerms()) ==
+          (exp = zzfunc->getTemplate()->getNumTerms()))
       {
         rightNumTerms = false;
         zzerr("Wrong number of terms for function %s. "
@@ -2183,8 +2076,8 @@ void zztermIsVariable(const bool& folDbg)
       int exp, unexp;
       
         // check that we have not exceeded the number of terms
-      if ((unexp=zzpred->getNumTerms()) ==
-          (exp=zzpred->getTemplate()->getNumTerms()))
+      if ((unexp = zzpred->getNumTerms()) ==
+          (exp = zzpred->getTemplate()->getNumTerms()))
       {
         rightNumTerms = false;
         zzerr("Wrong number of terms for predicate %s. "
@@ -2246,7 +2139,6 @@ void zzcleanUp()
   zztokenList.deleteContentsAndClear();
   while (!zzfuncStack.empty()) zzfuncStack.pop();
   while (!zzfuncConjStack.empty()) zzfuncConjStack.pop();
-  zzuniqueVarIndexes.clear();
   while (!zzformulaListObjs.empty()) 
   {
     ListObj* top = zzformulaListObjs.top();
@@ -2442,7 +2334,6 @@ void zzreset()
   zzformulaStr.clear();
   zzfuncConjStr.clear();
   zzparseGroundPred = false;
-  zzuniqueVarIndexes.clear();
   while (!zzformulaListObjs.empty()) 
   {
     ListObj* top = zzformulaListObjs.top();
@@ -2505,6 +2396,7 @@ void zzcheckAllTypesHaveConstants(const Domain* const & domain)
 void zzfillClosedWorldArray(Array<bool>& isClosedWorldArr,
                             const bool& allPredsExceptQueriesAreClosedWorld,
                             const StringHashArray* const & openWorldPredNames,
+                            const StringHashArray* const & closedWorldPredNames,
                             const StringHashArray* const & queryPredNames)
 {
   if (queryPredNames)
@@ -2527,48 +2419,58 @@ void zzfillClosedWorldArray(Array<bool>& isClosedWorldArr,
       }
     }
   }
-  
 
-  if (allPredsExceptQueriesAreClosedWorld)
+  int numPreds = zzdomain->getNumPredicates();
+  isClosedWorldArr.growToSize(numPreds, true);
+    // If a predicate has no evidence atoms, it is open-world (unless it's in
+    // cwPredNames), if it has evidence atoms, it is closed-world (unless it's in
+    // owPredNames).
+  for (int i = 0; i < numPreds; i++)
   {
-    isClosedWorldArr.growToSize(zzdomain->getNumPredicates(), true);
-    if (queryPredNames)
+    hash_map<int, PredicateHashArray*>::iterator it;
+    for (int i = 0; i < numPreds; i++)
     {
-      for (int i = 0; i < queryPredNames->size(); i++) 
+      if ((it = zzpredIdToGndPredMap.find(i)) != zzpredIdToGndPredMap.end())
       {
-        const char* predName = (*queryPredNames)[i].c_str();
-        int predId = zzdomain->getPredicateId(predName);
-        isClosedWorldArr[predId] = false;
+          // At least one evidence grounding is present
+        isClosedWorldArr[i] = true;
+      }
+      else
+      {
+          //  equality and internal predicates are handled specially by database
+        const PredicateTemplate* pt = zzdomain->getPredicateTemplate(i);          
+        if (!pt->isEqualPredicateTemplate() &&
+            !pt->isInternalPredicateTemplate())
+          isClosedWorldArr[i] = false;
+        else
+          isClosedWorldArr[i] = true;
       }
     }
-  }
-  else
-  {   // some or all predicates are open world
-    isClosedWorldArr.growToSize(zzdomain->getNumPredicates(), true);
- 
-    // '=' predicates are always closed world
+  }  
 
-    Array<string> owPredNames;
-      // if no open world predicates are specified then all are open world
-    if (openWorldPredNames == NULL || openWorldPredNames->empty())
-      zzdomain->getNonEqualPredicateNames(owPredNames);
-    else
-      for (int i = 0; i < openWorldPredNames->size(); i++) 
-        owPredNames.append((*openWorldPredNames)[i]);
-
-    for (int i = 0; i < owPredNames.size(); i++) 
+    // Force these to be open-world
+  if (openWorldPredNames)
+  {
+    for (int i = 0; i < openWorldPredNames->size(); i++) 
     {
-      const char* predName = owPredNames[i].c_str();
+      const char* predName = (*openWorldPredNames)[i].c_str();
       int predId = zzdomain->getPredicateId(predName);
-      if (predId < 0)
-      {
-        zzerr("predicate %s is not declared. Please declare it.", predName);
-        continue;
-      }
-      
       isClosedWorldArr[predId] = false;
     }
-
+  }
+    // Force these to be closed-world
+  if (closedWorldPredNames)
+  {
+    for (int i = 0; i < closedWorldPredNames->size(); i++) 
+    {
+      const char* predName = (*closedWorldPredNames)[i].c_str();
+      int predId = zzdomain->getPredicateId(predName);
+      isClosedWorldArr[predId] = true;
+    }
+  } 
+    // Queries are always open-world
+  if (queryPredNames)
+  {
     for (int i = 0; i < queryPredNames->size(); i++) 
     {
       const char* predName = (*queryPredNames)[i].c_str();
@@ -2616,21 +2518,16 @@ void zzappendFormulaClausesToMLN(const ListObj* const & formula,
                                  const ZZVarNameToIdMap& varNameToIdMap,
                                  const StringToIntMap& plusVarMap,
                                  const int& numAsterisk,
-                                 const Array<int>& uniqueVarIndexes,
                                  const bool& hasFullStop,
                                  const bool& readHardClauseWts,
                                  const bool& mustHaveWtOrFullStop,
                                  Array<int>& hardClauseIdxs,
                                  Array<string>& hardFormulas,
-                                 Array<int>& existUniqueClauseIdxs,
-                                 Array<string>& existUniqueFormulas,
                                  Clause*& flippedClause,
                                  const Domain* const & domain0)
 {
   //cout << "orig formula = " << endl << "\t: " << formulaStr << endl;    
   //cout << "formula      = " << endl << "\t: " << *formula << endl;
-
-  bool isExistUnique = (uniqueVarIndexes.size() > 0);
 
   VarTypeMap* vtMap = zzcreateVarTypeMap(varNameToIdMap);
   Array<ListObj*> formulas;
@@ -2656,10 +2553,10 @@ void zzappendFormulaClausesToMLN(const ListObj* const & formula,
       //cout << "formula (after *) " << endl << "\t: " << *(formulas2[g])<<endl;
       ListObj* vars = new ListObj;
       bool hasExist = false;
-      ListObj* cnf = ListObj::toCNF(formulas2[g], vars, domain, vtMap,hasExist);
+      ListObj* cnf = ListObj::toCNF(formulas2[g], vars, domain, vtMap, hasExist);
       delete formulas2[g];
       //cout << "cnf = " << endl << "\t: " << *cnf << endl;
-          
+
       cnf->cleanUpVars();
       //cout << "cnf (after cleanUp) = " << endl << "\t: " << *cnf << endl;
       
@@ -2670,17 +2567,8 @@ void zzappendFormulaClausesToMLN(const ListObj* const & formula,
       cnf->removeRedundantPredicates();
       //cout << "cnf (removed redundant preds) = " <<endl<<"\t: "<<*cnf<<endl;
 
-        //if the '!' operator is used
-      if (isExistUnique)
-      {
-        assert(formulas.size() == 1); // no '+' is used
-        assert(formulas2.size() == 1); //no '*' is used
-      }
       Array<Clause*> clauses;
       zzcreateClauses(cnf, clauses, flippedClause);
-      int numEPreds = 0;
-      if (isExistUnique) 
-        numEPreds=zzcreateExistUniqueClauses(clauses,uniqueVarIndexes,zzdomain);
 
       cout << "\tCNF has  " << clauses.size() << " clause"
            << ((clauses.size()>1)?"s":"") << endl;
@@ -2689,7 +2577,6 @@ void zzappendFormulaClausesToMLN(const ListObj* const & formula,
       double perClauseWt = 0;
       double formulaWt = 0;
       bool setHardWtLater = false;
-      bool setExistUniqueWtLater = false;
 
       if (hasFullStop) // if this is a hard clause/formula
       {
@@ -2711,40 +2598,22 @@ void zzappendFormulaClausesToMLN(const ListObj* const & formula,
           hardFormulas.append(formStr);
           setHardWtLater = true;
         }
-        if (isExistUnique) numEPreds = 0;
       }
       else
       if (wt)
       { perClauseWt = (*wt)/clauses.size(); formulaWt = *wt; }
       else
       {
-        if (mustHaveWtOrFullStop && !isExistUnique)
+        if (mustHaveWtOrFullStop)
           zzerr("a weight or full stop must be specified for:\n%s",
                 formStr.c_str());
         perClauseWt = defaultWt/clauses.size();
         formulaWt = defaultWt;
-
-        if (isExistUnique) 
-        { 
-          perClauseWt = 0; formulaWt = 0; 
-          existUniqueFormulas.append(formStr);
-          setExistUniqueWtLater = true;
-          numEPreds = 0;
-        }
       }
 
       
       for (int i = 0; i < clauses.size(); i++)
       {
-          //if this clause belongs to the CNF of  an exist. & unique. quant. 
-          //formula and a prior mean was explicitly specified
-        if (isExistUnique && numEPreds > 0) 
-        { 
-          double n = numEPreds;
-          if (i == 0) perClauseWt = (n > 1) ? formulaWt/(n+1) : formulaWt;
-          else        perClauseWt = 2*formulaWt/(n*n-1);
-        }
-
         ////// need a flag zzflipWtOfFlippedClause to indicate whether we should
         ////// flip the sign of the wt of a flipped clause.
         ////// During weight learning, we need not flip the sign because the
@@ -2770,13 +2639,11 @@ void zzappendFormulaClausesToMLN(const ListObj* const & formula,
         }
 
         if (setHardWtLater) hardClauseIdxs.append(prevIdx);
-        else if (setExistUniqueWtLater) existUniqueClauseIdxs.append(prevIdx);
       }
 
       mln->setFormulaNumPreds(formStr, numPreds);
       mln->setFormulaPriorMean(formStr, formulaWt);
       mln->setFormulaWt(formStr, formulaWt);
-      mln->setFormulaIsExistUnique(formStr, isExistUnique);
       mln->setFormulaIsHard(formStr, hasFullStop);      
 
     } //for (int g = 0; g < formulas2.size(); g++)
@@ -2790,8 +2657,8 @@ void zzappendFormulasToMLN(Array<ZZFormulaInfo*>& formulaInfos,
 {
   cout << "converting to CNF:" << endl;
 
-  Array<int> hardClauseIdxs, existUniqueClauseIdxs;
-  Array<string> hardFormulas, existUniqueFormulas;
+  Array<int> hardClauseIdxs;
+  Array<string> hardFormulas;
   Clause* flippedClause = NULL;
 
   for (int i = 0; i < formulaInfos.size(); i++)
@@ -2801,13 +2668,13 @@ void zzappendFormulasToMLN(Array<ZZFormulaInfo*>& formulaInfos,
     cout << "formula " << i << ": " << epfi->formulaStr << endl;
     assert(mln == epfi->mln);
     zzappendFormulaClausesToMLN(epfi->formula, epfi->formulaStr, epfi->numPreds,
-                                epfi->wt, epfi->defaultWt, epfi->domain, epfi->mln,
-                                epfi->varNameToIdMap, epfi->plusVarMap,
-                                epfi->numAsterisk, epfi->uniqueVarIndexes,
-                                epfi->hasFullStop, epfi->readHardClauseWts,
-                                epfi->mustHaveWtOrFullStop, 
+                                epfi->wt, epfi->defaultWt, epfi->domain,
+                                epfi->mln, epfi->varNameToIdMap,
+                                epfi->plusVarMap, epfi->numAsterisk,
+                                epfi->hasFullStop,
+                                epfi->readHardClauseWts,
+                                epfi->mustHaveWtOrFullStop,
                                 hardClauseIdxs, hardFormulas, 
-                                existUniqueClauseIdxs, existUniqueFormulas,
                                 flippedClause, domain0);
     delete epfi;
     cout<<"CNF conversion took ";Timer::printTime(cout,zztimer.time()-startSec);
@@ -2815,26 +2682,12 @@ void zzappendFormulasToMLN(Array<ZZFormulaInfo*>& formulaInfos,
   }
   formulaInfos.clear();
 
-  //set the weights of hard clauses and those derived from 
-  //existentially & uniquely quant formulas
-
+  //set the weights of hard clauses
   double maxSoftWt = mln->getMaxAbsSoftWt();
   if (maxSoftWt == 0) maxSoftWt = 1;
 
   double hardWt = (HARD_WEIGHT==DBL_MIN) ?  HARD_WEIGHT_MULTIPLIER * maxSoftWt 
                                           : HARD_WEIGHT;
-  double existUniqueWt = (EXIST_UNIQUE_WEIGHT==DBL_MIN) ? 
-                         EXIST_UNIQUE_WEIGHT_MULTIPLIER *maxSoftWt 
-                       : EXIST_UNIQUE_WEIGHT; 
-
-  for (int i = 0; i < existUniqueClauseIdxs.size(); i++)
-    ((Clause*)mln->getClause(existUniqueClauseIdxs[i]))->setWt(existUniqueWt);
-
-  for (int i = 0; i < existUniqueFormulas.size(); i++)
-  {
-    mln->setFormulaWt(existUniqueFormulas[i], existUniqueWt);
-    mln->setFormulaPriorMean(existUniqueFormulas[i], existUniqueWt);
-  }
 
   for (int i = 0; i < hardClauseIdxs.size(); i++)
   {
@@ -2886,9 +2739,9 @@ void zzsigHandler(int signo)
 
 /**
  * Compiles a C++ file containing linked-in functions into a shared object file.
- * The old version of the target file is removed, if it exists, then the C++ file
- * is compiled. If the old target file can not be removed or if the C++ file
- * can not be compiled then the program exits.
+ * The old version of the target file is removed, if it exists, then the C++
+ * file is compiled. If the old target file can not be removed or if the C++
+ * file can not be compiled then the program exits.
  * 
  * @fileName absolute path to file to be compiled.
  */
@@ -2957,9 +2810,11 @@ void zzcompileFunctions(const char* fileName)
  * currently being inserted
  * 
  */
-void zzinsertPermutationOfLinkedFunction(const Domain* const & domain, void* funccall,
-										 const FunctionTemplate* ftemplate, int numTerms,
-										 Array<int>* currentConstants)
+void zzinsertPermutationOfLinkedFunction(const Domain* const & domain,
+                                         void* funccall,
+                                         const FunctionTemplate* ftemplate,
+                                         int numTerms,
+                                         Array<int>* currentConstants)
 {
   string retString;
   string arguments[numTerms];
@@ -2968,15 +2823,17 @@ void zzinsertPermutationOfLinkedFunction(const Domain* const & domain, void* fun
   // Find the arguments for the function according to currentConstants
   for (int i = 0; i < numTerms; i++)
   {
-  	const Array<int>* constantsByType =
-  		domain->getConstantsByType(ftemplate->getTermTypeAsInt(i));
+    const Array<int>* constantsByType =
+      domain->getConstantsByType(ftemplate->getTermTypeAsInt(i));
 
-	arguments[i] = domain->getConstantName((*constantsByType)[((*currentConstants)[i])]);
-	// If constant is a number, then we have to cut it out of the string C@Type@Number
-	unsigned int at = arguments[i].rfind("@");
-  	if (at != string::npos)
-	  argumentsAsNum[i] = arguments[i].substr(at+1, arguments[i].length()-at-1);
-	else argumentsAsNum[i] = arguments[i];
+    arguments[i] =
+      domain->getConstantName((*constantsByType)[((*currentConstants)[i])]);
+	// If constant is a number, then we have to cut it out of the string
+    // C@Type@Number
+    unsigned int at = arguments[i].rfind("@");
+    if (at != string::npos)
+      argumentsAsNum[i] = arguments[i].substr(at+1, arguments[i].length()-at-1);
+    else argumentsAsNum[i] = arguments[i];
   }
   
   // Make the function call (max. 5 arguments)
@@ -2990,27 +2847,27 @@ void zzinsertPermutationOfLinkedFunction(const Domain* const & domain, void* fun
       break;
     case 2:
       retString = (*(string (*)(string, string))(funccall))
-      				(argumentsAsNum[0], argumentsAsNum[1]);
+                    (argumentsAsNum[0], argumentsAsNum[1]);
       break;
     case 3:
       retString = (*(string (*)(string, string, string))(funccall))
-      				(argumentsAsNum[0], argumentsAsNum[1], argumentsAsNum[2]);
+                    (argumentsAsNum[0], argumentsAsNum[1], argumentsAsNum[2]);
       break;
     case 4:
       retString = (*(string (*)(string, string, string, string))(funccall))
-      				(argumentsAsNum[0], argumentsAsNum[1], argumentsAsNum[2],
-      				 argumentsAsNum[3]);
+                    (argumentsAsNum[0], argumentsAsNum[1], argumentsAsNum[2],
+                     argumentsAsNum[3]);
       break;
     case 5:
-      retString = (*(string (*)(string, string, string, string, string))(funccall))
-      				(argumentsAsNum[0], argumentsAsNum[1], argumentsAsNum[2],
-      				 argumentsAsNum[3], argumentsAsNum[4]);
+      retString = (*(string (*)(string, string, string, string, string))
+                    (funccall))
+                    (argumentsAsNum[0], argumentsAsNum[1], argumentsAsNum[2],
+                     argumentsAsNum[3], argumentsAsNum[4]);
       break;
     default:
       cout << "Linked-in functions can take max. 5 arguments\n" << endl;
       return;    
   }
-
 
   // If a number is returned, then we have to make a constant out of it
   int i;
@@ -3019,49 +2876,50 @@ void zzinsertPermutationOfLinkedFunction(const Domain* const & domain, void* fun
   if (iss>>i) // We are dealing with an integer
     zzcreateIntConstant(constName, ftemplate->getRetTypeName(), i);
   else
-  	strcpy(constName, retString.c_str());
+    strcpy(constName, retString.c_str());
 
   // The return value has to be an existing constant of the return type
   int constantId = domain->getConstantId(constName);
   const Array<int>* returnConstants =
-  		domain->getConstantsByType(ftemplate->getRetTypeId());
+    domain->getConstantsByType(ftemplate->getRetTypeId());
   
-  if (returnConstants->contains(constantId)) {
-  	// Insert the function definition just created  
-  	// Predicate name is PredicateTemplate::ZZ_RETURN_PREFIX + function name
-  	char* predName;
-  	predName = (char *)malloc((strlen(PredicateTemplate::ZZ_RETURN_PREFIX) +
-  							   strlen(ftemplate->getName()) + 1)*sizeof(char));
-  	strcpy(predName, PredicateTemplate::ZZ_RETURN_PREFIX);
-  	strcat(predName, ftemplate->getName());
-	zzcreatePred(zzpred, predName);
-  	zzpred->setTruthValue(TRUE);
+  if (returnConstants->contains(constantId))
+  {
+      // Insert the function definition just created  
+      // Predicate name is PredicateTemplate::ZZ_RETURN_PREFIX + function name
+    char* predName;
+    predName = (char *)malloc((strlen(PredicateTemplate::ZZ_RETURN_PREFIX) +
+                               strlen(ftemplate->getName()) + 1)*sizeof(char));
+    strcpy(predName, PredicateTemplate::ZZ_RETURN_PREFIX);
+    strcat(predName, ftemplate->getName());
+    zzcreatePred(zzpred, predName);
+    zzpred->setTruthValue(TRUE);
 
-	//Add return constant to predicate
-	zzpredAppendConstant(zzpred, constantId, constName);
-	//Add constant terms to predicate
-	for (int i = 0; i < numTerms; i++)
-	{
-	  const char* term = arguments[i].c_str();
-	  int constId = domain->getConstantId(term);
-	  zzpredAppendConstant(zzpred, constId, term);
-	}
+      //Add return constant to predicate
+    zzpredAppendConstant(zzpred, constantId, constName);
+      //Add constant terms to predicate
+    for (int i = 0; i < numTerms; i++)
+    {
+      const char* term = arguments[i].c_str();
+      int constId = domain->getConstantId(term);
+      zzpredAppendConstant(zzpred, constId, term);
+    }
 	
-	zzcheckPredNumTerm(zzpred);
-	int predId = zzpred->getId();
+    zzcheckPredNumTerm(zzpred);
+    int predId = zzpred->getId();
 
-	// Insert mapping of grounding
-  	hash_map<int,PredicateHashArray*>::iterator it;
-  	if ((it=zzpredIdToGndPredMap.find(predId)) == zzpredIdToGndPredMap.end())
-    	zzpredIdToGndPredMap[predId] = new PredicateHashArray;
+      // Insert mapping of grounding
+    hash_map<int,PredicateHashArray*>::iterator it;
+    if ((it=zzpredIdToGndPredMap.find(predId)) == zzpredIdToGndPredMap.end())
+      zzpredIdToGndPredMap[predId] = new PredicateHashArray;
 
 //cout << "Mapping " << endl;
 //zzpred->printWithStrVar(cout, zzdomain);
 //cout << " " << zzpred->getTruthValue() << endl;
   
-  	PredicateHashArray* pha = zzpredIdToGndPredMap[predId];
-  	if (pha->append(zzpred) < 0)
-  	{
+    PredicateHashArray* pha = zzpredIdToGndPredMap[predId];
+    if (pha->append(zzpred) < 0)
+    {
       int a = pha->find(zzpred);
       zzassert(a >= 0, "expecting ground predicate to be found");
       string origTvStr = (*pha)[a]->getTruthValueAsStr();
@@ -3074,16 +2932,17 @@ void zzinsertPermutationOfLinkedFunction(const Domain* const & domain, void* fun
         oss << "Duplicate ground predicate "; zzpred->print(oss, zzdomain); 
         oss << " found. ";
         if (origTvStr.compare(newTvStr) != 0)
-          oss << "Changed its truthValue from " << origTvStr << " to " <<newTvStr 
-              << endl;
+          oss << "Changed its truthValue from " << origTvStr << " to "
+              << newTvStr << endl;
         zzwarn(oss.str().c_str());
       }
   	  delete zzpred;
     }
 
     delete [] predName;
-  	zzpred = NULL;
+    zzpred = NULL;
   }
+  //delete returnConstants;
 }
 
 /**
@@ -3105,32 +2964,34 @@ void zzinsertPermutationOfLinkedFunction(const Domain* const & domain, void* fun
  * currently being inserted
  * 
  */
-void zzinsertPermutationsOfLinkedFunction(const Domain* const & domain, void* funccall,
-		       							  const FunctionTemplate* ftemplate, int numTerms,
-										  int currentTerm, Array<int>* currentConstants)
+void zzinsertPermutationsOfLinkedFunction(const Domain* const & domain,
+                                          void* funccall,
+                                          const FunctionTemplate* ftemplate,
+                                          int numTerms, int currentTerm,
+                                          Array<int>* currentConstants)
 {
   const Array<int>* constants =
-  	domain->getConstantsByType(ftemplate->getTermTypeAsInt(currentTerm));
+    domain->getConstantsByType(ftemplate->getTermTypeAsInt(currentTerm));
 
-  // Base case: at the last term
+    // Base case: at the last term
   if (currentTerm == numTerms - 1)
   {
-	for (int i = 0; i < constants->size(); i++)
-	{
-	  (*currentConstants)[currentTerm] = i;
-	  zzinsertPermutationOfLinkedFunction(domain, funccall, ftemplate,
-	    								  numTerms, currentConstants);
-	}
-  	return;
+    for (int i = 0; i < constants->size(); i++)
+    {
+      (*currentConstants)[currentTerm] = i;
+      zzinsertPermutationOfLinkedFunction(domain, funccall, ftemplate, numTerms,
+                                          currentConstants);
+    }
+    return;
   }
   
-  // Not yet at last term
-  zzinsertPermutationsOfLinkedFunction(domain, funccall, ftemplate,
-  									   numTerms, currentTerm + 1, currentConstants);
+    // Not yet at last term
+  zzinsertPermutationsOfLinkedFunction(domain, funccall, ftemplate, numTerms,
+                                       currentTerm + 1, currentConstants);
   
   if (++(*currentConstants)[currentTerm] < constants->size())
-	zzinsertPermutationsOfLinkedFunction(domain, funccall, ftemplate,
-  									     numTerms, currentTerm, currentConstants);
+    zzinsertPermutationsOfLinkedFunction(domain, funccall, ftemplate, numTerms,
+                                         currentTerm, currentConstants);
 
   (*currentConstants)[currentTerm] = 0;
   return;
@@ -3155,27 +3016,28 @@ void zzgenerateGroundingsFromLinkedFunction(const Domain* const & domain,
   char* error;
   void* funccall;
   
-  // Obtain functioncall from dynamic library
+    // Obtain functioncall from dynamic library
   dlerror();    // Clear any existing error
   funccall = dlsym(handle, funcname);
   if ((error = dlerror()) != NULL)
   {
-  	printf("Error while evaluating function %s\n", funcname);
+    printf("Error while evaluating function %s\n", funcname);
     fprintf (stderr, "dlerror: %s\n", error);
-	return;
+    return;
   }
 
-  // Find number of terms for function
+    // Find number of terms for function
   const FunctionTemplate* ftemplate = domain->getFunctionTemplate(funcname);
   int numTerms = ftemplate->getNumTerms();
 
-  // Insert all possible permutations of constants
+    // Insert all possible permutations of constants
   const Array<int>* termTypes = ftemplate->getTermTypesAsInt();
   zzassert(numTerms == termTypes->size(),
-  		   "Number of terms and term types in function don't match");
+           "Number of terms and term types in function don't match");
   Array<int>* currentConstants = new Array<int>;
   for (int i = 0; i < numTerms; i++) currentConstants->append(0);
-  zzinsertPermutationsOfLinkedFunction(domain, funccall, ftemplate, numTerms, 0, currentConstants);
+  zzinsertPermutationsOfLinkedFunction(domain, funccall, ftemplate, numTerms, 0,
+                                       currentConstants);
 
   return;
 }
@@ -3192,35 +3054,35 @@ void zzgenerateGroundingsFromLinkedFunction(const Domain* const & domain,
  */
 void zzgenerateGroundingsFromLinkedFunctions(const Domain* const & domain)
 {
-  // First check if a file with functions exists
+    // First check if a file with functions exists
   void *handle;
   char* openFileName;
   openFileName = (char *)malloc((strlen("./") +
-								strlen(ZZ_FUNCTION_SO_FILE) + 1)*sizeof(char));
+                                 strlen(ZZ_FUNCTION_SO_FILE) + 1)*sizeof(char));
   strcpy(openFileName, "./");
   strcat(openFileName, ZZ_FUNCTION_SO_FILE);
   handle = dlopen(openFileName, RTLD_LAZY);
   if (!handle)
   {
-  	// Can not open file, so no linked-in functions
+      // Can not open file, so no linked-in functions
     printf("No file for linked-in functions found.\n");
     fprintf (stderr, "%s\n", dlerror());
     dlclose(handle);
     return;
   }
 
-  // Look at each function
+    // Look at each function
   const Array<const char*>* fnames = domain->getFunctionNames();
   for (int i = 0; i < fnames->size(); i++)
   {
-  	// If it is a linked-in function,
-  	// then generate groundings for each permutation of the given types
-  	if (!zzisInternalFunction((*fnames)[i]) &&
-  		zzisLinkedFunction((*fnames)[i], handle))
-  	{
-	  cout << "Found linked-in function: " << (*fnames)[i] << endl;
-  	  zzgenerateGroundingsFromLinkedFunction(domain, (*fnames)[i], handle);
-  	}
+      // If it is a linked-in function,
+      // then generate groundings for each permutation of the given types
+    if (!zzisInternalFunction((*fnames)[i]) &&
+        zzisLinkedFunction((*fnames)[i], handle))
+    {
+      cout << "Found linked-in function: " << (*fnames)[i] << endl;
+      zzgenerateGroundingsFromLinkedFunction(domain, (*fnames)[i], handle);
+    }
   }
   dlclose(handle);
   return;
@@ -3244,29 +3106,33 @@ void zzgenerateGroundingsFromLinkedFunctions(const Domain* const & domain)
  * currently being inserted
  * 
  */
-void zzinsertPermutationOfLinkedPredicate(const Domain* const & domain, void* funccall,
-										  const PredicateTemplate* ptemplate, int numTerms,
-										  Array<int>* currentConstants)
+void zzinsertPermutationOfLinkedPredicate(const Domain* const & domain,
+                                          void* funccall,
+                                          const PredicateTemplate* ptemplate,
+                                          int numTerms,
+                                          Array<int>* currentConstants)
 {
   bool retBool = false;
   string arguments[numTerms];
   string argumentsAsNum[numTerms];
   
-  // Find the arguments for the predicate according to currentConstants
+    // Find the arguments for the predicate according to currentConstants
   for (int i = 0; i < numTerms; i++)
   {
-  	const Array<int>* constantsByType =
-  		domain->getConstantsByType(ptemplate->getTermTypeAsInt(i));
+    const Array<int>* constantsByType =
+      domain->getConstantsByType(ptemplate->getTermTypeAsInt(i));
 
-	arguments[i] = domain->getConstantName((*constantsByType)[((*currentConstants)[i])]);
-	// If constant is a number, then we have to cut it out of the string C@Type@Number
-	unsigned int at = arguments[i].rfind("@");
-  	if (at != string::npos)
-	  argumentsAsNum[i] = arguments[i].substr(at+1, arguments[i].length()-at-1);
-	else argumentsAsNum[i] = arguments[i];
+    arguments[i] =
+      domain->getConstantName((*constantsByType)[((*currentConstants)[i])]);
+      // If constant is a number, then we have to cut it out of the string
+      // C@Type@Number
+    unsigned int at = arguments[i].rfind("@");
+    if (at != string::npos)
+      argumentsAsNum[i] = arguments[i].substr(at+1, arguments[i].length()-at-1);
+    else argumentsAsNum[i] = arguments[i];
   }
   
-  // Make the function call (max. 5 arguments)
+    // Make the function call (max. 5 arguments)
   switch (numTerms)
   {
     case 0:
@@ -3277,48 +3143,48 @@ void zzinsertPermutationOfLinkedPredicate(const Domain* const & domain, void* fu
       break;
     case 2:
       retBool = (*(bool (*)(string, string))(funccall))
-      				(argumentsAsNum[0], argumentsAsNum[1]);
+                    (argumentsAsNum[0], argumentsAsNum[1]);
       break;
     case 3:
       retBool = (*(bool (*)(string, string, string))(funccall))
-      				(argumentsAsNum[0], argumentsAsNum[1], argumentsAsNum[2]);
+                    (argumentsAsNum[0], argumentsAsNum[1], argumentsAsNum[2]);
       break;
     case 4:
       retBool = (*(bool (*)(string, string, string, string))(funccall))
-      				(argumentsAsNum[0], argumentsAsNum[1], argumentsAsNum[2],
-      				 argumentsAsNum[3]);
+                    (argumentsAsNum[0], argumentsAsNum[1], argumentsAsNum[2],
+                     argumentsAsNum[3]);
       break;
     case 5:
       retBool = (*(bool (*)(string, string, string, string, string))(funccall))
-      				(argumentsAsNum[0], argumentsAsNum[1], argumentsAsNum[2],
-      				 argumentsAsNum[3], argumentsAsNum[4]);
+                    (argumentsAsNum[0], argumentsAsNum[1], argumentsAsNum[2],
+                     argumentsAsNum[3], argumentsAsNum[4]);
       break;
     default:
       cout << "Linked-in predicates can take max. 5 arguments\n" << endl;
       return;    
   }
   
-  // Insert the predicate definition just created  
+    // Insert the predicate definition just created  
   const char* predName;
-  	predName = ptemplate->getName();
+  predName = ptemplate->getName();
   //for (int i = 0; i < currentConstants->size(); i++)
     //printf("%d ", (*currentConstants)[i]);
   zzcreatePred(zzpred, predName);
   if (retBool) zzpred->setTruthValue(TRUE);
   else zzpred->setTruthValue(FALSE);
   
-  //Add constant terms to predicate
+    // Add constant terms to predicate
   for (int i = 0; i < numTerms; i++)
   {
-	const char* term = arguments[i].c_str();
-	int constId = domain->getConstantId(term);
-	zzpredAppendConstant(zzpred, constId, term);
+    const char* term = arguments[i].c_str();
+    int constId = domain->getConstantId(term);
+    zzpredAppendConstant(zzpred, constId, term);
   }
 	
   zzcheckPredNumTerm(zzpred);
   int predId = zzpred->getId();
 
-  // Insert mapping of grounding
+    // Insert mapping of grounding
   hash_map<int,PredicateHashArray*>::iterator it;
   if ((it=zzpredIdToGndPredMap.find(predId)) == zzpredIdToGndPredMap.end())
    	zzpredIdToGndPredMap[predId] = new PredicateHashArray;
@@ -3342,13 +3208,12 @@ void zzinsertPermutationOfLinkedPredicate(const Domain* const & domain, void* fu
       oss << "Duplicate ground predicate "; zzpred->print(oss, zzdomain); 
       oss << " found. ";
       if (origTvStr.compare(newTvStr) != 0)
-        oss << "Changed its truthValue from " << origTvStr << " to " <<newTvStr 
+        oss << "Changed its truthValue from " << origTvStr << " to " << newTvStr
             << endl;
       zzwarn(oss.str().c_str());
     }
     delete zzpred;
   }
-
   zzpred = NULL;
 }
 
@@ -3371,32 +3236,34 @@ void zzinsertPermutationOfLinkedPredicate(const Domain* const & domain, void* fu
  * currently being inserted
  * 
  */
-void zzinsertPermutationsOfLinkedPredicate(const Domain* const & domain, void* funccall,
-										   const PredicateTemplate* ptemplate, int numTerms,
-										   int currentTerm, Array<int>* currentConstants)
+void zzinsertPermutationsOfLinkedPredicate(const Domain* const & domain,
+                                           void* funccall,
+                                           const PredicateTemplate* ptemplate,
+                                           int numTerms, int currentTerm,
+                                           Array<int>* currentConstants)
 {
   const Array<int>* constants =
-  	domain->getConstantsByType(ptemplate->getTermTypeAsInt(currentTerm));
+    domain->getConstantsByType(ptemplate->getTermTypeAsInt(currentTerm));
 
-  // Base case: at the last term
+    // Base case: at the last term
   if (currentTerm == numTerms - 1)
   {
-	for (int i = 0; i < constants->size(); i++)
-	{
-	  (*currentConstants)[currentTerm] = i;
-	  zzinsertPermutationOfLinkedPredicate(domain, funccall, ptemplate,
-	  									   numTerms, currentConstants);
-	}
-  	return;
+    for (int i = 0; i < constants->size(); i++)
+    {
+      (*currentConstants)[currentTerm] = i;
+      zzinsertPermutationOfLinkedPredicate(domain, funccall, ptemplate,
+                                           numTerms, currentConstants);
+    }
+    return;
   }
   
-  // Not yet at last term
-  zzinsertPermutationsOfLinkedPredicate(domain, funccall, ptemplate,
-  									    numTerms, currentTerm + 1, currentConstants);
+    // Not yet at last term
+  zzinsertPermutationsOfLinkedPredicate(domain, funccall, ptemplate, numTerms,
+                                        currentTerm + 1, currentConstants);
   
   if (++(*currentConstants)[currentTerm] < constants->size())
-	zzinsertPermutationsOfLinkedPredicate(domain, funccall, ptemplate,
-  									      numTerms, currentTerm, currentConstants);
+    zzinsertPermutationsOfLinkedPredicate(domain, funccall, ptemplate, numTerms,
+                                          currentTerm, currentConstants);
 
   (*currentConstants)[currentTerm] = 0;
   return;
@@ -3421,27 +3288,28 @@ void zzgenerateGroundingsFromLinkedPredicate(const Domain* const & domain,
   char* error;
   void* funccall;
   
-  // Obtain functioncall from dynamic library
+    // Obtain functioncall from dynamic library
   dlerror();    // Clear any existing error
   funccall = dlsym(handle, predname);
   if ((error = dlerror()) != NULL)
   {
-  	printf("Error while evaluating predicate %s\n", predname);
+    printf("Error while evaluating predicate %s\n", predname);
     fprintf (stderr, "dlerror: %s\n", error);
-	return;
+    return;
   }
 
-  // Find number of terms for predicate
+    // Find number of terms for predicate
   const PredicateTemplate* ptemplate = domain->getPredicateTemplate(predname);
   int numTerms = ptemplate->getNumTerms();
 
-  // Insert all possible permutations of constants
+    // Insert all possible permutations of constants
   const Array<int>* termTypes = ptemplate->getTermTypesAsInt();
   zzassert(numTerms == termTypes->size(),
-  		   "Number of terms and term types in function don't match");
+           "Number of terms and term types in function don't match");
   Array<int>* currentConstants = new Array<int>;
   for (int i = 0; i < numTerms; i++) currentConstants->append(0);
-  zzinsertPermutationsOfLinkedPredicate(domain, funccall, ptemplate, numTerms, 0, currentConstants);
+  zzinsertPermutationsOfLinkedPredicate(domain, funccall, ptemplate, numTerms,
+                                        0, currentConstants);
 
   return;
 }
@@ -3458,35 +3326,35 @@ void zzgenerateGroundingsFromLinkedPredicate(const Domain* const & domain,
  */
 void zzgenerateGroundingsFromLinkedPredicates(const Domain* const & domain)
 {
-  // First check if a file with predicates exists
+    // First check if a file with predicates exists
   void *handle;
   char* openFileName;
   openFileName = (char *)malloc((strlen("./") +
-								strlen(ZZ_FUNCTION_SO_FILE) + 1)*sizeof(char));
+                                 strlen(ZZ_FUNCTION_SO_FILE) + 1)*sizeof(char));
   strcpy(openFileName, "./");
   strcat(openFileName, ZZ_FUNCTION_SO_FILE);
   handle = dlopen(openFileName, RTLD_LAZY);
   if (!handle)
   {
-  	// Can not open file, so no linked-in predicates
+      // Can not open file, so no linked-in predicates
     printf("No file for linked-in predicates found.\n");
     fprintf (stderr, "%s\n", dlerror());
     dlclose(handle);
     return;
   }
 
-  // Look at each predicate
+    // Look at each predicate
   const Array<const char*>* pnames = domain->getPredicateNames();
   for (int i = 0; i < pnames->size(); i++)
   {
-  	// If it is a linked-in predicate,
-  	// then generate groundings for each permutation of the given types
-  	if (!zzisInternalPredicate((*pnames)[i]) &&
-  		zzisLinkedPredicate((*pnames)[i], handle))
-  	{
-	  cout << "Found linked-in predicate: " << (*pnames)[i] << endl;
-  	  zzgenerateGroundingsFromLinkedPredicate(domain, (*pnames)[i], handle);
-  	}
+      // If it is a linked-in predicate,
+      // then generate groundings for each permutation of the given types
+    if (!zzisInternalPredicate((*pnames)[i]) &&
+        zzisLinkedPredicate((*pnames)[i], handle))
+    {
+      cout << "Found linked-in predicate: " << (*pnames)[i] << endl;
+      zzgenerateGroundingsFromLinkedPredicate(domain, (*pnames)[i], handle);
+    }
   }
   dlclose(handle);
   return;
@@ -3627,59 +3495,62 @@ void zzdeclareInternalPredicatesAndFunctions()
  * currently being inserted 
  */
 void zzinsertPermutationOfInternalPredicate(int index,
-											const PredicateTemplate* const& ptemplate,
-										    int numTerms, Array<int>* currentConstants)
+                                      const PredicateTemplate* const& ptemplate,
+                                            int numTerms,
+                                            Array<int>* currentConstants)
 {
   bool retBool = false;
   string arguments[numTerms];
   string argumentsAsNum[numTerms];
   
-  // Find the arguments for the predicate according to currentConstants
+    // Find the arguments for the predicate according to currentConstants
   for (int i = 0; i < numTerms; i++)
   {
-  	const Array<int>* constantsByType =
-  		zzdomain->getConstantsByType(ptemplate->getTermTypeAsInt(i));
+    const Array<int>* constantsByType =
+      zzdomain->getConstantsByType(ptemplate->getTermTypeAsInt(i));
 
-	arguments[i] = zzdomain->getConstantName((*constantsByType)[((*currentConstants)[i])]);
-	// If constant is a number, then we have to cut it out of the string C@Type@Number
-	unsigned int at = arguments[i].rfind("@");
-  	if (at != string::npos)
-	  argumentsAsNum[i] = arguments[i].substr(at+1, arguments[i].length()-at-1);
-	else
-	{
-	  argumentsAsNum[i] = arguments[i];
-		// Remove " from constants
-	  string::size_type loc = argumentsAsNum[i].find("\"", 0);
-	  while (loc != string::npos)
-	  {
-	  	argumentsAsNum[i].erase(loc, 1);
-	  	loc = argumentsAsNum[i].find("\"", 0);
-	  }
-	}
+    arguments[i] =
+      zzdomain->getConstantName((*constantsByType)[((*currentConstants)[i])]);
+      // If constant is a number, then we have to cut it out of the string
+      // C@Type@Number
+    unsigned int at = arguments[i].rfind("@");
+    if (at != string::npos)
+      argumentsAsNum[i] = arguments[i].substr(at+1, arguments[i].length()-at-1);
+    else
+    {
+      argumentsAsNum[i] = arguments[i];
+        // Remove " from constants
+      string::size_type loc = argumentsAsNum[i].find("\"", 0);
+      while (loc != string::npos)
+      {
+        argumentsAsNum[i].erase(loc, 1);
+        loc = argumentsAsNum[i].find("\"", 0);
+      }
+    }
   }
   
-  // Make the function call
+    // Make the function call
   int a, b;
   switch(index)
   {
-  	case 0:
-  	  Internals::stringToInt(argumentsAsNum[0], a);
-  	  Internals::stringToInt(argumentsAsNum[1], b);
+    case 0:
+      Internals::stringToInt(argumentsAsNum[0], a);
+      Internals::stringToInt(argumentsAsNum[1], b);
       retBool = Internals::greaterThan(a, b);
       break;
     case 1:
-  	  Internals::stringToInt(argumentsAsNum[0], a);
-  	  Internals::stringToInt(argumentsAsNum[1], b);
+      Internals::stringToInt(argumentsAsNum[0], a);
+      Internals::stringToInt(argumentsAsNum[1], b);
       retBool = Internals::lessThan(a, b);
       break;
     case 2:
-  	  Internals::stringToInt(argumentsAsNum[0], a);
-  	  Internals::stringToInt(argumentsAsNum[1], b);
+      Internals::stringToInt(argumentsAsNum[0], a);
+      Internals::stringToInt(argumentsAsNum[1], b);
       retBool = Internals::greaterThanEq(a, b);
       break;
     case 3:
-  	  Internals::stringToInt(argumentsAsNum[0], a);
-  	  Internals::stringToInt(argumentsAsNum[1], b);
+      Internals::stringToInt(argumentsAsNum[0], a);
+      Internals::stringToInt(argumentsAsNum[1], b);
       retBool = Internals::lessThanEq(a, b);
       break;
     case 4:
@@ -3687,28 +3558,28 @@ void zzinsertPermutationOfInternalPredicate(int index,
       break;
   }
     
-  // Insert the predicate definition just created  
+    // Insert the predicate definition just created  
   const char* predName;
   predName = ptemplate->getName();
   zzcreatePred(zzpred, predName);
   if (retBool) zzpred->setTruthValue(TRUE);
   else zzpred->setTruthValue(FALSE);
   
-  //Add constant terms to predicate
+    // Add constant terms to predicate
   for (int i = 0; i < numTerms; i++)
   {
-	const char* term = arguments[i].c_str();
-	int constId = zzdomain->getConstantId(term);
-	zzpredAppendConstant(zzpred, constId, term);
+    const char* term = arguments[i].c_str();
+    int constId = zzdomain->getConstantId(term);
+    zzpredAppendConstant(zzpred, constId, term);
   }
-	
+
   zzcheckPredNumTerm(zzpred);
   int predId = zzpred->getId();
 
-  // Insert mapping of grounding
+    // Insert mapping of grounding
   hash_map<int,PredicateHashArray*>::iterator it;
   if ((it=zzpredIdToGndPredMap.find(predId)) == zzpredIdToGndPredMap.end())
-   	zzpredIdToGndPredMap[predId] = new PredicateHashArray;
+    zzpredIdToGndPredMap[predId] = new PredicateHashArray;
   
 //cout << "Mapping " << endl;
 //zzpred->printWithStrVar(cout, zzdomain);
@@ -3729,7 +3600,7 @@ void zzinsertPermutationOfInternalPredicate(int index,
       oss << "Duplicate ground predicate "; zzpred->print(oss, zzdomain); 
       oss << " found. ";
       if (origTvStr.compare(newTvStr) != 0)
-        oss << "Changed its truthValue from " << origTvStr << " to " <<newTvStr 
+        oss << "Changed its truthValue from " << origTvStr << " to " << newTvStr
             << endl;
       zzwarn(oss.str().c_str());
     }
@@ -3755,105 +3626,116 @@ void zzinsertPermutationOfInternalPredicate(int index,
  * currently being inserted
  * 
  */
-void zzinsertPermutationOfInternalFunction(int index, const FunctionTemplate* ftemplate,
-										   int numTerms, Array<int>* currentConstants)
+void zzinsertPermutationOfInternalFunction(int index,
+                                           const FunctionTemplate* ftemplate,
+                                           int numTerms,
+                                           Array<int>* currentConstants)
 {
   char constName[1000];
   string arguments[numTerms];
   string argumentsAsNum[numTerms];
   
-  // Find the arguments for the predicate according to currentConstants
+    // Find the arguments for the predicate according to currentConstants
   for (int i = 0; i < numTerms; i++)
   {
-  	const Array<int>* constantsByType =
-  		zzdomain->getConstantsByType(ftemplate->getTermTypeAsInt(i));
+    const Array<int>* constantsByType =
+      zzdomain->getConstantsByType(ftemplate->getTermTypeAsInt(i));
 
-	arguments[i] = zzdomain->getConstantName((*constantsByType)[((*currentConstants)[i])]);
-	// If constant is a number, then we have to cut it out of the string C@Type@Number
-	unsigned int at = arguments[i].rfind("@");
-  	if (at != string::npos)
-	  argumentsAsNum[i] = arguments[i].substr(at+1, arguments[i].length()-at-1);
-	else argumentsAsNum[i] = arguments[i];
+    arguments[i] =
+      zzdomain->getConstantName((*constantsByType)[((*currentConstants)[i])]);
+      // If constant is a number, then we have to cut it out of the string
+      // C@Type@Number
+    unsigned int at = arguments[i].rfind("@");
+    if (at != string::npos)
+      argumentsAsNum[i] = arguments[i].substr(at+1, arguments[i].length()-at-1);
+    else argumentsAsNum[i] = arguments[i];
   }
   
-  // Make the function call
+    // Make the function call
   int a, b;
   switch(index)
   {
-  	case 0:
-  	  Internals::stringToInt(argumentsAsNum[0], a);
-  	  zzcreateIntConstant(constName, ftemplate->getRetTypeName(), Internals::succ(a));
+    case 0:
+      Internals::stringToInt(argumentsAsNum[0], a);
+      zzcreateIntConstant(constName, ftemplate->getRetTypeName(),
+                          Internals::succ(a));
       break;
     case 1:
-  	  Internals::stringToInt(argumentsAsNum[0], a);
-  	  Internals::stringToInt(argumentsAsNum[1], b);
-  	  zzcreateIntConstant(constName, ftemplate->getRetTypeName(), Internals::plus(a, b));
+      Internals::stringToInt(argumentsAsNum[0], a);
+      Internals::stringToInt(argumentsAsNum[1], b);
+      zzcreateIntConstant(constName, ftemplate->getRetTypeName(),
+                          Internals::plus(a, b));
       break;
     case 2:
-  	  Internals::stringToInt(argumentsAsNum[0], a);
-  	  Internals::stringToInt(argumentsAsNum[1], b);
-  	  zzcreateIntConstant(constName, ftemplate->getRetTypeName(), Internals::minus(a, b));
+      Internals::stringToInt(argumentsAsNum[0], a);
+      Internals::stringToInt(argumentsAsNum[1], b);
+      zzcreateIntConstant(constName, ftemplate->getRetTypeName(),
+                          Internals::minus(a, b));
       break;
     case 3:
-  	  Internals::stringToInt(argumentsAsNum[0], a);
-  	  Internals::stringToInt(argumentsAsNum[1], b);
-  	  zzcreateIntConstant(constName, ftemplate->getRetTypeName(), Internals::times(a, b));
+      Internals::stringToInt(argumentsAsNum[0], a);
+      Internals::stringToInt(argumentsAsNum[1], b);
+      zzcreateIntConstant(constName, ftemplate->getRetTypeName(),
+                          Internals::times(a, b));
       break;
     case 4:
-  	  Internals::stringToInt(argumentsAsNum[0], a);
-  	  Internals::stringToInt(argumentsAsNum[1], b);
-  	  zzcreateIntConstant(constName, ftemplate->getRetTypeName(), Internals::dividedBy(a, b));
+      Internals::stringToInt(argumentsAsNum[0], a);
+      Internals::stringToInt(argumentsAsNum[1], b);
+      zzcreateIntConstant(constName, ftemplate->getRetTypeName(),
+                          Internals::dividedBy(a, b));
       break;
     case 5:
-  	  Internals::stringToInt(argumentsAsNum[0], a);
-  	  Internals::stringToInt(argumentsAsNum[1], b);
-  	  zzcreateIntConstant(constName, ftemplate->getRetTypeName(), Internals::mod(a, b));
+      Internals::stringToInt(argumentsAsNum[0], a);
+      Internals::stringToInt(argumentsAsNum[1], b);
+      zzcreateIntConstant(constName, ftemplate->getRetTypeName(),
+                          Internals::mod(a, b));
       break;
     case 6:
-      strcpy(constName, Internals::concat(argumentsAsNum[0], argumentsAsNum[1]).c_str());
+      strcpy(constName,
+             Internals::concat(argumentsAsNum[0], argumentsAsNum[1]).c_str());
   }
   
-  // The return value has to be an existing constant of the return type
+    // The return value has to be an existing constant of the return type
   int constantId = zzdomain->getConstantId(constName);
   const Array<int>* returnConstants =
-  		zzdomain->getConstantsByType(ftemplate->getRetTypeId());
+    zzdomain->getConstantsByType(ftemplate->getRetTypeId());
   
   if (returnConstants->contains(constantId))
   {
-  	// Insert the function definition just created  
-  	// Predicate name is PredicateTemplate::ZZ_RETURN_PREFIX + function name
-  	char* predName;
-  	predName = (char *)malloc((strlen(PredicateTemplate::ZZ_RETURN_PREFIX) +
-  							   strlen(ftemplate->getName()) + 1)*sizeof(char));
-  	strcpy(predName, PredicateTemplate::ZZ_RETURN_PREFIX);
-  	strcat(predName, ftemplate->getName());
-	zzcreatePred(zzpred, predName);
-  	zzpred->setTruthValue(TRUE);
+      // Insert the function definition just created  
+      // Predicate name is PredicateTemplate::ZZ_RETURN_PREFIX + function name
+    char* predName;
+    predName = (char *)malloc((strlen(PredicateTemplate::ZZ_RETURN_PREFIX) +
+                               strlen(ftemplate->getName()) + 1)*sizeof(char));
+    strcpy(predName, PredicateTemplate::ZZ_RETURN_PREFIX);
+    strcat(predName, ftemplate->getName());
+    zzcreatePred(zzpred, predName);
+    zzpred->setTruthValue(TRUE);
 
-	//Add return constant to predicate
-	zzpredAppendConstant(zzpred, constantId, constName);
-	//Add constant terms to predicate
-	for (int i = 0; i < numTerms; i++)
-	{
-	  const char* term = arguments[i].c_str();
-	  int constId = zzdomain->getConstantId(term);
-	  zzpredAppendConstant(zzpred, constId, term);
-	}
-	
-	zzcheckPredNumTerm(zzpred);
-	int predId = zzpred->getId();
-	// Insert mapping of grounding
-  	hash_map<int,PredicateHashArray*>::iterator it;
-  	if ((it=zzpredIdToGndPredMap.find(predId)) == zzpredIdToGndPredMap.end())
-    	zzpredIdToGndPredMap[predId] = new PredicateHashArray;
+      // Add return constant to predicate
+    zzpredAppendConstant(zzpred, constantId, constName);
+      // Add constant terms to predicate
+    for (int i = 0; i < numTerms; i++)
+    {
+      const char* term = arguments[i].c_str();
+      int constId = zzdomain->getConstantId(term);
+      zzpredAppendConstant(zzpred, constId, term);
+    }
+    
+    zzcheckPredNumTerm(zzpred);
+    int predId = zzpred->getId();
+      // Insert mapping of grounding
+    hash_map<int,PredicateHashArray*>::iterator it;
+    if ((it=zzpredIdToGndPredMap.find(predId)) == zzpredIdToGndPredMap.end())
+      zzpredIdToGndPredMap[predId] = new PredicateHashArray;
 
 //cout << "Mapping " << endl;
 //zzpred->printWithStrVar(cout, zzdomain);
 //cout << " " << zzpred->getTruthValue() << endl;
   
-  	PredicateHashArray* pha = zzpredIdToGndPredMap[predId];
-  	if (pha->append(zzpred) < 0)
-  	{
+    PredicateHashArray* pha = zzpredIdToGndPredMap[predId];
+    if (pha->append(zzpred) < 0)
+    {
       int a = pha->find(zzpred);
       zzassert(a >= 0, "expecting ground predicate to be found");
       string origTvStr = (*pha)[a]->getTruthValueAsStr();
@@ -3866,17 +3748,17 @@ void zzinsertPermutationOfInternalFunction(int index, const FunctionTemplate* ft
         oss << "Duplicate ground predicate "; zzpred->print(oss, zzdomain); 
         oss << " found. ";
         if (origTvStr.compare(newTvStr) != 0)
-          oss << "Changed its truthValue from " << origTvStr << " to " <<newTvStr 
-              << endl;
+          oss << "Changed its truthValue from " << origTvStr << " to "
+              << newTvStr << endl;
         zzwarn(oss.str().c_str());
       }
-  	  delete zzpred;
+      delete zzpred;
     }
 
     free(predName);
-  	zzpred = NULL;
+    zzpred = NULL;
   }
-  
+  //delete returnConstants;
 }
 
 /**
@@ -3897,32 +3779,32 @@ void zzinsertPermutationOfInternalFunction(int index, const FunctionTemplate* ft
  * 
  */
 void zzinsertPermutationsOfInternalPredicate(int index,
-											 const PredicateTemplate* const& ptemplate,
-										     int numTerms, int currentTerm,
-										     Array<int>* currentConstants)
+                                      const PredicateTemplate* const& ptemplate,
+                                             int numTerms, int currentTerm,
+                                             Array<int>* currentConstants)
 {
   const Array<int>* constants =
-  	zzdomain->getConstantsByType(ptemplate->getTermTypeAsInt(currentTerm));
+    zzdomain->getConstantsByType(ptemplate->getTermTypeAsInt(currentTerm));
 
-  // Base case: at the last term
+    // Base case: at the last term
   if (currentTerm == numTerms - 1)
   {
-	for (int i = 0; i < constants->size(); i++)
-	{
-	  (*currentConstants)[currentTerm] = i;
-	  zzinsertPermutationOfInternalPredicate(index, ptemplate,
-	  									     numTerms, currentConstants);
-	}
-  	return;
+    for (int i = 0; i < constants->size(); i++)
+    {
+      (*currentConstants)[currentTerm] = i;
+      zzinsertPermutationOfInternalPredicate(index, ptemplate, numTerms,
+                                             currentConstants);
+    }
+    return;
   }
   
-  // Not yet at last term
-  zzinsertPermutationsOfInternalPredicate(index, ptemplate,
-  									 	  numTerms, currentTerm + 1, currentConstants);
+    // Not yet at last term
+  zzinsertPermutationsOfInternalPredicate(index, ptemplate, numTerms,
+                                          currentTerm + 1, currentConstants);
   
   if (++(*currentConstants)[currentTerm] < constants->size())
-	zzinsertPermutationsOfInternalPredicate(index, ptemplate,
-  									        numTerms, currentTerm, currentConstants);
+    zzinsertPermutationsOfInternalPredicate(index, ptemplate, numTerms,
+                                            currentTerm, currentConstants);
 
   (*currentConstants)[currentTerm] = 0;
   return;
@@ -3947,32 +3829,32 @@ void zzinsertPermutationsOfInternalPredicate(int index,
  * 
  */
 void zzinsertPermutationsOfInternalFunction(int index,
-											const FunctionTemplate* const& ftemplate,
-										    int numTerms, int currentTerm,
-										    Array<int>* currentConstants)
+                                       const FunctionTemplate* const& ftemplate,
+                                       int numTerms, int currentTerm,
+                                       Array<int>* currentConstants)
 {
   const Array<int>* constants =
-  	zzdomain->getConstantsByType(ftemplate->getTermTypeAsInt(currentTerm));
+    zzdomain->getConstantsByType(ftemplate->getTermTypeAsInt(currentTerm));
 
-  // Base case: at the last term
+    // Base case: at the last term
   if (currentTerm == numTerms - 1)
   {
-	for (int i = 0; i < constants->size(); i++)
-	{
-	  (*currentConstants)[currentTerm] = i;
-	  zzinsertPermutationOfInternalFunction(index, ftemplate,
-	  									    numTerms, currentConstants);
-	}
-  	return;
+    for (int i = 0; i < constants->size(); i++)
+    {
+      (*currentConstants)[currentTerm] = i;
+      zzinsertPermutationOfInternalFunction(index, ftemplate, numTerms,
+                                            currentConstants);
+    }
+    return;
   }
   
-  // Not yet at last term
-  zzinsertPermutationsOfInternalFunction(index, ftemplate,
-  									     numTerms, currentTerm + 1, currentConstants);
+    // Not yet at last term
+  zzinsertPermutationsOfInternalFunction(index, ftemplate, numTerms,
+                                         currentTerm + 1, currentConstants);
   
   if (++(*currentConstants)[currentTerm] < constants->size())
-	zzinsertPermutationsOfInternalFunction(index, ftemplate,
-  									       numTerms, currentTerm, currentConstants);
+    zzinsertPermutationsOfInternalFunction(index, ftemplate, numTerms,
+                                           currentTerm, currentConstants);
 
   (*currentConstants)[currentTerm] = 0;
   return;
@@ -3984,23 +3866,21 @@ void zzinsertPermutationsOfInternalFunction(int index,
  * @param index Index of the internal predicate
  */
 void zzgenerateGroundingsFromInternalPredicate(int index,
-											   const PredicateTemplate* const& ptemplate)
+                                      const PredicateTemplate* const& ptemplate)
 {
-  // Find number of terms for predicate
-  //const PredicateTemplate* ptemplate =
-  //	zzdomain->getPredicateTemplate(zzinternalPredicates[index][0]);
-
+    // Find number of terms for predicate
   if (ptemplate != NULL)
   {
     int numTerms = ptemplate->getNumTerms();
 
-    // Insert all possible permutations of constants
+      // Insert all possible permutations of constants
     const Array<int>* termTypes = ptemplate->getTermTypesAsInt();
     zzassert(numTerms == termTypes->size(),
-  	    	 "Number of terms and term types in predicate don't match");
+             "Number of terms and term types in predicate don't match");
     Array<int>* currentConstants = new Array<int>;
     for (int i = 0; i < numTerms; i++) currentConstants->append(0);
-    zzinsertPermutationsOfInternalPredicate(index, ptemplate, numTerms, 0, currentConstants);
+    zzinsertPermutationsOfInternalPredicate(index, ptemplate, numTerms, 0,
+                                            currentConstants);
     delete currentConstants;
   }
   return;
@@ -4012,23 +3892,21 @@ void zzgenerateGroundingsFromInternalPredicate(int index,
  * @param index Index of the internal function
  */
 void zzgenerateGroundingsFromInternalFunction(int index,
-											  const FunctionTemplate* const& ftemplate)
+                                       const FunctionTemplate* const& ftemplate)
 {
   // Find number of terms for function
-  //const FunctionTemplate* ftemplate =
-  	//zzdomain->getFunctionTemplate(zzinternalFunctions[index][0]);
-  	
   if (ftemplate != NULL)
   {
     int numTerms = ftemplate->getNumTerms();
 
-    // Insert all possible permutations of constants
+      // Insert all possible permutations of constants
     const Array<int>* termTypes = ftemplate->getTermTypesAsInt();
     zzassert(numTerms == termTypes->size(),
-  		   "Number of terms and term types in predicate don't match");
+             "Number of terms and term types in predicate don't match");
     Array<int>* currentConstants = new Array<int>;
     for (int i = 0; i < numTerms; i++) currentConstants->append(0);
-    zzinsertPermutationsOfInternalFunction(index, ftemplate, numTerms, 0, currentConstants);
+    zzinsertPermutationsOfInternalFunction(index, ftemplate, numTerms, 0,
+                                           currentConstants);
     delete currentConstants;
   }
   return;
@@ -4038,78 +3916,61 @@ void zzgenerateGroundingsFromInternalFunction(int index,
  * Generates all valid groundings from internally implemented predicates and
  * functions  (see internalPredicates and internalFunctions).
  * 
- * @param domain The domain from which the predicate / function names and constants
- * are used
+ * @param domain The domain from which the predicate / function names and
+ * constants are used
  * 
  */
 void zzgenerateGroundingsFromInternalPredicatesAndFunctions()
 {
-  // Look at each predicate
-  //for (int i = 0; i < zzinternalPredicates.size(); i++)
-  //{
-  	//const char* predName = zzinternalPredicates[i][0];
-  	//if (zzdomain->getPredicateId(predName) >= 0)
-  	//{
-	  //cout << "Found internal predicate: " << zzinternalPredicates[i][0] << endl;
-  	  //zzgenerateGroundingsFromInternalPredicate(i);
-  	//}
-  //}
-
-  // Look at each predicate
+    // Look at each predicate
   for (int i = 0; i < zzdomain->getNumPredicates(); i++)
   {
-  	const PredicateTemplate* ptemplate = zzdomain->getPredicateTemplate(i);
-  	if (ptemplate->isInternalPredicateTemplate())
-  	{
-	  cout << "Found internal predicate: " << ptemplate->getName() << endl;
-	  for (int j = 0; j < zzinternalPredicates.size(); j++)
-	  {
-	  	if (strncmp(ptemplate->getName(), zzinternalPredicates[j][0],
-	  				strlen(zzinternalPredicates[j][0])) == 0)
-	  	{
-	  	  zzgenerateGroundingsFromInternalPredicate(j, ptemplate);
-	  	  break;
-	  	}
-	  }
-  	}
+    const PredicateTemplate* ptemplate = zzdomain->getPredicateTemplate(i);
+    if (ptemplate->isInternalPredicateTemplate())
+    {
+      cout << "Found internal predicate: " << ptemplate->getName() << endl;
+      for (int j = 0; j < zzinternalPredicates.size(); j++)
+      {
+cout << "h1" << endl;
+        if (strncmp(ptemplate->getName(), zzinternalPredicates[j][0],
+                    strlen(zzinternalPredicates[j][0])) == 0)
+        {
+cout << "h2" << endl;
+          zzgenerateGroundingsFromInternalPredicate(j, ptemplate);
+cout << "h3" << endl;
+          break;
+        }
+cout << "h4" << endl;
+      }
+    }
   }
 
-  // Look at each function
-  //for (int i = 0; i < zzinternalFunctions.size(); i++)
-  //{
-  	//const char* funcName = zzinternalFunctions[i][0];
-  	//if (zzdomain->getFunctionId(funcName) >= 0)
-  	//{
-	  //cout << "Found internal function: " << zzinternalFunctions[i][0] << endl;
-  	  //zzgenerateGroundingsFromInternalFunction(i);
-  	//}
-  //}
-
-  // Look at each function
+    // Look at each function
   for (int i = 0; i < zzdomain->getNumFunctions(); i++)
   {
-  	const FunctionTemplate* ftemplate = zzdomain->getFunctionTemplate(i);
-  	if (ftemplate->isInternalFunctionTemplate())
-  	{
-	  cout << "Found internal function: " << ftemplate->getName() << endl;
-	  for (int j = 0; j < zzinternalFunctions.size(); j++)
-	  {
-	  	if (strncmp(ftemplate->getName(), zzinternalFunctions[j][0],
-	  				strlen(zzinternalFunctions[j][0])) == 0)
-	  	{
-	  	  zzgenerateGroundingsFromInternalFunction(j, ftemplate);
-	  	  break;
-	  	}
-	  }
-  	}
+    const FunctionTemplate* ftemplate = zzdomain->getFunctionTemplate(i);
+    if (ftemplate->isInternalFunctionTemplate())
+    {
+      cout << "Found internal function: " << ftemplate->getName() << endl;
+      for (int j = 0; j < zzinternalFunctions.size(); j++)
+      {
+        if (strncmp(ftemplate->getName(), zzinternalFunctions[j][0],
+                    strlen(zzinternalFunctions[j][0])) == 0)
+        {
+          zzgenerateGroundingsFromInternalFunction(j, ftemplate);
+          break;
+        }
+      }
+    }
   }
 
   return;
 }
 
-void zzcreateInternalPredTemplate(const string& predName, const char* const & ttype)
+void zzcreateInternalPredTemplate(const string& predName,
+                                  const char* const & ttype)
 {
-  // If already declared then return
+    // If already declared then return
   if (zzdomain->getPredicateId(predName.c_str()) >= 0) return;
   int index;
   string baseName = predName.substr(0, predName.find_last_of("_"));
@@ -4117,29 +3978,27 @@ void zzcreateInternalPredTemplate(const string& predName, const char* const & tt
   if ((index = zzfindInternalPredicate(baseName.c_str())) >= 0)
   {
     zzassert(zzdomain->getFunctionId(predName.c_str()) < 0, 
-  	       "not expecting pred name to be declared as a function name");
+             "not expecting pred name to be declared as a function name");
     PredicateTemplate* ptemplate = new PredicateTemplate();
-  	ptemplate->setName(predName.c_str());
+    ptemplate->setName(predName.c_str());
  	
-  	// Add types
-  	for (int j = 1; j < zzinternalPredicates[index].size(); j++)
-  	{
-  	  int id;
-  	  //const char* ttype = zzinternalPredicates[index][j];
-  	  if (!zzdomain->isType(ttype))
-  	  {
-		id = zzaddTypeToDomain(zzdomain, ttype);
-  		zzassert(id >= 0, "expecting var id >= 0");
-  	  }
-  	  zzaddType(ttype, ptemplate, NULL, false, zzdomain);
-	  //delete [] ttype;
-  	}
-  	
-   	// Add template to domain
-  	zzassert(ptemplate, "not expecting ptemplate==NULL");
-	int id = zzdomain->addPredicateTemplate(ptemplate);
-  	zzassert(id >= 0, "expecting pred template id >= 0");
-  	ptemplate->setId(id);
+      // Add types
+    for (int j = 1; j < zzinternalPredicates[index].size(); j++)
+    {
+      int id;
+      if (!zzdomain->isType(ttype))
+      {
+        id = zzaddTypeToDomain(zzdomain, ttype);
+        zzassert(id >= 0, "expecting var id >= 0");
+      }
+      zzaddType(ttype, ptemplate, NULL, false, zzdomain);
+    }
+
+      // Add template to domain
+    zzassert(ptemplate, "not expecting ptemplate==NULL");
+    int id = zzdomain->addPredicateTemplate(ptemplate);
+    zzassert(id >= 0, "expecting pred template id >= 0");
+    ptemplate->setId(id);
   }
   else
     zzexit("Predicate %s is not an internal predicate.", predName.c_str());
@@ -4148,9 +4007,11 @@ void zzcreateInternalPredTemplate(const string& predName, const char* const & tt
 void zzsetInternalPredTypeName(const char* const & predName, const int& typeId)
 {
   const char * typeName = zzdomain->getTypeName(typeId);
-  string intPredName = PredicateTemplate::createInternalPredTypeName(predName, typeName);
+  string intPredName =
+    PredicateTemplate::createInternalPredTypeName(predName, typeName);
   zzcreateInternalPredTemplate(intPredName, typeName);
-  const PredicateTemplate* t = zzdomain->getPredicateTemplate(intPredName.c_str());
+  const PredicateTemplate* t =
+    zzdomain->getPredicateTemplate(intPredName.c_str());
   zzpred->setTemplate((PredicateTemplate*)t);
   zzassert(zzdomain->getPredicateTemplate(intPredName.c_str()) != NULL,
            "expect internal pred template != NULL");
@@ -4161,7 +4022,7 @@ void zzsetInternalPredTypeName(const char* const & predName, const int& typeId)
 void zzcreateInternalFuncTemplate(const string & funcName,
 								  const Array<string>& typeNames)
 {
-  // If already declared then return
+    // If already declared then return
   if (zzdomain->getFunctionId(funcName.c_str()) >= 0) return;
   int index;
   string baseName = funcName.substr(0, funcName.find_first_of("_"));
@@ -4169,88 +4030,88 @@ void zzcreateInternalFuncTemplate(const string & funcName,
   if ((index = zzfindInternalFunction(baseName.c_str())) >= 0)
   {
     zzassert(zzfuncTemplate==NULL, "expecting zzfuncTemplate==NULL");
-	zzfuncTemplate = new FunctionTemplate();
+    zzfuncTemplate = new FunctionTemplate();
 
-	// We are creating a new predicate as well
-  	zzassert(zzpredTemplate==NULL,"expecting zzpredTemplate==NULL");
-  	zzpredTemplate = new PredicateTemplate();
+      // We are creating a new predicate as well
+    zzassert(zzpredTemplate==NULL,"expecting zzpredTemplate==NULL");
+    zzpredTemplate = new PredicateTemplate();
 
-	zzassert(zzdomain->getPredicateId(funcName.c_str()) < 0, 
-    	     "not expecting func name to be declared as pred name");
-  	zzassert(zzfuncTemplate,"expecting zzfuncTemplate!=NULL");
-	zzfuncTemplate->setName(funcName.c_str());
+    zzassert(zzdomain->getPredicateId(funcName.c_str()) < 0, 
+             "not expecting func name to be declared as pred name");
+    zzassert(zzfuncTemplate,"expecting zzfuncTemplate!=NULL");
+    zzfuncTemplate->setName(funcName.c_str());
 
-	// Predicate name is PredicateTemplate::ZZ_RETURN_PREFIX + function name
-	char* predName;
-	predName = (char *)malloc((strlen(PredicateTemplate::ZZ_RETURN_PREFIX) +
-  							strlen(funcName.c_str()) + 1)*sizeof(char));
-	strcpy(predName, PredicateTemplate::ZZ_RETURN_PREFIX);
-	strcat(predName, funcName.c_str());
-    	
-	// Check that predicate has not been declared a function
-	zzassert(zzdomain->getFunctionId(predName) < 0, 
-  		     "not expecting pred name to be declared as a function name");
-  	zzassert(zzpredTemplate,"expecting zzpredTemplate!=NULL");
- 	zzpredTemplate->setName(predName);
-	free(predName);  
-  	
-  	// Add return type
-  	//const char* retTypeName = zzinternalFunctions[index][1];
-  	const char* retTypeName = typeNames[0].c_str();
+      // Predicate name is PredicateTemplate::ZZ_RETURN_PREFIX + function name
+    char* predName;
+    predName = (char *)malloc((strlen(PredicateTemplate::ZZ_RETURN_PREFIX) +
+                               strlen(funcName.c_str()) + 1)*sizeof(char));
+    strcpy(predName, PredicateTemplate::ZZ_RETURN_PREFIX);
+    strcat(predName, funcName.c_str());
 
-	if (!zzdomain->isType(retTypeName))
-  	{
-   	  int id = zzaddTypeToDomain(zzdomain, retTypeName);
+      // Check that predicate has not been declared a function
+    zzassert(zzdomain->getFunctionId(predName) < 0, 
+             "not expecting pred name to be declared as a function name");
+    zzassert(zzpredTemplate,"expecting zzpredTemplate!=NULL");
+    zzpredTemplate->setName(predName);
+    free(predName);  
+    
+      // Add return type
+    const char* retTypeName = typeNames[0].c_str();
+
+    if (!zzdomain->isType(retTypeName))
+    {
+      int id = zzaddTypeToDomain(zzdomain, retTypeName);
       zzassert(id >= 0, "expecting retTypeName's id >= 0");
-  	}
+    }
 
-	zzfuncTemplate->setRetTypeName(retTypeName, zzdomain);
-  	// We are creating a new predicate as well
-	zzaddType(retTypeName, zzpredTemplate, NULL, false, zzdomain);
+    zzfuncTemplate->setRetTypeName(retTypeName, zzdomain);
+      // We are creating a new predicate as well
+    zzaddType(retTypeName, zzpredTemplate, NULL, false, zzdomain);
   
-  	// Add types
-  	//for (int j = 2; j < zzinternalFunctions[index].size(); j++)
-  	for (int j = 1; j < typeNames.size(); j++)
-  	{
-  	  int id;
-  	  //const char* ttype = zzinternalFunctions[index][j];
-  	  const char* ttype = typeNames[j].c_str();
-  	  if (!zzdomain->isType(ttype))
-  	  {
-		id = zzaddTypeToDomain(zzdomain, ttype);
-  		zzassert(id >= 0, "expecting var id >= 0");
-  	  }
-  	  zzaddType(ttype, zzpredTemplate, NULL, false, zzdomain);
-	  // Add the type to the function too
-	  zzaddType(ttype, NULL, zzfuncTemplate, false, zzdomain);
-  	}
+      // Add types
+    for (int j = 1; j < typeNames.size(); j++)
+    {
+      int id;
+      const char* ttype = typeNames[j].c_str();
+      if (!zzdomain->isType(ttype))
+      {
+        id = zzaddTypeToDomain(zzdomain, ttype);
+        zzassert(id >= 0, "expecting var id >= 0");
+      }
+      zzaddType(ttype, zzpredTemplate, NULL, false, zzdomain);
+        // Add the type to the function too
+      zzaddType(ttype, NULL, zzfuncTemplate, false, zzdomain);
+    }
 
-  	// Add templates to domain
-  	zzassert(zzfuncTemplate, "expecting zzfuncTemplate != NULL");
-  	int id = zzdomain->addFunctionTemplate(zzfuncTemplate);
-  	zzassert(id >= 0, "expecting function template's id >= 0");
-  	zzfuncTemplate->setId(id);
-  	zzfuncTemplate = NULL;
+      // Add templates to domain
+    zzassert(zzfuncTemplate, "expecting zzfuncTemplate != NULL");
+    int id = zzdomain->addFunctionTemplate(zzfuncTemplate);
+    zzassert(id >= 0, "expecting function template's id >= 0");
+    zzfuncTemplate->setId(id);
+    zzfuncTemplate = NULL;
 
-  	zzassert(zzpredTemplate, "not expecting zzpredTemplate==NULL");
-  	int predId = zzdomain->addPredicateTemplate(zzpredTemplate);
-  	zzassert(predId >= 0, "expecting pred template id >= 0");
-  	zzpredTemplate->setId(predId);
-  	zzpredTemplate = NULL;  	
+    zzassert(zzpredTemplate, "not expecting zzpredTemplate==NULL");
+    int predId = zzdomain->addPredicateTemplate(zzpredTemplate);
+    zzassert(predId >= 0, "expecting pred template id >= 0");
+    zzpredTemplate->setId(predId);
+    zzpredTemplate = NULL;  	
   }
   else
     zzexit("Function %s is not an internal function.", funcName.c_str());
 }
 
-void zzsetInternalFuncTypeName(const char* const & funcName, const Array<int>& typeIds)
+void zzsetInternalFuncTypeName(const char* const & funcName,
+                               const Array<int>& typeIds)
 {
   Array<string> typeNames(typeIds.size());
   for (int i = 0; i < typeIds.size(); i++)
     typeNames.append(zzdomain->getTypeName(typeIds[i]));
-  string intFuncName = FunctionTemplate::createInternalFuncTypeName(funcName, typeNames);
+  string intFuncName =
+    FunctionTemplate::createInternalFuncTypeName(funcName, typeNames);
   zzcreateInternalFuncTemplate(intFuncName, typeNames);
   
-  const FunctionTemplate* t = zzdomain->getFunctionTemplate(intFuncName.c_str());
+  const FunctionTemplate* t =
+    zzdomain->getFunctionTemplate(intFuncName.c_str());
   zzfunc->setTemplate((FunctionTemplate*)t);
   zzassert(zzdomain->getFunctionTemplate(intFuncName.c_str()) != NULL,
            "expect internal func template != NULL");
@@ -4258,24 +4119,58 @@ void zzsetInternalFuncTypeName(const char* const & funcName, const Array<int>& t
   funclo->replace(funcName, intFuncName.c_str());
 }
 
-const FunctionTemplate* zzgetGenericInternalFunctionTemplate(const char* const & funcName)
+const FunctionTemplate* zzgetGenericInternalFunctionTemplate(
+                                                   const char* const & funcName)
 {
   zzassert(FunctionTemplate::isInternalFunctionTemplateName(funcName),
-  		   "expect internal function name");
+           "expect internal function name");
   int index = zzfindInternalFunction(funcName);
   FunctionTemplate* funcTemplate = new FunctionTemplate();
   funcTemplate->setName(funcName);
   	
-  	// Add return type
+    // Add return type
   funcTemplate->setRetTypeName(PredicateTemplate::ANY_TYPE_NAME, zzdomain);
   
-  	// Add types
+    // Add types
   for (int j = 2; j < zzinternalFunctions[index].size(); j++)
   {
-	  // Add the type to the function
-  	zzaddType(PredicateTemplate::ANY_TYPE_NAME, NULL, funcTemplate, false, zzdomain);
+      // Add the type to the function
+    zzaddType(PredicateTemplate::ANY_TYPE_NAME, NULL, funcTemplate, false,
+              zzdomain);
   }
   return funcTemplate;
+}
+
+/**
+ * Moves a term attached to the previous function / predicate to the current infix
+ * function. If the parser encounters a term, it is first attached to the current
+ * function / predicate. After encountering an infix function sign, the term has to
+ * be transferred via this method.
+ */
+void moveTermToInfixFunction()
+{
+    // top in zzpredFuncListObjs must be infix function, second to top is pred /
+    // func in which it is nested
+
+  Term* term = NULL;
+    // In a function
+  if (!zzfuncStack.empty())
+  {
+    Function* prevFunc = zzfuncStack.top();
+    term = prevFunc->removeLastTerm();
+  }
+    // Not in a function
+  else
+  {
+    zzassert(zzpred, "expecting to be in a predicate");
+    term = zzpred->removeLastTerm();
+  }
+  term->setParent(zzfunc, false);
+  zzfunc->appendTerm(term);
+  ListObj* lo = zzpredFuncListObjs.top();
+  zzpredFuncListObjs.pop();
+  lo->append((zzpredFuncListObjs.top())->removeLast());
+  zzpredFuncListObjs.push(lo);
 }
 
 #endif

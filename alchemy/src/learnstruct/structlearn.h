@@ -70,7 +70,7 @@
 #include "mln.h"
 //#include "pseudologlikelihood.h"
 #include "lbfgsb.h"
-#include "votedperceptron.h"
+#include "discriminativelearner.h"
 
 //class ExistFormula;
 /////////////////////// code to handle existential formulas //////////////////
@@ -1819,16 +1819,20 @@ class StructLearn
     
     ofstream out(fname.c_str());
     if (!out.good()) { cout << "ERROR: failed to open " <<fname<<endl;exit(-1);}
-        // output the predicate declaration
+
+      // output the predicate declaration
     out << "//predicate declarations" << endl;
     (*domains_)[0]->printPredicateTemplates(out);
     out << endl;
 
-		// output the function declarations
-	out << "//function declarations" << endl;
-	(*domains_)[0]->printFunctionTemplates(out);
-	out << endl;
-  
+      // output the function declarations
+    if ((*domains_)[0]->getNumFunctions() > 0) 
+    {
+      out << "//function declarations" << endl;
+      (*domains_)[0]->printFunctionTemplates(out);
+      out << endl;
+    }
+
     if (indexTrans_) indexTrans_->printClauseFormulaWts(out, false);
     else             mln0_->printMLNClausesFormulas(out, (*domains_)[0], false);
 

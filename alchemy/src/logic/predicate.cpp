@@ -160,17 +160,16 @@ void Predicate::createAllGroundings(const int& predId,
     assert(constArr->size() > 0);
     acc.appendArray(constArr);
   }
-  
-  
+
   while (acc.hasNextCombination())
   {
     Predicate* pred = new Predicate(pt);
     int constId;
     while (acc.nextItemInCombination(constId))
       pred->appendTerm(new Term(constId, (void*)pred, true));
-    returnArray.append(pred);
-    
+    returnArray.append(pred);    
   }
+  //acc.deleteArraysAndClear();  
 }
 
 //get all the groundings unifying with the term given 
@@ -180,7 +179,7 @@ void Predicate::createAllGroundingsUnifyingWithTerm(const int& predId,
                                     Array<Predicate*>& returnArray,
 									int termTypeId,int termConstId)
 {
-  Array<int> tmpArr;
+  Array<int>* tmpArr;
   const PredicateTemplate* pt = domain->getPredicateTemplate(predId);
   if (pt == NULL)
   {
@@ -200,16 +199,19 @@ void Predicate::createAllGroundingsUnifyingWithTerm(const int& predId,
   {
     int typeId = pt->getTermTypeAsInt(i);
     assert(typeId >= 0);
-	const Array<int>* constArr;
-    if(typeId != termTypeId) {
-	 constArr = domain->getConstantsByType(typeId);
-	} else {
-	 tmpArr.clear();
-	 tmpArr.append(termConstId);
-	 constArr = &tmpArr;
+    const Array<int>* constArr;
+    if (typeId != termTypeId)
+    {
+      constArr = domain->getConstantsByType(typeId);
 	}
-	assert(constArr->size() > 0);
-	acc.appendArray(constArr);
+    else
+    {
+      tmpArr = new Array<int>;
+      tmpArr->append(termConstId);
+      constArr = tmpArr;
+	}
+    assert(constArr->size() > 0);
+    acc.appendArray(constArr);
   }
   
   while (acc.hasNextCombination())
@@ -219,20 +221,36 @@ void Predicate::createAllGroundingsUnifyingWithTerm(const int& predId,
     while (acc.nextItemInCombination(constId))
       pred->appendTerm(new Term(constId, (void*)pred, true));
     returnArray.append(pred);
-    
   }
+  //acc.deleteArraysAndClear();
 }
 
 
-  //exactly one of  predReturnArray or constReturnArray must be NULL;
+/**
+ * Create groundings of predicate, taking into account vars may be shared.
+ * Exactly one of predReturnArray or constReturnArray must be NULL. If
+ * constReturnArray is NULL, then the generated predicates are stored in
+ * predReturnArray; otherwise arrays of the constant ids are stored in
+ * constReturnArray.
+ * Callers are responsible for deleting the parameters and their contents.
+ * 
+ * @param domain Domain in which this predicate exists.
+ * @param predReturnArray The groundings produced are placed in this Array.
+ * @param constReturnArray The constants produced are placed in this Array.
+ * @param grounding If non-negative, then only the grounding with this index
+ * is produced. This is the grounding-th combination of constants starting at
+ * 0.
+ */
 void Predicate::createAllGroundings(const Domain* const & domain,
                                     Array<Predicate*>* const & predReturnArray,
-                                    Array<int*>* const & constReturnArray)
+                                    Array<int*>* const & constReturnArray,
+                                    const int& grounding)
 {
   assert(predReturnArray == NULL || constReturnArray == NULL);
 
   if (isGrounded())
   {
+    if (grounding >= 0) assert(grounding == 0);
     if (predReturnArray)
       predReturnArray->append(new Predicate(*this));
     else
@@ -249,7 +267,6 @@ void Predicate::createAllGroundings(const Domain* const & domain,
     return;
   }
 
-
   Array<VarsGroundedType*> vgtArr;
   for (int i = 0; i < terms_->size(); i++)
   {
@@ -258,7 +275,7 @@ void Predicate::createAllGroundings(const Domain* const & domain,
     {
       int id = -(t->getId());
       assert(id > 0);
-      if (id >= vgtArr.size()) vgtArr.growToSize(id+1,NULL);
+      if (id >= vgtArr.size()) vgtArr.growToSize(id + 1,NULL);
       VarsGroundedType*& vgt = vgtArr[id];
       if (vgt == NULL) 
       {
@@ -280,33 +297,42 @@ void Predicate::createAllGroundings(const Domain* const & domain,
     acc.appendArray(domain->getConstantsByType(vgtArr[i]->typeId));
   }
 
+  int combination = 0;
   while (acc.hasNextCombination())
   {
     int i = 0;
     int constId;
     while (acc.nextItemInCombination(constId))
     {
-      Array<Term*>& vars = vgtArr[ negVarId[i] ]->vars;
+      Array<Term*>& vars = vgtArr[negVarId[i]]->vars;
       for (int j = 0; j < vars.size(); j++) vars[j]->setId(constId);
       i++;
     }
     
-    if (predReturnArray) 
-      predReturnArray->append(new Predicate(*this));
-    else
+      // If collecting all preds or we are at the right combination
+    if (grounding < 0 || grounding == combination)
     {
-      assert(constReturnArray);
-      int* constArr = new int[terms_->size()];
-      for (int j = 0; j < terms_->size(); j++) 
+      if (predReturnArray)
+        predReturnArray->append(new Predicate(*this));
+      else
       {
-        constArr[j] = (*terms_)[j]->getId();
-        assert(constArr[j] >= 0);
+        assert(constReturnArray);
+        int* constArr = new int[terms_->size()];
+        for (int j = 0; j < terms_->size(); j++) 
+        {
+          constArr[j] = (*terms_)[j]->getId();
+          assert(constArr[j] >= 0);
+        }
+        constReturnArray->append(constArr);
       }
-      constReturnArray->append(constArr);
+      if (grounding == combination) break;
     }
+    combination++;
   }
-
-    //restore
+  if (grounding >= 0) assert(combination == grounding);
+  //acc.deleteArraysAndClear();
+  
+    // Restore variables
   for (int i = 0; i < vgtArr.size(); i++) 
   {
     if (vgtArr[i] == NULL) continue;

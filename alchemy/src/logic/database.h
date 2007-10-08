@@ -66,6 +66,8 @@
 #ifndef DATABASE_H_JUN_28_2005
 #define DATABASE_H_JUN_28_2005
 
+#include <set>
+#include "hash.h"
 #include "groundpreds.h"
 #include "domain.h"
 #include "arraysaccessor.h"
@@ -73,13 +75,13 @@
 
   // Used by Database::paramMultByPred_. 
   // First value is the multiplier and the second is the class id.
-typedef pair<unsigned int, unsigned int> MultAndType;
+typedef pair<unsigned long long, unsigned int> MultAndType;
 
 const int dbdebug = 0;
 //const int dbdebug = 1;
 
-// T_INDEX = True, FA_INDEX = False and Active
-enum IndexType { T_INDEX = 0, FA_INDEX = 1, INDEX_TYPE_COUNT = 2 };
+// T_INDEX = True ev., F_INDEX = False ev., A_INDEX = Active ev.
+enum IndexType { T_INDEX = 0, F_INDEX = 1, A_INDEX = 2, INDEX_TYPE_COUNT = 3 };
 
 struct NumTrueFalse 
 { 
@@ -87,6 +89,30 @@ struct NumTrueFalse
   int numTrue; 
   int numFalse; 
 };
+
+
+////////////////////////////////// hash /////////////////////////////////
+class HashLongLong
+{
+ public:
+  size_t operator()(const unsigned long long ld) const
+  {
+    return (size_t)ld;
+  }
+};
+
+
+class EqualLongLong
+{
+ public:
+  bool operator()(const unsigned long long ld1, const unsigned long long ld2) const
+  { return ld1 == ld2; }
+};
+
+////////////////////////////////// containers /////////////////////////////////
+
+typedef hash_set<unsigned long long, HashLongLong, EqualLongLong>
+    LongLongHashSet;
 
 
 class Database
@@ -110,6 +136,7 @@ class Database
       const Array<int>* constIds = domain_->getConstantsByType(i);
       if (constIds->empty()) firstConstIdByType_[i] = (unsigned int)0;
       else                   firstConstIdByType_[i] = (*constIds)[0];
+      //delete constIds;
     }
 
     closedWorld_.growToSize(numFOPreds);
@@ -118,21 +145,21 @@ class Database
 	
     termMultByPred_.growToSize(numFOPreds, NULL);
 
-    truePredIdxSet_ = new Array<hash_set<int> >(numFOPreds);
-    falsePredIdxSet_ = new Array<hash_set<int> >(numFOPreds);
+    truePredIdxSet_ = new Array<LongLongHashSet >(numFOPreds);
+    falsePredIdxSet_ = new Array<LongLongHashSet >(numFOPreds);
     numberOfGroundings_.growToSize(numFOPreds);
     truePredIdxSet_->growToSize(numFOPreds);
     falsePredIdxSet_->growToSize(numFOPreds);
 
-    paramPredsArray_ = new Array<Array<Array<Array<Array<int>*>*>*>*>;
-    paramPredsArray_->growToSize(INDEX_TYPE_COUNT);
-      
-	  //Initialize inverse index
-    for(int idxType = 0; idxType < INDEX_TYPE_COUNT; idxType++)
-    {
-      (*paramPredsArray_)[idxType] = new Array<Array<Array<Array<int>*>*>*>;
-      (*paramPredsArray_)[idxType]->growToSize(numFOPreds, NULL);
-    }
+      //Initialize inverted index
+    trueEvIndex_ = 
+      new Array<hash_map<pair<unsigned int, unsigned int>, set<unsigned long long>,
+                         IntPairHash> >(numFOPreds);
+    trueEvIndex_->growToSize(numFOPreds);
+    activeIndex_ = 
+      new Array<hash_map<pair<unsigned int, unsigned int>, set<unsigned long long>,
+                         IntPairHash> >(numFOPreds);
+    activeIndex_->growToSize(numFOPreds);
 
     for (int i = 0; i < numFOPreds; i++)
     {
@@ -146,7 +173,7 @@ class Database
       Array<MultAndType>* matArr = new Array<MultAndType>;
       int numTermTypes = termTypes->size(); 
       matArr->growToSize(numTermTypes);
-      int curMult = 1;
+      unsigned long long curMult = 1;
       for (int j = numTermTypes-1; j >= 0; j--)
       {
         int typeId = (*termTypes)[j];
@@ -155,29 +182,11 @@ class Database
       }
       termMultByPred_[i] = matArr;
 
-        //Initialize inverse index for this predicate
-      for(int idxType = 0; idxType < INDEX_TYPE_COUNT; idxType++)
-      {
-        (*((*paramPredsArray_)[idxType]))[i] = new Array<Array<Array<int>*>*>;
-        (*((*paramPredsArray_)[idxType]))[i]->growToSize(t->getNumTerms());
-      }
-      	
       int numGnd = 1;
       for (int j = 0; j < t->getNumTerms(); j++)
       {
         int numConstByType =
           domain_->getNumConstantsByType(t->getTermTypeAsInt(j));
-        for(int idxType = 0; idxType < INDEX_TYPE_COUNT; idxType++)
-        {
-          (*((*((*paramPredsArray_)[idxType]))[i]))[j] = new Array<Array<int>*>;
-          (*((*((*paramPredsArray_)[idxType]))[i]))[j]->
-            growToSize(numConstByType);
-          for (int k = 0; k < numConstByType; k++)
-          {
-            (*((*((*((*paramPredsArray_)[idxType]))[i]))[j]))[k] =
-              new Array<int>;
-          }
-        }
         numGnd *= numConstByType;
       }
       numberOfGroundings_[i] = numGnd;
@@ -224,54 +233,27 @@ class Database
 	  }
 	}
 
-    if (db.paramPredsArray_)
+    if (db.trueEvIndex_)
     {
-      paramPredsArray_ = new Array<Array<Array<Array<Array<int>*>*>*>*>;
-      int size0 = db.paramPredsArray_->size();
-      paramPredsArray_->growToSize(size0);
-      
-      for(int idxType = 0; idxType < size0; idxType++)
+      trueEvIndex_ = 
+        new Array<hash_map<pair<unsigned int, unsigned int>, set<unsigned long long>,
+                           IntPairHash> >(db.trueEvIndex_->size());
+      trueEvIndex_->growToSize(db.trueEvIndex_->size());
+      for (int i = 0; i < db.trueEvIndex_->size(); i++)
       {
-        Array<Array<Array<Array<int>*>*>*>* arr1 =
-          ((*db.paramPredsArray_)[idxType]);
-        int size1 = arr1->size();
-        (*paramPredsArray_)[idxType] = new Array<Array<Array<Array<int>*>*>*>;
-        (*paramPredsArray_)[idxType]->growToSize(size1);
-        
-        for (int i = 0; i < size1; i++)
-        {
-          Array<Array<Array<int>*>*>* arr2 = ((*arr1)[i]);
-          if (arr2 == NULL) 
-          {
-            (*(*paramPredsArray_)[idxType])[i] = NULL;
-            continue;
-          }
-          int size2 = arr2->size();
-          (*(*paramPredsArray_)[idxType])[i] = new Array<Array<Array<int>*>*>;
-          (*(*paramPredsArray_)[idxType])[i]->growToSize(size2);
-          
-          for (int j = 0; j < size2; j++)
-          {
-            Array<Array<int>*>* arr3 = ((*arr2)[j]);
-            int size3 = arr3->size();
-            (*(*(*paramPredsArray_)[idxType])[i])[j] = new Array<Array<int>*>;
-            (*(*(*paramPredsArray_)[idxType])[i])[j]->growToSize(size3);
-            
-            for (int k = 0; k < size3; k++)
-            {
-              Array<int>* arr4 = ((*arr3)[k]);
-              int size4 = arr4->size();
-              (*(*(*(*paramPredsArray_)[idxType])[i])[j])[k] = new Array<int>;
-              (*(*(*(*paramPredsArray_)[idxType])[i])[j])[k]->growToSize(size4);
-              
-              for (int l = 0; l < size4; l++)
-              {
-                (*(*(*(*(*paramPredsArray_)[idxType])[i])[j])[k])[l] = 
-                  ((*arr4)[l]);
-              }
-            }
-          }
-        }
+        (*trueEvIndex_)[i] = (*db.trueEvIndex_)[i];
+      }
+    }
+
+    if (db.activeIndex_)
+    {
+      activeIndex_ = 
+        new Array<hash_map<pair<unsigned int, unsigned int>, set<unsigned long long>,
+                           IntPairHash> >(db.activeIndex_->size());
+      activeIndex_->growToSize(db.activeIndex_->size());
+      for (int i = 0; i < db.activeIndex_->size(); i++)
+      {
+        (*activeIndex_)[i] = (*db.activeIndex_)[i];
       }
     }
 
@@ -287,7 +269,7 @@ class Database
 	
 	if (db.truePredIdxSet_)
 	{
-	  truePredIdxSet_ = new Array<hash_set<int> >(db.truePredIdxSet_->size());
+	  truePredIdxSet_ = new Array<LongLongHashSet >(db.truePredIdxSet_->size());
 	  truePredIdxSet_->growToSize(db.truePredIdxSet_->size());
 	  for (int i = 0; i < db.truePredIdxSet_->size(); i++)
 	  {
@@ -297,7 +279,7 @@ class Database
 	
 	if (db.falsePredIdxSet_)
 	{	
-	  falsePredIdxSet_ = new Array<hash_set<int> >();
+	  falsePredIdxSet_ = new Array<LongLongHashSet >();
 	  falsePredIdxSet_->growToSize(db.falsePredIdxSet_->size());
 	  for (int i = 0; i < db.falsePredIdxSet_->size(); i++)
 	  	(*falsePredIdxSet_)[i] = (*db.falsePredIdxSet_)[i];
@@ -305,7 +287,7 @@ class Database
 	
 	if (db.activePredIdxSet_)
 	{
-	  activePredIdxSet_ = new Array<hash_set<int> >();
+	  activePredIdxSet_ = new Array<LongLongHashSet >();
 	  activePredIdxSet_->growToSize(db.activePredIdxSet_->size());
 	  for (int i = 0; i < db.activePredIdxSet_->size(); i++)
 	  	(*activePredIdxSet_)[i] = (*db.activePredIdxSet_)[i];
@@ -313,7 +295,7 @@ class Database
 	
 	if (db.evidencePredIdxSet_)
 	{
-	  evidencePredIdxSet_ = new Array<hash_set<int> >();
+	  evidencePredIdxSet_ = new Array<LongLongHashSet >();
 	  evidencePredIdxSet_->growToSize(db.evidencePredIdxSet_->size());
 	  for (int i = 0; i < db.evidencePredIdxSet_->size(); i++)
 	  	(*evidencePredIdxSet_)[i] = (*db.evidencePredIdxSet_)[i];
@@ -321,7 +303,7 @@ class Database
 
 	if (db.deactivatedPredIdxSet_)
 	{
-	  deactivatedPredIdxSet_ = new Array<hash_set<int> >();
+	  deactivatedPredIdxSet_ = new Array<LongLongHashSet >();
 	  deactivatedPredIdxSet_->growToSize(db.deactivatedPredIdxSet_->size());
 	  for (int i = 0; i < db.deactivatedPredIdxSet_->size(); i++)
 	  	(*deactivatedPredIdxSet_)[i] = (*db.deactivatedPredIdxSet_)[i];
@@ -359,36 +341,14 @@ class Database
 
     if (predIdToNumTF_)  { delete predIdToNumTF_; predIdToNumTF_ = NULL; }
 
-    if (paramPredsArray_)
-    {
-      int size0 = paramPredsArray_->size();
-      for(int idxType = 0; idxType < size0; idxType++)
-      {
-        Array<Array<Array<Array<int>*>*>*>* arr1 =
-          ((*paramPredsArray_)[idxType]);
-        int size1 = arr1->size();
-        
-        for (int i = 0; i < size1; i++)
-        {
-          Array<Array<Array<int>*>*>* arr2 = ((*arr1)[i]);
-          if (arr2 == NULL) 
-          {
-            continue;
-          }
-          int size2 = arr2->size();
-          
-          for (int j = 0; j < size2; j++)
-          {
-            Array<Array<int>*>* arr3 = ((*arr2)[j]);
-            arr3->deleteItemsAndClear();
-          }
-          arr2->deleteItemsAndClear();
-        }
-        arr1->deleteItemsAndClear();
-      }
-      paramPredsArray_->deleteItemsAndClear();
-      delete paramPredsArray_;
-    }
+    for (int i = 0; i < trueEvIndex_->size(); i++)
+      (*trueEvIndex_)[i].clear();
+    delete trueEvIndex_;
+
+    for (int i = 0; i < activeIndex_->size(); i++)
+      (*activeIndex_)[i].clear();
+    delete activeIndex_;
+
   }
   
   void compress()
@@ -409,13 +369,13 @@ class Database
     cout << "TRUE " << truePredIdxSet_->size() << endl;
     for (int i = 0; i < truePredIdxSet_->size(); i++)
     {
-      hash_set<int> hs = (*truePredIdxSet_)[i];
+      LongLongHashSet hs = (*truePredIdxSet_)[i];
       cout << i << ": " << hs.size() << endl;
     }
     cout << "FALSE " << falsePredIdxSet_->size() << endl;
     for (int i = 0; i < falsePredIdxSet_->size(); i++)
     {
-      hash_set<int> hs = (*falsePredIdxSet_)[i];
+      LongLongHashSet hs = (*falsePredIdxSet_)[i];
       cout << i << ": " << hs.size() << endl;
     }
     cout << "ACTIVE " << activePredIdxSet_->size() << endl;
@@ -435,36 +395,35 @@ class Database
     if ((lf && lazyFlag_) || (!lf && !lazyFlag_)) return;
 
       // If changing lazy flag, our lazy index sets become invalid
-      if (activePredIdxSet_)
-      {
-        for (int i = 0; i < activePredIdxSet_->size(); i++)
-          (*activePredIdxSet_)[i].clear();
-        delete activePredIdxSet_;
+    if (activePredIdxSet_)
+    {
+      for (int i = 0; i < activePredIdxSet_->size(); i++)
+        (*activePredIdxSet_)[i].clear();
+      delete activePredIdxSet_;
       activePredIdxSet_ = NULL;
-      }
-      if (evidencePredIdxSet_)
-      {
-        for (int i = 0; i < evidencePredIdxSet_->size(); i++)
-          (*evidencePredIdxSet_)[i].clear();
-        delete evidencePredIdxSet_;
+    }
+    if (evidencePredIdxSet_)
+    {
+      for (int i = 0; i < evidencePredIdxSet_->size(); i++)
+        (*evidencePredIdxSet_)[i].clear();
+      delete evidencePredIdxSet_;
       evidencePredIdxSet_ = NULL;
-      }
-      if (deactivatedPredIdxSet_)
-      {
-        for (int i = 0; i < deactivatedPredIdxSet_->size(); i++)
-          (*deactivatedPredIdxSet_)[i].clear();
-        delete deactivatedPredIdxSet_;
+    }
+    if (deactivatedPredIdxSet_)
+    {
+      for (int i = 0; i < deactivatedPredIdxSet_->size(); i++)
+        (*deactivatedPredIdxSet_)[i].clear();
+      delete deactivatedPredIdxSet_;
       deactivatedPredIdxSet_ = NULL;
-      }
-
+    }
     if (lf)
     {
       lazyFlag_ = true;
       int numFOPreds = domain_->getNumPredicates();
 
-      activePredIdxSet_ = new Array<hash_set<int> >(numFOPreds);
-      evidencePredIdxSet_ = new Array<hash_set<int> >(numFOPreds);
-      deactivatedPredIdxSet_ = new Array<hash_set<int> >(numFOPreds);
+      activePredIdxSet_ = new Array<LongLongHashSet >(numFOPreds);
+      evidencePredIdxSet_ = new Array<LongLongHashSet >(numFOPreds);
+      deactivatedPredIdxSet_ = new Array<LongLongHashSet >(numFOPreds);
       activePredIdxSet_->growToSize(numFOPreds);
       evidencePredIdxSet_->growToSize(numFOPreds);
       deactivatedPredIdxSet_->growToSize(numFOPreds);
@@ -523,7 +482,7 @@ class Database
       return actual;
     }
     
-    int idx = getIdxOfGndPredValues(pred);
+    unsigned long long idx = getIdxOfGndPredValues(pred);
     return getValue(idx, predId);
   }
   
@@ -536,7 +495,7 @@ class Database
     if (dbdebug >= 1) cout << "Calling database::getValue" << endl;     
     int predId = pred->getId();
     
-    int idx = getIdxOfGndPredValues(pred);
+    unsigned long long idx = getIdxOfGndPredValues(pred);
     return getValue(idx, predId);
   }
  
@@ -550,7 +509,7 @@ class Database
 	assert(lazyFlag_);
 	assert(((Predicate*)pred)->isGrounded());
     
-    int idx = getIdxOfGndPredValues(pred);
+    unsigned long long idx = getIdxOfGndPredValues(pred);
     return getActiveStatus(idx, pred->getId());
   }
   
@@ -563,7 +522,7 @@ class Database
     if (dbdebug >= 1) cout << "Calling database::getActiveStatus" << endl;
     assert(lazyFlag_);
 
-    int idx = getIdxOfGndPredValues(pred);
+    unsigned long long idx = getIdxOfGndPredValues(pred);
     return getActiveStatus(idx, pred->getId());
   }
   
@@ -578,7 +537,7 @@ class Database
 	assert(lazyFlag_);
 	assert(((Predicate*)pred)->isGrounded());
     
-    int idx = getIdxOfGndPredValues(pred);
+    unsigned long long idx = getIdxOfGndPredValues(pred);
     return getDeactivatedStatus(idx, pred->getId());
   }
   
@@ -591,7 +550,7 @@ class Database
     if (dbdebug >= 1) cout << "Calling database::getDeactivatedStatus" << endl;
     assert(lazyFlag_);
     
-    int idx = getIdxOfGndPredValues(pred);
+    unsigned long long idx = getIdxOfGndPredValues(pred);
     return getDeactivatedStatus(idx, pred->getId());
   }
     
@@ -605,7 +564,7 @@ class Database
     assert(lazyFlag_);
 	assert(((Predicate*)pred)->isGrounded());
 
-    int idx = getIdxOfGndPredValues(pred);
+    unsigned long long idx = getIdxOfGndPredValues(pred);
     return getEvidenceStatus(idx, pred->getId());
   }
   
@@ -618,7 +577,7 @@ class Database
     if (dbdebug >= 1) cout << "Calling database::getEvidenceStatus" << endl;
     assert(lazyFlag_);
 
-    int idx = getIdxOfGndPredValues(pred);
+    unsigned long long idx = getIdxOfGndPredValues(pred);
     return getEvidenceStatus(idx, pred->getId());
   }
   
@@ -700,7 +659,7 @@ class Database
     assert(((Predicate*)pred)->isGrounded());
     
     int predId = pred->getId();
-    int idx = getIdxOfGndPredValues(pred);
+    unsigned long long idx = getIdxOfGndPredValues(pred);
     return setActiveStatus(idx, predId, as, pred, NULL);
   }
   
@@ -718,7 +677,7 @@ class Database
     assert(lazyFlag_);
     
     int predId = pred->getId();
-    int idx = getIdxOfGndPredValues(pred);
+    unsigned long long idx = getIdxOfGndPredValues(pred);
     return setActiveStatus(idx, predId, as, NULL, pred);
   }
   
@@ -750,7 +709,7 @@ class Database
     assert(((Predicate*)pred)->isGrounded());
 	
     int predId = pred->getId();
-    int idx = getIdxOfGndPredValues(pred);
+    unsigned long long idx = getIdxOfGndPredValues(pred);
     return setDeactivatedStatus(idx, predId, das);
   }
   
@@ -769,7 +728,7 @@ class Database
     assert(lazyFlag_);
     
     int predId = pred->getId();
-    int idx = getIdxOfGndPredValues(pred);
+    unsigned long long idx = getIdxOfGndPredValues(pred);
     return setDeactivatedStatus(idx, predId, das);
   }
   
@@ -788,20 +747,20 @@ class Database
    */
   bool setEvidenceStatus(const Predicate* const & pred, const bool& es)
   {
-  	if (dbdebug >= 1) cout << "Calling database::setEvidenceStatus" << endl;
-	if (pred->isEqualPredWithType())
-	{
-  	  if (dbdebug >= 1) cout << "Returning true" << endl;
-	  return true;
-	}
-	//active preds can not be evidence
-	if (es) assert(!getActiveStatus(pred));
-				  
-	assert(lazyFlag_);
+    if (dbdebug >= 1) cout << "Calling database::setEvidenceStatus" << endl;
+    if (pred->isEqualPredWithType())
+    {
+      if (dbdebug >= 1) cout << "Returning true" << endl;
+      return true;
+    }
+      //active preds can not be evidence
+    if (es) assert(!getActiveStatus(pred));
+			  
+    assert(lazyFlag_);
     assert(((Predicate*)pred)->isGrounded());
 
     int predId = pred->getId();
-    int idx = getIdxOfGndPredValues(pred);
+    unsigned long long idx = getIdxOfGndPredValues(pred);
     return setEvidenceStatus(idx, predId, es);
   }
   
@@ -819,7 +778,7 @@ class Database
     assert(lazyFlag_);
 
     int predId = pred->getId();
-    int idx = getIdxOfGndPredValues(pred);
+    unsigned long long idx = getIdxOfGndPredValues(pred);
     return setEvidenceStatus(idx, predId, es);
   }
   
@@ -887,15 +846,19 @@ class Database
     // Caller should delete pred if required
   void addEvidenceGroundPredicate(Predicate* const & pred)
   {
-  	if (dbdebug >= 1)
+    if (dbdebug >= 1)
       cout << "Calling database::addEvidenceGroundPredicate" << endl;
-  	setValue(pred, pred->getTruthValue());
-  	  //Evidence status only needs to be set for open-world preds
-  	if (lazyFlag_ && !closedWorld_[pred->getId()])
-  	{
-  	  setEvidenceStatus(pred, true);
-  	}
-  	if (dbdebug >= 1) cout << "Returning" << endl;
+    setValue(pred, pred->getTruthValue());
+      // Evidence status only needs to be set for open-world preds
+    if (!closedWorld_[pred->getId()])
+    {
+      setEvidenceStatus(pred, true);
+    }
+    unsigned long long idx = getIdxOfGndPredValues(pred);
+      // Add to evidence index
+    if (pred->getTruthValue() == TRUE)
+      addToInvertedIndex(pred, idx, T_INDEX);
+    if (dbdebug >= 1) cout << "Returning" << endl;
   }
 
   int getNumGroundings(const int& predId) const
@@ -1007,7 +970,7 @@ class Database
   {
     PredicateHashArray* preds = new PredicateHashArray();
     
-    hash_set<int>::const_iterator it = (*truePredIdxSet_)[predId].begin();
+    LongLongHashSet::const_iterator it = (*truePredIdxSet_)[predId].begin();
     for (; it != (*truePredIdxSet_)[predId].end(); it++)
     {
         // Check if in evidence
@@ -1023,11 +986,10 @@ class Database
   }
   
   /**
-   * Retrieves indexed groundings of a predicate. The predicate must have
-   * exactly 2 terms. The indexed groundings are the true (and false and
-   * active) groundings of the (possibly partially grounded) predicate.
-   * Caller should delete indexedGndings and elements of indexedGndings, if
-   * necessary.
+   * Retrieves indexed groundings of a predicate. The indexed groundings are
+   * the true (and false and active) groundings of the (possibly partially
+   * grounded) predicate. Caller should delete indexedGndings and elements of
+   * indexedGndings, if necessary.
    * 
    * @param indexedGndings Groundings found are appended here.
    * @param pred Predicate whose groundings are found.
@@ -1038,91 +1000,232 @@ class Database
   						 Predicate* const & pred,
                          bool const & ignoreActivePreds)
   {
-    assert(pred->getNumTerms() == 2);
     int predId = pred->getId();
-
-    const Term* term0 = pred->getTerm(0);
-    const Term* term1 = pred->getTerm(1);
-	  
-	  // Both terms are grounded
-    if (term0->getType() == Term::CONSTANT &&
-        term1->getType() == Term::CONSTANT)
+      // All terms are grounded: just return itself
+    if (pred->isGrounded())
     {
         // Check if pred is true or, if getting active preds, active
       TruthValue tv = getValue(pred);
-      if (tv == TRUE || (!ignoreActivePreds && tv == FALSE))
+      if ((tv == TRUE) || 
+          (!ignoreActivePreds && getActiveStatus(pred)))
       {
         Predicate* p = new Predicate(*pred);
         indexedGndings->append(p);
       }
       return;
     }
+    
+      // No terms are grounded: Return truePredIdxSet_ and activePredIdxSet_
+    if (!pred->containsConstants())
+    {
+        // True gndings from truePredIdxSet_
+      LongLongHashSet::const_iterator it = (*truePredIdxSet_)[predId].begin();
+      for (; it != (*truePredIdxSet_)[predId].end(); it++)
+      {
+        Predicate* p = getPredFromIdx((*it), pred->getTemplate());
+        indexedGndings->append(p);
+      }
+        // active gndings from activePredIdxSet_ (just false gndings)
+      if (!ignoreActivePreds)
+      {
+          // Active gndings from activePredIdxSet_
+        LongLongHashSet::const_iterator ait =
+          (*activePredIdxSet_)[predId].begin();
+        for (; ait != (*activePredIdxSet_)[predId].end(); ait++)
+        {
+          Predicate* p = getPredFromIdx((*ait), pred->getTemplate());
+          indexedGndings->append(p);
+        }
+      }
+      return;
+    }
 
-	  // Neither term is grounded
-	if (term0->getType() != Term::CONSTANT && 
-        term1->getType() != Term::CONSTANT)
-	{
-	  const Array<int>* constArray =
-  	    domain_->getConstantsByType(pred->getTermTypeAsInt(0));
-	
-		//
-  	  for (int j = 0; j < constArray->size(); j++)
-  	  {
-  	  	int constIdx = domain_->getConstantIndexInType((*constArray)[j]);
-        Array<int>* preds =
-          (*(*(*(*paramPredsArray_)[T_INDEX])[predId])[0])[constIdx];
-        for (int i = 0; i < preds->size(); i++)
-  	  	{
-          Predicate* p = getPredFromIdx((*preds)[i], pred->getTemplate());
-		  indexedGndings->append(p);
-  	  	}
-  	  }
-  	
-	  if (!ignoreActivePreds)
-  	  {
-  	  	for (int j = 0; j < constArray->size(); j++)
-  	  	{
-  	  	  int constIdx = domain_->getConstantIndexInType((*constArray)[j]);
-          Array<int>* preds =
-            (*(*(*(*paramPredsArray_)[FA_INDEX])[predId])[0])[constIdx];
-          for (int i = 0; i < preds->size(); i++)
-  	      {
-            Predicate* p = getPredFromIdx((*preds)[i], pred->getTemplate());
-		  	indexedGndings->append(p);
-  	      }
-  	  	}
-  	  }	
-	  return;	
-	}
-	  // If we've reached here, then one term is grounded, the other isn't
-	int gndTerm = (term0->getType() == Term::CONSTANT) ? 0 : 1;
-	int constIdx =
-      domain_->getConstantIndexInType(pred->getTerm(gndTerm)->getId());
-    Array<int>* preds =
-      (*(*(*(*paramPredsArray_)[T_INDEX])[predId])[gndTerm])[constIdx];
-    for (int i = 0; i < preds->size(); i++)
-  	{
-      Predicate* p = getPredFromIdx((*preds)[i], pred->getTemplate());
-	  indexedGndings->append(p);
-  	 }
-  	  
-  	if (!ignoreActivePreds)
-  	{
-      Array<int>* preds =
-        (*(*(*(*paramPredsArray_)[FA_INDEX])[predId])[gndTerm])[constIdx];
-      for (int i = 0; i < preds->size(); i++)
-  	  {
-        Predicate* p = getPredFromIdx((*preds)[i], pred->getTemplate());
-		indexedGndings->append(p);
-  	  }
-  	}	
+      // Not all terms are grounded: Compute intersection of index sets
+    assert(predId < trueEvIndex_->size());
+    set<unsigned long long> trueIntersection;
+    set<unsigned long long> activeIntersection;
+    bool initial = true;
+      // For each constant, retrieve the groundings and merge them
+    for (int term = 0; term < pred->getNumTerms(); term++)
+    {
+      int constantId = pred->getTerm(term)->getId();
+        // If at a variable, do nothing
+      if (constantId < 0) continue;
+      pair<unsigned int, unsigned int> placeAndConstant(term, constantId);
+        // True index
+      if (initial)
+        trueIntersection = ((*trueEvIndex_)[predId])[placeAndConstant];
+      else
+      {
+        set<unsigned long long> tmpTrueIntersection;
+        set_intersection(trueIntersection.begin(), trueIntersection.end(),
+                         ((*trueEvIndex_)[predId])[placeAndConstant].begin(),
+                         ((*trueEvIndex_)[predId])[placeAndConstant].end(),
+                         inserter(tmpTrueIntersection,
+                                  tmpTrueIntersection.begin()));
+        trueIntersection = tmpTrueIntersection;
+      }
+        // Active index
+      if (!ignoreActivePreds)
+      {
+        if (initial)
+          activeIntersection = ((*activeIndex_)[predId])[placeAndConstant];
+        else
+        {
+          set<unsigned long long> tmpActiveIntersection;
+          set_intersection(activeIntersection.begin(),
+                           activeIntersection.end(),
+                           ((*activeIndex_)[predId])[placeAndConstant].begin(),
+                           ((*activeIndex_)[predId])[placeAndConstant].end(),
+                           inserter(tmpActiveIntersection,
+                                    tmpActiveIntersection.begin()));
+          activeIntersection = tmpActiveIntersection;
+        }
+      }
+      initial = false;
+    }    
+
+      // Now, intersection sets contain the intersections of groundings
+      // Make preds and append them to return array
+      // True intersection
+    set<unsigned long long>::const_iterator it = trueIntersection.begin();
+    for (; it != trueIntersection.end(); it++)
+    {
+      Predicate* p = getPredFromIdx((*it), pred->getTemplate());
+      indexedGndings->append(p);
+    }
+      // active intersection
+    if (!ignoreActivePreds)
+    {
+      it = activeIntersection.begin();
+      for (; it != activeIntersection.end(); it++)
+      {
+        Predicate* p = getPredFromIdx((*it), pred->getTemplate());
+        indexedGndings->append(p);
+      }
+    }
+    return;
+  }
+
+
+  /**
+   * Reindexes all predicates with new constant ids. This is necessary after
+   * constant ids have been changed.
+   * 
+   * @param oldToNewConstIds Mapping of old to new constant ids.
+   */
+  void changeConstantsToNewIds(hash_map<int,int>& oldToNewConstIds)
+  {
+      // Change in all Arrays of hash_sets
+      // - compute new first-const/multi, but do not overwrite old struc yet
+      // - update predIdSet 
+      //   . calls getIdOfGndValues/getPredFromIdx w. old first-const/multi
+      //   . compute new hashcode w. new first-const/multi
+      //   . update hashcode
+      // - update first-const/multi
+
+      // compute new first-const
+    int numTypes = domain_->getNumTypes();
+    Array<unsigned int> newfirstConstIdByType;
+    newfirstConstIdByType.growToSize(numTypes);
+    for (int i = 0; i < numTypes; i++)
+    {
+      assert(domain_->isType(i));
+      //const Array<int>* constIds = domain_->getConstantsByTypeWithExt(i);
+      const Array<int>* constIds = domain_->getConstantsByType(i);
+      if (constIds->empty()) newfirstConstIdByType[i] = (unsigned int)0;
+      else                   newfirstConstIdByType[i] = (*constIds)[0];
+      //delete constIds;
+      constIds = domain_->getConstantsByType(i);
+      //delete constIds;
+    }   
+      
+    // compute new termMultByPred_
+    int numFOPreds = domain_->getNumPredicates();
+    Array<Array<MultAndType>*> newtermMultByPred;
+    newtermMultByPred.growToSize(numFOPreds, NULL);
+    for (int i = 0; i < numFOPreds; i++)
+    {
+        // if this is a '=' pred, leave termMultByPred_[i]
+        // as NULL
+      const PredicateTemplate* t = domain_->getPredicateTemplate(i);
+      if (t->isEqualPredWithType()) continue;
+        
+      const Array<int>* termTypes = domain_->getPredicateTermTypesAsInt(i);
+      Array<MultAndType>* matArr = new Array<MultAndType>;
+      int numTermTypes = termTypes->size(); 
+      matArr->growToSize(numTermTypes);
+      unsigned long long curMult = 1;
+      for (int j = numTermTypes-1; j >= 0; j--)
+      {
+        int typeId = (*termTypes)[j];
+        (*matArr)[j] = MultAndType(curMult,typeId);
+        //curMult *= domain_->getNumConstantsByTypeWithExt(typeId);
+        curMult *= domain_->getNumConstantsByType(typeId);
+      }
+      //delete termMultByPred_[i];
+      newtermMultByPred[i] = matArr;
+    }
+
+      // update predIdSet: retrieve w. old DS, compute hashcode w. new DS
+    changeConstantsToNewIds(truePredIdxSet_, oldToNewConstIds,
+                            newfirstConstIdByType, newtermMultByPred);
+    changeConstantsToNewIds(falsePredIdxSet_, oldToNewConstIds,
+                            newfirstConstIdByType, newtermMultByPred);
+    changeConstantsToNewIds(activePredIdxSet_, oldToNewConstIds,
+                            newfirstConstIdByType, newtermMultByPred);
+    changeConstantsToNewIds(evidencePredIdxSet_, oldToNewConstIds,
+                            newfirstConstIdByType, newtermMultByPred);
+    changeConstantsToNewIds(deactivatedPredIdxSet_, oldToNewConstIds,
+                            newfirstConstIdByType, newtermMultByPred);
+
+      // update first-const/multi
+    firstConstIdByType_ = newfirstConstIdByType;
+    for (int i = 0; i < numFOPreds; i++)
+    {
+      delete termMultByPred_[i];
+    }
+    termMultByPred_ = newtermMultByPred;
   }
 
 
 
-
-
  private:
+
+  /**
+   * Retrieves a set of true or false ground predicates.
+   * 
+   * @param predId Id of predicate whose groundings should be retrieved.
+   * @param truthValue If true, true groundings are retrieved, otherwise
+   * false groundings.
+   * @param withEvidence If false, only non-evidence groundings are retrieved,
+   * otherwise evidence and non-evidence are retrieved.
+   */ 
+  const PredicateHashArray* getGndPreds(const int& predId,
+                                        const bool& truthValue,
+                                        const bool& withEvidence) const 
+  {
+    PredicateHashArray* preds = new PredicateHashArray();
+    LongLongHashSet predIdxSet;
+      // True or false preds?
+    if (truthValue) predIdxSet = (*truePredIdxSet_)[predId];
+    else predIdxSet = (*falsePredIdxSet_)[predId];
+
+    LongLongHashSet::const_iterator it = predIdxSet.begin();
+    for (; it != predIdxSet.end(); it++)
+    {
+        // Check if in evidence if only non-evidence are to be included
+      if (withEvidence ||
+          (*evidencePredIdxSet_)[predId].find(*it) ==
+          (*evidencePredIdxSet_)[predId].end())
+      {
+        Predicate* p = getPredFromIdx((*it),
+                                      domain_->getPredicateTemplate(predId));
+        preds->append(p);
+      }
+    }
+    return preds;
+  }
 
   /**
    * Get the index of the ground predicate in Predicate representation. This
@@ -1137,20 +1240,28 @@ class Database
    * 
    * @return Index of the Predicate.
    */  
-  int getIdxOfGndPredValues(const Predicate* const & pred) const
+  unsigned long long getIdxOfGndPredValues(const Predicate* const & pred,
+                            const Array<unsigned int> & currfirstConstIdByType,
+                    const Array<Array<MultAndType>*> & currtermMultByPred) const
   {
     int numTerms = pred->getNumTerms();
-    Array<MultAndType>* multAndTypes = termMultByPred_[pred->getId()];
-    int idx = 0;
+    Array<MultAndType>* multAndTypes = currtermMultByPred[pred->getId()];
+    unsigned long long idx = 0;
     for (int i = 0; i < numTerms; i++)
     {
       int constId = pred->getTerm(i)->getId();
       assert(constId >= 0);
         // idx += mutliplier * num of constants belonging to type d]);
       idx += (*multAndTypes)[i].first 
-        * (constId - firstConstIdByType_[(*multAndTypes)[i].second]);
+        * (constId - currfirstConstIdByType[(*multAndTypes)[i].second]);
     }
     return idx;
+  }
+
+    // default: use member vars
+  unsigned long long getIdxOfGndPredValues(const Predicate* const & pred) const
+  {
+    return getIdxOfGndPredValues(pred, firstConstIdByType_, termMultByPred_);
   }
 
   /**
@@ -1166,22 +1277,31 @@ class Database
    * 
    * @return Index of the GroundPredicate.
    */  
-  int getIdxOfGndPredValues(const GroundPredicate* const & pred) const
+  unsigned long long getIdxOfGndPredValues(const GroundPredicate* const & pred,
+                            const Array<unsigned int> & currfirstConstIdByType,
+                    const Array<Array<MultAndType>*> & currtermMultByPred) const
   {
     int numTerms = pred->getNumTerms();
-    Array<MultAndType>* multAndTypes = termMultByPred_[pred->getId()];
-    int idx = 0;
+    Array<MultAndType>* multAndTypes = currtermMultByPred[pred->getId()];
+    unsigned long long idx = 0;
     for (int i = 0; i < numTerms; i++)
     {
       int constId = pred->getTermId(i);
       assert(constId >= 0);
         // idx += mutliplier * num of constants belonging to type d]);
       idx += (*multAndTypes)[i].first 
-        * (constId - firstConstIdByType_[(*multAndTypes)[i].second]);
+        * (constId - currfirstConstIdByType[(*multAndTypes)[i].second]);
     }
     return idx;
   }
-  
+
+    // default: use member vars
+  unsigned long long getIdxOfGndPredValues(const GroundPredicate* const & pred)
+  const
+  {
+    return getIdxOfGndPredValues(pred, firstConstIdByType_, termMultByPred_);
+  }
+
   /**
    * Create a Predicate based on the index in this database and its template.
    * 
@@ -1190,28 +1310,84 @@ class Database
    * 
    * @return Predicate created.
    */
-  Predicate* getPredFromIdx(const int& idx,
+  Predicate* getPredFromIdx(unsigned long long idx,
+                            const PredicateTemplate* const & predTemplate,
+                            const Array<unsigned int> & currfirstConstIdByType,
+                    const Array<Array<MultAndType>*> & currtermMultByPred) const
+  {
+    Predicate* p = new Predicate(predTemplate);
+    Array<unsigned long long>* auxIdx =
+      new Array<unsigned long long>(predTemplate->getNumTerms());
+    auxIdx->growToSize(predTemplate->getNumTerms());
+    Array<MultAndType>* multAndTypes = currtermMultByPred[p->getId()];
+    for (int i = 0; i < predTemplate->getNumTerms(); i++)
+    {
+      unsigned long long aux = 0;
+      for (int j = 0; j < i; j++)
+      {
+        aux += (*auxIdx)[j] * ((*multAndTypes)[j].first);
+      }
+      (*auxIdx)[i] = (idx - aux) / (*multAndTypes)[i].first;
+      int constId =
+        (int)(*auxIdx)[i] + currfirstConstIdByType[(*multAndTypes)[i].second];
+      p->setTermToConstant(i, constId);
+    }
+    delete auxIdx;
+    return p;
+  }
+
+  Predicate* getPredFromIdx(unsigned long long idx,
                             const PredicateTemplate* const & predTemplate) const
   {
-	Predicate* p = new Predicate(predTemplate);
-	Array<int>* auxIdx = new Array<int>(predTemplate->getNumTerms());
-	auxIdx->growToSize(predTemplate->getNumTerms());
-	Array<MultAndType>* multAndTypes = termMultByPred_[p->getId()];
-	for (int i = 0; i < predTemplate->getNumTerms(); i++)
-	{
-	  int aux = 0;
-	  for (int j = 0; j < i; j++)
-	  {
-	  	aux += (*auxIdx)[j] * ((*multAndTypes)[j].first);
-	  }
-	  (*auxIdx)[i] = (idx - aux) / (*multAndTypes)[i].first;
-	  int constId = (*auxIdx)[i] +
-                    firstConstIdByType_[(*multAndTypes)[i].second];
-	  p->setTermToConstant(i, constId);
-	}
-	delete auxIdx;
-	return p;
+    return getPredFromIdx(idx, predTemplate, firstConstIdByType_,
+                          termMultByPred_);
   }
+
+  /**
+   * Reindexes all predicates in an Array of hash_sets with new constant ids.
+   * This is necessary after constant ids have been changed.
+   * 
+   * @param predIdxSets Array of hash_sets containing the pred indices
+   * @param oldToNewConstIds Mapping of old to new constant ids.
+   */
+  void changeConstantsToNewIds(Array<LongLongHashSet >* predIdxSets,
+                               hash_map<int,int>& oldToNewConstIds,
+                             const Array<unsigned int> & currfirstConstIdByType,
+                          const Array<Array<MultAndType>*> & currtermMultByPred)
+  {
+    for (int i = 0; i < predIdxSets->size(); i++)
+    {
+      LongLongHashSet newHashSet;
+      LongLongHashSet& predIdxSet = (*predIdxSets)[i];
+      LongLongHashSet::const_iterator it = predIdxSet.begin();
+      for (; it != predIdxSet.end(); it++)
+      {
+        Predicate* p = getPredFromIdx((*it), domain_->getPredicateTemplate(i));
+        
+        for (int j = 0; j < p->getNumTerms(); j++)
+        {
+          Term* t = (Term*) p->getTerm(j);
+          if (t->getType() == Term::CONSTANT)
+          {
+            int oldId = t->getId();
+            assert(oldToNewConstIds.find(oldId) != oldToNewConstIds.end());
+            t->setId(oldToNewConstIds[oldId]);
+          }
+        }
+
+        unsigned long long d = getIdxOfGndPredValues(p, currfirstConstIdByType,
+                                              currtermMultByPred);
+        newHashSet.insert(d);
+
+          // verify
+        p = getPredFromIdx(d, domain_->getPredicateTemplate(i),
+                           currfirstConstIdByType, currtermMultByPred);
+      }
+      assert(predIdxSet.size() == newHashSet.size());
+      (*predIdxSets)[i] = newHashSet;    
+    }
+  }
+
 
   /**
    * Get the truth value of a predicate in this database.
@@ -1219,9 +1395,9 @@ class Database
    * @param idx Index of the predicate in this database.
    * @param predId Id of the predicate.
    */
-  TruthValue getValue(const int& idx, const int& predId) const
+  TruthValue getValue(const unsigned long long& idx, const int& predId) const
   {
-    hash_set<int>::const_iterator it = (*truePredIdxSet_)[predId].find(idx);
+    LongLongHashSet::const_iterator it = (*truePredIdxSet_)[predId].find(idx);
     if (it != (*truePredIdxSet_)[predId].end())
     {
       if (dbdebug >= 1) cout << "returning TRUE" << endl;
@@ -1252,7 +1428,7 @@ class Database
    * @param idx Index of the predicate in this database.
    * @param predId Id of the predicate.
    */
-  bool getActiveStatus(const int& idx, const int& predId) const
+  bool getActiveStatus(const unsigned long long& idx, const int& predId) const
   { 
       // Evidence atoms can not be active
     if (getEvidenceStatus(idx, predId))
@@ -1277,7 +1453,7 @@ class Database
    * @param idx Index of the predicate in this database.
    * @param predId Id of the predicate.
    */  
-  bool getDeactivatedStatus(const int& idx, const int& predId) const
+  bool getDeactivatedStatus(const unsigned long long& idx, const int& predId) const
   {
       // Evidence atoms can not be active or deactivated
     if (getEvidenceStatus(idx, predId))
@@ -1302,7 +1478,7 @@ class Database
    * @param idx Index of the predicate in this database.
    * @param predId Id of the predicate.
    */
-  bool getEvidenceStatus(const int& idx, const int& predId) const
+  bool getEvidenceStatus(const unsigned long long& idx, const int& predId) const
   {
       // All closed-world preds are evidence
     if (closedWorld_[predId])
@@ -1365,7 +1541,7 @@ class Database
       return actual;
     }
 
-    int idx = getIdxOfGndPredValues(pred);
+    unsigned long long idx = getIdxOfGndPredValues(pred);
     int predId = pred->getId();
     return setValueHelper(idx, predId, flip, ttv, pred, NULL);
   }
@@ -1384,7 +1560,7 @@ class Database
                             const bool& flip, const TruthValue& ttv)
   {
     if (dbdebug >= 1) cout << "Calling database::setValueHelper" << endl;      
-    int idx = getIdxOfGndPredValues(pred);
+    unsigned long long idx = getIdxOfGndPredValues(pred);
     int predId = pred->getId();
     return setValueHelper(idx, predId, flip, ttv, NULL, pred);
   }
@@ -1393,7 +1569,7 @@ class Database
    * Sets the value of a predicate in this database.
    * 
    * Right now, pred and gndPred are being sent as parameters in order to
-   * utilize the inverse index. This needs to be fixed. Exactly one of pred
+   * utilize the inverted index. This needs to be fixed. Exactly one of pred
    * and gndPred must be NULL.
    * 
    * @param idx Index of the predicate in this database.
@@ -1404,7 +1580,7 @@ class Database
    * 
    * @return Previous value of the predicate in this database.
    */
-  TruthValue setValueHelper(const int& idx, const int& predId,
+  TruthValue setValueHelper(const unsigned long long& idx, const int& predId,
                             const bool& flip, const TruthValue& ttv,
                             const Predicate* const & pred,
                             const GroundPredicate* const & gndPred)
@@ -1430,34 +1606,12 @@ class Database
           assert(tv == FALSE);
           (*predIdToNumTF_)[predId].numTrue--;
           (*truePredIdxSet_)[predId].erase(idx);
-          if (lazyFlag_)
-          {
-            if (pred) removeFromInverseIndex(pred, idx, T_INDEX);
-            else if (gndPred) removeFromInverseIndex(gndPred, idx, T_INDEX);
-
-            if (getActiveStatus(idx, predId))
-            {
-              if (pred) addToInverseIndex(pred, idx, FA_INDEX);
-              else if (gndPred) addToInverseIndex(gndPred, idx, FA_INDEX);
-            }
-          }
         }
         else 
         { //FALSE->TRUE
           assert(oldtv == FALSE && tv == TRUE);
           (*predIdToNumTF_)[predId].numTrue++;
           (*truePredIdxSet_)[predId].insert(idx);
-          if (lazyFlag_)
-          {
-            if (pred) addToInverseIndex(pred, idx, T_INDEX);
-            else if (gndPred) addToInverseIndex(gndPred, idx, T_INDEX);
- 
-            if (getActiveStatus(idx, predId))
-            {
-              if (pred) removeFromInverseIndex(pred, idx, FA_INDEX);
-              else if (gndPred) removeFromInverseIndex(gndPred, idx, FA_INDEX);
-            }
-          }
         }
       }
       else
@@ -1468,24 +1622,11 @@ class Database
           { //UNKNOWN->TRUE
             (*predIdToNumTF_)[predId].numTrue++;
             (*truePredIdxSet_)[predId].insert(idx);
-            if (lazyFlag_)
-            {
-              if (pred) addToInverseIndex(pred, idx, T_INDEX);
-              else if (gndPred) addToInverseIndex(gndPred, idx, T_INDEX);
-            }
           }
           else
           { //UKNOWN->FALSE
             (*predIdToNumTF_)[predId].numFalse++;
             if (!performingInference_) (*falsePredIdxSet_)[predId].insert(idx);
-            if (lazyFlag_)
-            {
-              if (getActiveStatus(idx, predId))
-              {
-                if (pred) addToInverseIndex(pred, idx, FA_INDEX);
-                if (gndPred) addToInverseIndex(gndPred, idx, FA_INDEX);
-              }
-            }
           }
         }
         else
@@ -1493,23 +1634,10 @@ class Database
         {
           (*predIdToNumTF_)[predId].numTrue--;
           (*truePredIdxSet_)[predId].erase(idx);
-          if (lazyFlag_)
-          {
-            if (pred) removeFromInverseIndex(pred, idx, T_INDEX);
-            if (gndPred) removeFromInverseIndex(gndPred, idx, T_INDEX);
-          }
           if (tv == FALSE) 
           { //TRUE->FALSE
             (*predIdToNumTF_)[predId].numFalse++;
             if (!performingInference_) (*falsePredIdxSet_)[predId].insert(idx);
-            if (lazyFlag_)
-            {
-              if (getActiveStatus(idx, predId))
-              {
-                if (pred) addToInverseIndex(pred, idx, FA_INDEX);
-                if (gndPred) addToInverseIndex(gndPred, idx, FA_INDEX);
-              }
-            }
           }
         }
         else
@@ -1517,23 +1645,10 @@ class Database
           assert(oldtv == FALSE);
           (*predIdToNumTF_)[predId].numFalse--;
           if (!performingInference_) (*falsePredIdxSet_)[predId].erase(idx);
-          if (lazyFlag_)
-          {
-            if (getActiveStatus(idx, predId))
-            {
-              if (pred) removeFromInverseIndex(pred, idx, FA_INDEX);
-              else if (gndPred) removeFromInverseIndex(gndPred, idx, FA_INDEX);
-            }
-          }
           if (tv == TRUE)
           { //FALSE->TRUE
             (*predIdToNumTF_)[predId].numTrue++;
             (*truePredIdxSet_)[predId].insert(idx);
-            if (lazyFlag_)
-            {
-              if (pred) addToInverseIndex(pred, idx, T_INDEX);
-              else if (gndPred) addToInverseIndex(gndPred, idx, T_INDEX);
-            }
           }
         }          
       }
@@ -1547,12 +1662,12 @@ class Database
    * responsible for deleting pred.
    * 
    * Right now, pred and gndPred are being sent as parameters in order to
-   * utilize the inverse index. This needs to be fixed. Exactly one of pred
+   * utilize the inverted index. This needs to be fixed. Exactly one of pred
    * and gndPred must be NULL.
    * 
    * @return Previous active status of predicate.
    */
-  bool setActiveStatus(const int& idx, const int& predId,
+  bool setActiveStatus(const unsigned long long& idx, const int& predId,
                        const bool& as, const Predicate* const & pred,
                        const GroundPredicate* const & gndPred)
   {
@@ -1569,22 +1684,18 @@ class Database
         (*activePredIdxSet_)[predId].erase(idx);
       }
       
-      // If truth value is false then add to/remove from inverse index
+        // Add to/remove from inverted index
       if (lazyFlag_)
       {
-        TruthValue tv = getValue(idx, predId);
-        if (tv == FALSE)
+        if (as)
         {
-          if (as)
-          {
-            if (pred) addToInverseIndex(pred, idx, FA_INDEX);
-            else if (gndPred) addToInverseIndex(gndPred, idx, FA_INDEX);
-          }
-          else
-          {
-            if (pred) removeFromInverseIndex(pred, idx, FA_INDEX);
-            if (gndPred) removeFromInverseIndex(gndPred, idx, FA_INDEX);
-          }
+          if (pred) addToInvertedIndex(pred, idx, A_INDEX);
+          else if (gndPred) addToInvertedIndex(gndPred, idx, A_INDEX);
+        }
+        else
+        {
+          if (pred) removeFromInvertedIndex(pred, idx, A_INDEX);
+          if (gndPred) removeFromInvertedIndex(gndPred, idx, A_INDEX);
         }
       }
     }
@@ -1598,7 +1709,8 @@ class Database
    * 
    * @return Previous deactivated status of predicate.
    */
-  bool setDeactivatedStatus(const int& idx, const int& predId, const bool& das)
+  bool setDeactivatedStatus(const unsigned long long& idx, const int& predId,
+                            const bool& das)
   {
     bool olddas = getDeactivatedStatus(idx, predId);
     if (olddas != das)
@@ -1622,7 +1734,7 @@ class Database
    * 
    * @return Previous evidence status of predicate.
    */
-  bool setEvidenceStatus(const int& idx, const int& predId, const bool& es)
+  bool setEvidenceStatus(const unsigned long long& idx, const int& predId, const bool& es)
   {  
     bool oldes = getEvidenceStatus(idx, predId);
     if (oldes != es)
@@ -1643,41 +1755,111 @@ class Database
   /**
    * Add a predicate to the given index type.
    */
-  void addToInverseIndex(const Predicate* const & pred, const int& predIdx,
-                         IndexType idxType)
+  void addToInvertedIndex(const Predicate* const & pred, const unsigned long long& predIdx,
+                          IndexType idxType)
   {
-    int numTerms = pred->getNumTerms();
-    if (numTerms == 2)
+      // Assumption is: Predicate is grounded
+    assert(((Predicate*)pred)->isGrounded());
+    int predId = pred->getId();
+    assert(predId < trueEvIndex_->size());
+    for (int term = 0; term < pred->getNumTerms(); term++)
     {
-      int predId = pred->getId();
-      for (int term = 0; term < numTerms; term++)
+      int constantId = pred->getTerm(term)->getId();
+      assert(constantId >= 0);
+        // Insert this grounding for each constant term
+      pair<unsigned int, unsigned int> placeAndConstant(term, constantId);
+      pair<set<unsigned long long>::iterator, bool> prevElement;
+        // True index
+      if (idxType == T_INDEX)
       {
-        int constantId = pred->getTerm(term)->getId();
-        assert(constantId >= 0);
-        int constantIndex = domain_->getConstantIndexInType(constantId);
-        (*(*(*(*paramPredsArray_)[idxType])[predId])[term])
-          [constantIndex]->append(predIdx);
+        prevElement =
+          ((*trueEvIndex_)[predId])[placeAndConstant].insert(predIdx);
+          // prevElement.second is false if key already in set (assert that this
+          // is the same element as was tried to be inserted
+        if (!prevElement.second)
+          assert(predIdx == *(prevElement.first));
       }
-    }
+        // Active index
+      else if (idxType == A_INDEX)
+      {
+        prevElement =
+          ((*activeIndex_)[predId])[placeAndConstant].insert(predIdx);
+          // prevElement.second is false if key already in set (assert that this
+          // is the same element as was tried to be inserted
+        if (!prevElement.second)
+          assert(predIdx == *(prevElement.first));
+      }
+    }    
   }
 
   /**
    * Add a predicate to the given index type.
    */
-  void addToInverseIndex(const GroundPredicate* const & pred,
-                         const int& predIdx, IndexType idxType)
+  void addToInvertedIndex(const GroundPredicate* const & pred,
+                          const unsigned long long& predIdx, IndexType idxType)
   {
-    int numTerms = pred->getNumTerms();
-    if (numTerms == 2)
+    int predId = pred->getId();
+    assert(predId < trueEvIndex_->size());
+    for (unsigned int term = 0; term < pred->getNumTerms(); term++)
     {
-      int predId = pred->getId();
-      for (int term = 0; term < numTerms; term++)
+      int constantId = pred->getTermId(term);
+      assert(constantId >= 0);
+        // Insert this grounding for each constant term
+      pair<unsigned int, unsigned int> placeAndConstant(term, constantId);
+      pair<set<unsigned long long>::iterator, bool> prevElement;
+        // True index
+      if (idxType == T_INDEX)
       {
-        int constantId = pred->getTermId(term);
-        assert(constantId >= 0);
-        int constantIndex = domain_->getConstantIndexInType(constantId);
-        (*(*(*(*paramPredsArray_)[idxType])[predId])[term])
-          [constantIndex]->append(predIdx);
+        prevElement =
+          ((*trueEvIndex_)[predId])[placeAndConstant].insert(predIdx);
+          // prevElement.second is false if key already in set (assert that this
+          // is the same element as was tried to be inserted
+        if (!prevElement.second)
+          assert(predIdx == *(prevElement.first));
+      }
+        // False, active index
+      else if (idxType == A_INDEX)
+      {
+        prevElement =
+          ((*activeIndex_)[predId])[placeAndConstant].insert(predIdx);
+          // prevElement.second is false if key already in set (assert that this
+          // is the same element as was tried to be inserted
+        if (!prevElement.second)
+          assert(predIdx == *(prevElement.first));
+      }
+    }    
+  }
+
+  /**
+   * Remove a predicate from the given index type.
+   */
+  void removeFromInvertedIndex(const Predicate* const & pred,
+                               const unsigned long long& predIdx, IndexType idxType)
+  {
+      // Assumption is: Predicate is grounded
+    assert(((Predicate*)pred)->isGrounded());
+    int predId = pred->getId();
+    assert(predId < trueEvIndex_->size());
+    for (int term = 0; term < pred->getNumTerms(); term++)
+    {
+      int constantId = pred->getTerm(term)->getId();
+      assert(constantId >= 0);
+        // Remove this grounding for each possible constant term
+      pair<unsigned int, unsigned int> placeAndConstant(term, constantId);
+      pair<set<unsigned long long>::iterator, bool> prevElement;
+      int numErased = 0;
+        // True index
+      if (idxType == T_INDEX)
+      {
+        numErased = ((*trueEvIndex_)[predId])[placeAndConstant].erase(predIdx);
+        assert(numErased <= 1);
+      }
+        // False, active index
+      else if (idxType == A_INDEX)
+      {
+        numErased =
+          ((*activeIndex_)[predId])[placeAndConstant].erase(predIdx);
+        assert(numErased <= 1);
       }
     }
   }
@@ -1685,51 +1867,31 @@ class Database
   /**
    * Remove a predicate from the given index type.
    */
-  void removeFromInverseIndex(const Predicate* const & pred,
-                              const int& predIdx, IndexType idxType)
+  void removeFromInvertedIndex(const GroundPredicate* const & pred,
+                               const unsigned long long& predIdx, IndexType idxType)
   {
-    int numTerms = pred->getNumTerms();
-    if (numTerms == 2)
+    int predId = pred->getId();
+    assert(predId < trueEvIndex_->size());
+    for (unsigned int term = 0; term < pred->getNumTerms(); term++)
     {
-      int predId = pred->getId();
-      for (int term = 0; term < numTerms; term++)
+      int constantId = pred->getTermId(term);
+      assert(constantId >= 0);
+        // Remove this grounding for each possible constant term
+      pair<unsigned int, unsigned int> placeAndConstant(term, constantId);
+      pair<set<unsigned long long>::iterator, bool> prevElement;
+      int numErased = 0;
+        // True index
+      if (idxType == T_INDEX)
       {
-        int constantId = pred->getTerm(term)->getId();
-        assert(constantId >= 0);
-        int constantIndex = domain_->getConstantIndexInType(constantId);
-        int pos = (*(*(*(*paramPredsArray_)[idxType])[predId])[term])
-                    [constantIndex]->find(predIdx);
-        if (pos > -1)
-        {
-          (*(*(*(*paramPredsArray_)[idxType])[predId])[term])
-            [constantIndex]->removeItemFastDisorder(pos);
-        }
+        numErased = ((*trueEvIndex_)[predId])[placeAndConstant].erase(predIdx);
+        assert(numErased <= 1);
       }
-    }
-  }
-
-  /**
-   * Remove a predicate from the given index type.
-   */
-  void removeFromInverseIndex(const GroundPredicate* const & pred,
-                              const int& predIdx, IndexType idxType)
-  {
-    int numTerms = pred->getNumTerms();
-    if (numTerms == 2)
-    {
-      int predId = pred->getId();
-      for (int term = 0; term < numTerms; term++)
+        // Active index
+      else if (idxType == A_INDEX)
       {
-        int constantId = pred->getTermId(term);
-        assert(constantId >= 0);
-        int constantIndex = domain_->getConstantIndexInType(constantId);
-        int pos = (*(*(*(*paramPredsArray_)[idxType])[predId])[term])
-                    [constantIndex]->find(predIdx);
-        if (pos > -1)
-        {
-          (*(*(*(*paramPredsArray_)[idxType])[predId])[term])
-            [constantIndex]->removeItemFastDisorder(pos);
-        }
+        numErased =
+          ((*activeIndex_)[predId])[placeAndConstant].erase(predIdx);
+        assert(numErased <= 1);
       }
     }
   }
@@ -1769,31 +1931,37 @@ class Database
     //its actual value,so there's no efficiency penalty when searching the array
   Array<Predicate*> oppEqGndPreds_;
   
-    //The following structure implements the inverse index
-	//3 levels of indirection. First - the first order predicate
-    //the true list is for, second - parameter in the predicate it 
-    //is indexed, and third - value of the parameter it is
-    //indexed.
-  Array<Array<Array<Array<Array<int>*>*>*>*>* paramPredsArray_;
+    // Inverted index of true evidence ground atoms: For each predicate p,
+    // trueEvIndex_[p] contains a hash map mapping a pair of ints (argument
+    // number and constant id) to a set of true groundings.
+  Array<hash_map<pair<unsigned int, unsigned int>, set<unsigned long long>,
+                 IntPairHash> >* trueEvIndex_;
 
-	// Hash set of true ground atoms
-  Array<hash_set<int> >* truePredIdxSet_;
+    // Inverted index of active ground atoms: For each predicate p,
+    // activeIndex_[p] contains a hash map mapping a pair of ints (argument
+    // number and constant id) to a set of false, active groundings.
+  Array<hash_map<pair<unsigned int, unsigned int>, set<unsigned long long>,
+                 IntPairHash> >* activeIndex_;
+
+    // Hash set of true ground atoms
+  Array<LongLongHashSet >* truePredIdxSet_;
   
-	// Hash set of false ground atoms - only used for open world preds
-  Array<hash_set<int> >* falsePredIdxSet_;
+    // Hash set of false ground atoms - only used for open world preds
+  Array<LongLongHashSet >* falsePredIdxSet_;
 
-	// Hash set of active ground atoms
-  Array<hash_set<int> >* activePredIdxSet_;
+    // Hash set of active ground atoms
+  Array<LongLongHashSet >* activePredIdxSet_;
 
-	// Hash set of evidence ground atoms
-  Array<hash_set<int> >* evidencePredIdxSet_;
+    // Hash set of evidence ground atoms
+  Array<LongLongHashSet >* evidencePredIdxSet_;
   
-	// Hash set of deactivated ground atoms
-  Array<hash_set<int> >* deactivatedPredIdxSet_;
+    // Hash set of deactivated ground atoms
+  Array<LongLongHashSet >* deactivatedPredIdxSet_;
 
     // Total number of groundings for each predicate
-  Array<int> numberOfGroundings_;
+  Array<unsigned long long> numberOfGroundings_;
 };
+
 
 
 #endif

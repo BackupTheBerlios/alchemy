@@ -71,24 +71,52 @@ GroundClause::GroundClause(const Clause* const & c,
                            GroundPredicateHashArray* const & gndPredHashArray) 
   : wt_(c->getWt()), foClauseFrequencies_(NULL), parentWtPtrs_(NULL)
 {
+  if (gcdebug) cout << "Constructing GroundClause" << endl;
+  if (gcdebug)
+  {
+    cout << "Seen ground preds: " << endl;
+    for (int i = 0; i < gndPredHashArray->size(); i++)
+    {
+      (*gndPredHashArray)[i]->print(cout);
+      cout << endl;
+    }
+  }
+
   int numPreds = c->getNumPredicates();
+  if (gcdebug) cout << "Number of preds: " << numPreds << endl;
   gndPredIndexes_ = new Array<int>;
-  //gndPredIndexes_->growToSize(numPreds);
   Array<unsigned int>* intArrRep = new Array<unsigned int>;
 
     // For each predicate in clause c
   for (int i = 0; i < numPreds; i++)
   {
+    if (gcdebug) cout << "Looking at pred " << i << endl;
     bool deletePred = false;
     Predicate* pred = c->getPredicate(i);
+
+    if (gcdebug) cout << "Constructing GroundPredicate" << endl;
     GroundPredicate* gndPred = new GroundPredicate(pred);
+    assert(gndPred);
+    if (gcdebug)
+    {
+      cout << "Constructed GroundPredicate ";
+      gndPred->print(cout);
+      cout << endl;
+    }
+    
+    if (gcdebug) cout << "Finding GroundPredicate" << endl;
     int index = gndPredHashArray->find(gndPred);
+
+    if (gcdebug) cout << "Index of GroundPredicate: " << index << endl;
     if (index < 0 )
     { // Predicate not seen before: add it to hash array
+      if (gcdebug) cout << "Pred " << i << " not seen before" << endl;
       index = gndPredHashArray->append(gndPred) + 1;
+      if (gcdebug) cout << "Appended it" << endl;
     }
     else
     { // Predicate seen before: must be deleted later
+      if (gcdebug) cout << "Pred " << i << " seen before" << endl;
       deletePred = true;
       index++;
     }
@@ -130,8 +158,8 @@ void GroundClause::appendToGndPreds(
     bool sense = ((*gndPredIndexes_)[i] > 0);
     int index = abs((*gndPredIndexes_)[i]) - 1;
       // Tell the ground pred that it occurs in this ground clause
-    bool ok = (*gndPredHashArray)[index]->appendGndClause(this, sense);
-    assert(ok); ok = true;  // avoid compilation warning
+    (*gndPredHashArray)[index]->appendGndClause(this, sense);
+    //assert(ok); ok = true;  // avoid compilation warning
   }
 }
 
