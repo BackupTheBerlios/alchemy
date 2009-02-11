@@ -2,11 +2,11 @@
  * All of the documentation and software included in the
  * Alchemy Software is copyrighted by Stanley Kok, Parag
  * Singla, Matthew Richardson, Pedro Domingos, Marc
- * Sumner and Hoifung Poon.
+ * Sumner, Hoifung Poon, and Daniel Lowd.
  * 
  * Copyright [2004-07] Stanley Kok, Parag Singla, Matthew
- * Richardson, Pedro Domingos, Marc Sumner and Hoifung
- * Poon. All rights reserved.
+ * Richardson, Pedro Domingos, Marc Sumner, Hoifung
+ * Poon, and Daniel Lowd. All rights reserved.
  * 
  * Contact: Pedro Domingos, University of Washington
  * (pedrod@cs.washington.edu).
@@ -28,8 +28,8 @@
  * of this software must display the following
  * acknowledgment: "This product includes software
  * developed by Stanley Kok, Parag Singla, Matthew
- * Richardson, Pedro Domingos, Marc Sumner and Hoifung
- * Poon in the Department of Computer Science and
+ * Richardson, Pedro Domingos, Marc Sumner, Hoifung
+ * Poon, and Daniel Lowd in the Department of Computer Science and
  * Engineering at the University of Washington".
  * 
  * 4. Your publications acknowledge the use or
@@ -105,7 +105,8 @@ class HashLongLong
 class EqualLongLong
 {
  public:
-  bool operator()(const unsigned long long ld1, const unsigned long long ld2) const
+  bool operator()(const unsigned long long ld1, const unsigned long long ld2)
+  const
   { return ld1 == ld2; }
 };
 
@@ -113,6 +114,10 @@ class EqualLongLong
 
 typedef hash_set<unsigned long long, HashLongLong, EqualLongLong>
     LongLongHashSet;
+
+typedef hash_map<pair<unsigned int, unsigned int>, set<unsigned long long>,
+                 IntPairHash>
+    LongLongHashMap;
 
 
 class Database
@@ -133,10 +138,10 @@ class Database
     for (int i = 0; i < numTypes; i++)
     {
       assert(domain_->isType(i));
-      const Array<int>* constIds = domain_->getConstantsByType(i);
+      const Array<int>* constIds = domain_->getConstantsByTypeWithExt(i);
       if (constIds->empty()) firstConstIdByType_[i] = (unsigned int)0;
       else                   firstConstIdByType_[i] = (*constIds)[0];
-      //delete constIds;
+      delete constIds;
     }
 
     closedWorld_.growToSize(numFOPreds);
@@ -145,20 +150,18 @@ class Database
 	
     termMultByPred_.growToSize(numFOPreds, NULL);
 
-    truePredIdxSet_ = new Array<LongLongHashSet >(numFOPreds);
-    falsePredIdxSet_ = new Array<LongLongHashSet >(numFOPreds);
+    truePredIdxSet_ = new Array<LongLongHashSet>(numFOPreds);
+    falsePredIdxSet_ = new Array<LongLongHashSet>(numFOPreds);
     numberOfGroundings_.growToSize(numFOPreds);
     truePredIdxSet_->growToSize(numFOPreds);
     falsePredIdxSet_->growToSize(numFOPreds);
 
       //Initialize inverted index
-    trueEvIndex_ = 
-      new Array<hash_map<pair<unsigned int, unsigned int>, set<unsigned long long>,
-                         IntPairHash> >(numFOPreds);
+    trueEvIndex_ = new Array<LongLongHashMap>(numFOPreds);
     trueEvIndex_->growToSize(numFOPreds);
-    activeIndex_ = 
-      new Array<hash_map<pair<unsigned int, unsigned int>, set<unsigned long long>,
-                         IntPairHash> >(numFOPreds);
+    falseEvIndex_ = new Array<LongLongHashMap>(numFOPreds);
+    falseEvIndex_->growToSize(numFOPreds);
+    activeIndex_ = new Array<LongLongHashMap>(numFOPreds);
     activeIndex_->growToSize(numFOPreds);
 
     for (int i = 0; i < numFOPreds; i++)
@@ -178,7 +181,7 @@ class Database
       {
         int typeId = (*termTypes)[j];
         (*matArr)[j] = MultAndType(curMult,typeId);
-        curMult *= domain_->getNumConstantsByType(typeId);
+        curMult *= domain_->getNumConstantsByTypeWithExt(typeId);
       }
       termMultByPred_[i] = matArr;
 
@@ -235,9 +238,7 @@ class Database
 
     if (db.trueEvIndex_)
     {
-      trueEvIndex_ = 
-        new Array<hash_map<pair<unsigned int, unsigned int>, set<unsigned long long>,
-                           IntPairHash> >(db.trueEvIndex_->size());
+      trueEvIndex_ = new Array<LongLongHashMap>(db.trueEvIndex_->size());
       trueEvIndex_->growToSize(db.trueEvIndex_->size());
       for (int i = 0; i < db.trueEvIndex_->size(); i++)
       {
@@ -245,11 +246,19 @@ class Database
       }
     }
 
+    if (db.falseEvIndex_)
+    {
+      falseEvIndex_ = new Array<LongLongHashMap>(db.falseEvIndex_->size());
+      falseEvIndex_->growToSize(db.falseEvIndex_->size());
+      for (int i = 0; i < db.falseEvIndex_->size(); i++)
+      {
+        (*falseEvIndex_)[i] = (*db.falseEvIndex_)[i];
+      }
+    }
+
     if (db.activeIndex_)
     {
-      activeIndex_ = 
-        new Array<hash_map<pair<unsigned int, unsigned int>, set<unsigned long long>,
-                           IntPairHash> >(db.activeIndex_->size());
+      activeIndex_ = new Array<LongLongHashMap>(db.activeIndex_->size());
       activeIndex_->growToSize(db.activeIndex_->size());
       for (int i = 0; i < db.activeIndex_->size(); i++)
       {
@@ -269,7 +278,7 @@ class Database
 	
 	if (db.truePredIdxSet_)
 	{
-	  truePredIdxSet_ = new Array<LongLongHashSet >(db.truePredIdxSet_->size());
+	  truePredIdxSet_ = new Array<LongLongHashSet>(db.truePredIdxSet_->size());
 	  truePredIdxSet_->growToSize(db.truePredIdxSet_->size());
 	  for (int i = 0; i < db.truePredIdxSet_->size(); i++)
 	  {
@@ -279,7 +288,7 @@ class Database
 	
 	if (db.falsePredIdxSet_)
 	{	
-	  falsePredIdxSet_ = new Array<LongLongHashSet >();
+	  falsePredIdxSet_ = new Array<LongLongHashSet>();
 	  falsePredIdxSet_->growToSize(db.falsePredIdxSet_->size());
 	  for (int i = 0; i < db.falsePredIdxSet_->size(); i++)
 	  	(*falsePredIdxSet_)[i] = (*db.falsePredIdxSet_)[i];
@@ -287,7 +296,7 @@ class Database
 	
 	if (db.activePredIdxSet_)
 	{
-	  activePredIdxSet_ = new Array<LongLongHashSet >();
+	  activePredIdxSet_ = new Array<LongLongHashSet>();
 	  activePredIdxSet_->growToSize(db.activePredIdxSet_->size());
 	  for (int i = 0; i < db.activePredIdxSet_->size(); i++)
 	  	(*activePredIdxSet_)[i] = (*db.activePredIdxSet_)[i];
@@ -295,7 +304,7 @@ class Database
 	
 	if (db.evidencePredIdxSet_)
 	{
-	  evidencePredIdxSet_ = new Array<LongLongHashSet >();
+	  evidencePredIdxSet_ = new Array<LongLongHashSet>();
 	  evidencePredIdxSet_->growToSize(db.evidencePredIdxSet_->size());
 	  for (int i = 0; i < db.evidencePredIdxSet_->size(); i++)
 	  	(*evidencePredIdxSet_)[i] = (*db.evidencePredIdxSet_)[i];
@@ -303,7 +312,7 @@ class Database
 
 	if (db.deactivatedPredIdxSet_)
 	{
-	  deactivatedPredIdxSet_ = new Array<LongLongHashSet >();
+	  deactivatedPredIdxSet_ = new Array<LongLongHashSet>();
 	  deactivatedPredIdxSet_->growToSize(db.deactivatedPredIdxSet_->size());
 	  for (int i = 0; i < db.deactivatedPredIdxSet_->size(); i++)
 	  	(*deactivatedPredIdxSet_)[i] = (*db.deactivatedPredIdxSet_)[i];
@@ -344,6 +353,10 @@ class Database
     for (int i = 0; i < trueEvIndex_->size(); i++)
       (*trueEvIndex_)[i].clear();
     delete trueEvIndex_;
+
+    for (int i = 0; i < falseEvIndex_->size(); i++)
+      (*falseEvIndex_)[i].clear();
+    delete falseEvIndex_;
 
     for (int i = 0; i < activeIndex_->size(); i++)
       (*activeIndex_)[i].clear();
@@ -421,9 +434,9 @@ class Database
       lazyFlag_ = true;
       int numFOPreds = domain_->getNumPredicates();
 
-      activePredIdxSet_ = new Array<LongLongHashSet >(numFOPreds);
-      evidencePredIdxSet_ = new Array<LongLongHashSet >(numFOPreds);
-      deactivatedPredIdxSet_ = new Array<LongLongHashSet >(numFOPreds);
+      activePredIdxSet_ = new Array<LongLongHashSet>(numFOPreds);
+      evidencePredIdxSet_ = new Array<LongLongHashSet>(numFOPreds);
+      deactivatedPredIdxSet_ = new Array<LongLongHashSet>(numFOPreds);
       activePredIdxSet_->growToSize(numFOPreds);
       evidencePredIdxSet_->growToSize(numFOPreds);
       deactivatedPredIdxSet_->growToSize(numFOPreds);
@@ -852,13 +865,36 @@ class Database
       // Evidence status only needs to be set for open-world preds
     if (!closedWorld_[pred->getId()])
     {
-      setEvidenceStatus(pred, true);
+      //setEvidenceStatus(pred, true);
     }
     unsigned long long idx = getIdxOfGndPredValues(pred);
       // Add to evidence index
     if (pred->getTruthValue() == TRUE)
       addToInvertedIndex(pred, idx, T_INDEX);
+    //else if (pred->getTruthValue() == FALSE)
+    //  addToInvertedIndex(pred, idx, F_INDEX);
     if (dbdebug >= 1) cout << "Returning" << endl;
+  }
+
+  /**
+   * Adds a grounding to the evidence inverted index. Assumption is that
+   * evidence groundings have already been added to the db so their truth values
+   * can bee looked up.
+   * 
+   * @param pred Predicate* being added to the inverted index.
+   * @param sense If true, grounding occurs as pos. literal in clause;
+   * otherwise, it occurs as neg. literal.
+   */
+  void addPredToEvidenceIndex(Predicate* const& pred, const bool& sense)
+  {
+    TruthValue tv = getValue(pred);
+    unsigned long long idx = getIdxOfGndPredValues(pred);
+      // Occurs as pos. lit. and false evidence
+    if (sense && tv == FALSE)
+      addToInvertedIndex(pred, idx, F_INDEX);
+      // Occurs as neg. lit. and true evidence
+    else if (!sense && tv == TRUE)
+      addToInvertedIndex(pred, idx, T_INDEX);    
   }
 
   int getNumGroundings(const int& predId) const
@@ -964,27 +1000,23 @@ class Database
   void setClosedWorld(const int& predId, const bool& b) 
   { closedWorld_[predId] = b; }
   const Array<bool>& getClosedWorld() const { return closedWorld_; }
-  
-    // Caller should delete returned array but not modify its contents.
-  const PredicateHashArray* getTrueNonEvidenceGndPreds(const int& predId) const
+
+  /**
+   * Gets true groundings of a predicate.
+   * 
+   * @param predId Id of predicate whose true groundings are being retrieved.
+   * @param indexedGndings True groundings are put here
+   */ 
+  void getTrueGndings(int predId, Array<Predicate*>* const & indexedGndings)
   {
-    PredicateHashArray* preds = new PredicateHashArray();
-    
+      // True gndings from truePredIdxSet_
     LongLongHashSet::const_iterator it = (*truePredIdxSet_)[predId].begin();
-    for (; it != (*truePredIdxSet_)[predId].end(); it++)
-    {
-        // Check if in evidence
-      if ((*evidencePredIdxSet_)[predId].find(*it) ==
-          (*evidencePredIdxSet_)[predId].end())
-      {
-        Predicate* p = getPredFromIdx((*it),
-                                      domain_->getPredicateTemplate(predId));
-        preds->append(p);
-      }
+    for (; it != (*truePredIdxSet_)[predId].end(); it++) {
+      Predicate* p = getPredFromIdx((*it), domain_->getPredicateTemplate(predId));
+      indexedGndings->append(p);
     }
-    return preds;
   }
-  
+
   /**
    * Retrieves indexed groundings of a predicate. The indexed groundings are
    * the true (and false and active) groundings of the (possibly partially
@@ -995,18 +1027,22 @@ class Database
    * @param pred Predicate whose groundings are found.
    * @param ignoreActivePreds If true, only true groundings are retrieved;
    * otherwise, groundings which are false and active are retrieved as well.
+   * @param trueGndings If true, true indexed groundings are retrieved;
+   * otherwise, false ones are retrieved.
    */
   void getIndexedGndings(Array<Predicate*>* const & indexedGndings,
   						 Predicate* const & pred,
-                         bool const & ignoreActivePreds)
+                         bool const & ignoreActivePreds,
+                         bool const & trueGndings)
   {
     int predId = pred->getId();
       // All terms are grounded: just return itself
     if (pred->isGrounded())
     {
-        // Check if pred is true or, if getting active preds, active
+        // Check if pred is true/false or, if getting active preds, active
       TruthValue tv = getValue(pred);
-      if ((tv == TRUE) || 
+      if ((trueGndings && tv == TRUE) ||
+          (!trueGndings && tv == FALSE) || 
           (!ignoreActivePreds && getActiveStatus(pred)))
       {
         Predicate* p = new Predicate(*pred);
@@ -1015,17 +1051,53 @@ class Database
       return;
     }
     
-      // No terms are grounded: Return truePredIdxSet_ and activePredIdxSet_
+      // No terms are grounded: Return activePredIdxSet_ and
+      // truePredIdxSet_ / falsePredIdxSet_
     if (!pred->containsConstants())
     {
-        // True gndings from truePredIdxSet_
-      LongLongHashSet::const_iterator it = (*truePredIdxSet_)[predId].begin();
-      for (; it != (*truePredIdxSet_)[predId].end(); it++)
+      if (trueGndings)
       {
-        Predicate* p = getPredFromIdx((*it), pred->getTemplate());
-        indexedGndings->append(p);
+          // True gndings from truePredIdxSet_
+        LongLongHashSet::const_iterator it = (*truePredIdxSet_)[predId].begin();
+        for (; it != (*truePredIdxSet_)[predId].end(); it++)
+        {
+          Predicate* p = getPredFromIdx((*it), pred->getTemplate());
+          indexedGndings->append(p);
+        }
       }
-        // active gndings from activePredIdxSet_ (just false gndings)
+      else
+      {
+        if (closedWorld_[predId])
+        {
+            // False groundings is the complement of truePredIdxSet_
+            // Generate all groundings and omit true ones
+          Array<Predicate*> predArr;
+          Predicate::createAllGroundings(predId, domain_, predArr);
+          int numPreds = predArr.size();
+          for (int i = 0; i < numPreds; i++)
+          {
+            Predicate* newPred = predArr[i];
+              // Check if in true groundings
+            LongLongHashSet::const_iterator it;
+            if ((it = (*truePredIdxSet_)[predId].find(i)) !=
+                (*truePredIdxSet_)[predId].end())
+              delete newPred;
+            else
+              indexedGndings->append(newPred);
+          }
+        }
+        else
+        {
+          LongLongHashSet::const_iterator it =
+            (*falsePredIdxSet_)[predId].begin();
+          for (; it != (*falsePredIdxSet_)[predId].end(); it++)
+          {
+            Predicate* p = getPredFromIdx((*it), pred->getTemplate());
+            indexedGndings->append(p);
+          }
+        }        
+      }
+        // active gndings from activePredIdxSet_
       if (!ignoreActivePreds)
       {
           // Active gndings from activePredIdxSet_
@@ -1042,7 +1114,9 @@ class Database
 
       // Not all terms are grounded: Compute intersection of index sets
     assert(predId < trueEvIndex_->size());
-    set<unsigned long long> trueIntersection;
+    assert(predId < falseEvIndex_->size());
+      // Only true OR false gndings are retrieved
+    set<unsigned long long> trueOrFalseIntersection;
     set<unsigned long long> activeIntersection;
     bool initial = true;
       // For each constant, retrieve the groundings and merge them
@@ -1054,16 +1128,32 @@ class Database
       pair<unsigned int, unsigned int> placeAndConstant(term, constantId);
         // True index
       if (initial)
-        trueIntersection = ((*trueEvIndex_)[predId])[placeAndConstant];
+      {
+        if (trueGndings)
+          trueOrFalseIntersection = ((*trueEvIndex_)[predId])[placeAndConstant];
+        else
+          trueOrFalseIntersection =
+            ((*falseEvIndex_)[predId])[placeAndConstant];
+      }
       else
       {
-        set<unsigned long long> tmpTrueIntersection;
-        set_intersection(trueIntersection.begin(), trueIntersection.end(),
-                         ((*trueEvIndex_)[predId])[placeAndConstant].begin(),
-                         ((*trueEvIndex_)[predId])[placeAndConstant].end(),
-                         inserter(tmpTrueIntersection,
-                                  tmpTrueIntersection.begin()));
-        trueIntersection = tmpTrueIntersection;
+        set<unsigned long long> tmpTrueOrFalseIntersection;
+        if (trueGndings)
+          set_intersection(trueOrFalseIntersection.begin(),
+                           trueOrFalseIntersection.end(),
+                           ((*trueEvIndex_)[predId])[placeAndConstant].begin(),
+                           ((*trueEvIndex_)[predId])[placeAndConstant].end(),
+                           inserter(tmpTrueOrFalseIntersection,
+                                    tmpTrueOrFalseIntersection.begin()));
+        else
+          set_intersection(trueOrFalseIntersection.begin(),
+                           trueOrFalseIntersection.end(),
+                           ((*falseEvIndex_)[predId])[placeAndConstant].begin(),
+                           ((*falseEvIndex_)[predId])[placeAndConstant].end(),
+                           inserter(tmpTrueOrFalseIntersection,
+                                    tmpTrueOrFalseIntersection.begin()));
+        trueOrFalseIntersection = tmpTrueOrFalseIntersection;
+//cout << "db size " << trueOrFalseIntersection.size() << endl;
       }
         // Active index
       if (!ignoreActivePreds)
@@ -1088,8 +1178,9 @@ class Database
       // Now, intersection sets contain the intersections of groundings
       // Make preds and append them to return array
       // True intersection
-    set<unsigned long long>::const_iterator it = trueIntersection.begin();
-    for (; it != trueIntersection.end(); it++)
+    set<unsigned long long>::const_iterator it =
+      trueOrFalseIntersection.begin();
+    for (; it != trueOrFalseIntersection.end(); it++)
     {
       Predicate* p = getPredFromIdx((*it), pred->getTemplate());
       indexedGndings->append(p);
@@ -1131,14 +1222,11 @@ class Database
     for (int i = 0; i < numTypes; i++)
     {
       assert(domain_->isType(i));
-      //const Array<int>* constIds = domain_->getConstantsByTypeWithExt(i);
-      const Array<int>* constIds = domain_->getConstantsByType(i);
+      const Array<int>* constIds = domain_->getConstantsByTypeWithExt(i);
+      //const Array<int>* constIds = domain_->getConstantsByType(i);
       if (constIds->empty()) newfirstConstIdByType[i] = (unsigned int)0;
       else                   newfirstConstIdByType[i] = (*constIds)[0];
-      //delete constIds;
-      constIds = domain_->getConstantsByType(i);
-      //delete constIds;
-    }   
+    }
       
     // compute new termMultByPred_
     int numFOPreds = domain_->getNumPredicates();
@@ -1146,8 +1234,7 @@ class Database
     newtermMultByPred.growToSize(numFOPreds, NULL);
     for (int i = 0; i < numFOPreds; i++)
     {
-        // if this is a '=' pred, leave termMultByPred_[i]
-        // as NULL
+        // if this is a '=' pred, leave termMultByPred_[i] as NULL
       const PredicateTemplate* t = domain_->getPredicateTemplate(i);
       if (t->isEqualPredWithType()) continue;
         
@@ -1156,12 +1243,12 @@ class Database
       int numTermTypes = termTypes->size(); 
       matArr->growToSize(numTermTypes);
       unsigned long long curMult = 1;
-      for (int j = numTermTypes-1; j >= 0; j--)
+      for (int j = numTermTypes - 1; j >= 0; j--)
       {
         int typeId = (*termTypes)[j];
-        (*matArr)[j] = MultAndType(curMult,typeId);
-        //curMult *= domain_->getNumConstantsByTypeWithExt(typeId);
-        curMult *= domain_->getNumConstantsByType(typeId);
+        (*matArr)[j] = MultAndType(curMult, typeId);
+        curMult *= domain_->getNumConstantsByTypeWithExt(typeId);
+        //curMult *= domain_->getNumConstantsByType(typeId);
       }
       //delete termMultByPred_[i];
       newtermMultByPred[i] = matArr;
@@ -1177,6 +1264,12 @@ class Database
     changeConstantsToNewIds(evidencePredIdxSet_, oldToNewConstIds,
                             newfirstConstIdByType, newtermMultByPred);
     changeConstantsToNewIds(deactivatedPredIdxSet_, oldToNewConstIds,
+                            newfirstConstIdByType, newtermMultByPred);
+    changeConstantsToNewIds(trueEvIndex_, oldToNewConstIds,
+                            newfirstConstIdByType, newtermMultByPred);
+    changeConstantsToNewIds(falseEvIndex_, oldToNewConstIds,
+                            newfirstConstIdByType, newtermMultByPred);
+    changeConstantsToNewIds(activeIndex_, oldToNewConstIds,
                             newfirstConstIdByType, newtermMultByPred);
 
       // update first-const/multi
@@ -1376,15 +1469,70 @@ class Database
         }
 
         unsigned long long d = getIdxOfGndPredValues(p, currfirstConstIdByType,
-                                              currtermMultByPred);
+                                                     currtermMultByPred);
         newHashSet.insert(d);
-
-          // verify
-        p = getPredFromIdx(d, domain_->getPredicateTemplate(i),
-                           currfirstConstIdByType, currtermMultByPred);
+        delete p;
       }
       assert(predIdxSet.size() == newHashSet.size());
-      (*predIdxSets)[i] = newHashSet;    
+      (*predIdxSets)[i] = newHashSet;
+    }
+  }
+
+  /**
+   * Reindexes all predicates in an Array of hash_maps with new constant ids.
+   * This is necessary after constant ids have been changed.
+   * 
+   * @param predIdxMaps Array of hash_maps containing the pred indices
+   * @param oldToNewConstIds Mapping of old to new constant ids.
+   */
+  void changeConstantsToNewIds(Array<LongLongHashMap>* predIdxMaps,
+                               hash_map<int,int>& oldToNewConstIds,
+                             const Array<unsigned int> & currfirstConstIdByType,
+                          const Array<Array<MultAndType>*> & currtermMultByPred)
+  {
+    for (int i = 0; i < predIdxMaps->size(); i++)
+    {
+      LongLongHashMap newHashMap;
+      LongLongHashMap& predIdxMap = (*predIdxMaps)[i];
+      LongLongHashMap::iterator it = predIdxMap.begin();
+      for (; it != predIdxMap.end(); it++)
+      {
+        set<unsigned long long> newSet;
+          // The second term of the pair in *it contains the set of groundings
+        set<unsigned long long> gndings = (*it).second;
+        set<unsigned long long>::const_iterator setit = gndings.begin();
+          // Change the constant ids in each grounding
+        for (; setit != gndings.end(); setit++)
+        {
+          Predicate* p = getPredFromIdx((*setit),
+                                        domain_->getPredicateTemplate(i));
+        
+          for (int j = 0; j < p->getNumTerms(); j++)
+          {
+            Term* t = (Term*) p->getTerm(j);
+            if (t->getType() == Term::CONSTANT)
+            {
+              int oldId = t->getId();
+              assert(oldToNewConstIds.find(oldId) != oldToNewConstIds.end());
+              t->setId(oldToNewConstIds[oldId]);
+            }
+          }
+
+          unsigned long long d = getIdxOfGndPredValues(p, currfirstConstIdByType,
+                                                       currtermMultByPred);
+          delete p;
+          newSet.insert(d);
+        }
+        //(*it).second = newSet;
+          // The constant id must be changed in the firste element of *it
+        pair<unsigned int, unsigned int> placeAndConstant = (*it).first;
+        pair<unsigned int, unsigned int>
+          newPlaceAndConstant(placeAndConstant.first,
+                              oldToNewConstIds[placeAndConstant.second]);
+        newHashMap[newPlaceAndConstant] = newSet;
+      }
+      assert(predIdxMap.size() == newHashMap.size());
+      (*predIdxMaps)[i] = newHashMap;
     }
   }
 
@@ -1755,8 +1903,8 @@ class Database
   /**
    * Add a predicate to the given index type.
    */
-  void addToInvertedIndex(const Predicate* const & pred, const unsigned long long& predIdx,
-                          IndexType idxType)
+  void addToInvertedIndex(const Predicate* const & pred,
+                          const unsigned long long& predIdx, IndexType idxType)
   {
       // Assumption is: Predicate is grounded
     assert(((Predicate*)pred)->isGrounded());
@@ -1774,6 +1922,16 @@ class Database
       {
         prevElement =
           ((*trueEvIndex_)[predId])[placeAndConstant].insert(predIdx);
+          // prevElement.second is false if key already in set (assert that this
+          // is the same element as was tried to be inserted
+        if (!prevElement.second)
+          assert(predIdx == *(prevElement.first));
+      }
+        // False index
+      else if (idxType == F_INDEX)
+      {
+        prevElement =
+          ((*falseEvIndex_)[predId])[placeAndConstant].insert(predIdx);
           // prevElement.second is false if key already in set (assert that this
           // is the same element as was tried to be inserted
         if (!prevElement.second)
@@ -1817,7 +1975,17 @@ class Database
         if (!prevElement.second)
           assert(predIdx == *(prevElement.first));
       }
-        // False, active index
+        // False index
+      else if (idxType == F_INDEX)
+      {
+        prevElement =
+          ((*falseEvIndex_)[predId])[placeAndConstant].insert(predIdx);
+          // prevElement.second is false if key already in set (assert that this
+          // is the same element as was tried to be inserted
+        if (!prevElement.second)
+          assert(predIdx == *(prevElement.first));
+      }
+        // Active index
       else if (idxType == A_INDEX)
       {
         prevElement =
@@ -1834,7 +2002,8 @@ class Database
    * Remove a predicate from the given index type.
    */
   void removeFromInvertedIndex(const Predicate* const & pred,
-                               const unsigned long long& predIdx, IndexType idxType)
+                               const unsigned long long& predIdx,
+                               IndexType idxType)
   {
       // Assumption is: Predicate is grounded
     assert(((Predicate*)pred)->isGrounded());
@@ -1854,7 +2023,13 @@ class Database
         numErased = ((*trueEvIndex_)[predId])[placeAndConstant].erase(predIdx);
         assert(numErased <= 1);
       }
-        // False, active index
+        // False index
+      else if (idxType == F_INDEX)
+      {
+        numErased = ((*falseEvIndex_)[predId])[placeAndConstant].erase(predIdx);
+        assert(numErased <= 1);
+      }
+        // Active index
       else if (idxType == A_INDEX)
       {
         numErased =
@@ -1868,7 +2043,8 @@ class Database
    * Remove a predicate from the given index type.
    */
   void removeFromInvertedIndex(const GroundPredicate* const & pred,
-                               const unsigned long long& predIdx, IndexType idxType)
+                               const unsigned long long& predIdx,
+                               IndexType idxType)
   {
     int predId = pred->getId();
     assert(predId < trueEvIndex_->size());
@@ -1884,6 +2060,12 @@ class Database
       if (idxType == T_INDEX)
       {
         numErased = ((*trueEvIndex_)[predId])[placeAndConstant].erase(predIdx);
+        assert(numErased <= 1);
+      }
+        // False index
+      else if (idxType == F_INDEX)
+      {
+        numErased = ((*falseEvIndex_)[predId])[placeAndConstant].erase(predIdx);
         assert(numErased <= 1);
       }
         // Active index
@@ -1934,29 +2116,32 @@ class Database
     // Inverted index of true evidence ground atoms: For each predicate p,
     // trueEvIndex_[p] contains a hash map mapping a pair of ints (argument
     // number and constant id) to a set of true groundings.
-  Array<hash_map<pair<unsigned int, unsigned int>, set<unsigned long long>,
-                 IntPairHash> >* trueEvIndex_;
+  Array<LongLongHashMap>* trueEvIndex_;
+
+    // Inverted index of false evidence ground atoms: For each predicate p,
+    // trueEvIndex_[p] contains a hash map mapping a pair of ints (argument
+    // number and constant id) to a set of false groundings.
+  Array<LongLongHashMap>* falseEvIndex_;
 
     // Inverted index of active ground atoms: For each predicate p,
     // activeIndex_[p] contains a hash map mapping a pair of ints (argument
     // number and constant id) to a set of false, active groundings.
-  Array<hash_map<pair<unsigned int, unsigned int>, set<unsigned long long>,
-                 IntPairHash> >* activeIndex_;
+  Array<LongLongHashMap>* activeIndex_;
 
     // Hash set of true ground atoms
-  Array<LongLongHashSet >* truePredIdxSet_;
+  Array<LongLongHashSet>* truePredIdxSet_;
   
     // Hash set of false ground atoms - only used for open world preds
-  Array<LongLongHashSet >* falsePredIdxSet_;
+  Array<LongLongHashSet>* falsePredIdxSet_;
 
     // Hash set of active ground atoms
-  Array<LongLongHashSet >* activePredIdxSet_;
+  Array<LongLongHashSet>* activePredIdxSet_;
 
     // Hash set of evidence ground atoms
-  Array<LongLongHashSet >* evidencePredIdxSet_;
+  Array<LongLongHashSet>* evidencePredIdxSet_;
   
     // Hash set of deactivated ground atoms
-  Array<LongLongHashSet >* deactivatedPredIdxSet_;
+  Array<LongLongHashSet>* deactivatedPredIdxSet_;
 
     // Total number of groundings for each predicate
   Array<unsigned long long> numberOfGroundings_;

@@ -2,11 +2,11 @@
  * All of the documentation and software included in the
  * Alchemy Software is copyrighted by Stanley Kok, Parag
  * Singla, Matthew Richardson, Pedro Domingos, Marc
- * Sumner and Hoifung Poon.
+ * Sumner, Hoifung Poon, and Daniel Lowd.
  * 
  * Copyright [2004-07] Stanley Kok, Parag Singla, Matthew
- * Richardson, Pedro Domingos, Marc Sumner and Hoifung
- * Poon. All rights reserved.
+ * Richardson, Pedro Domingos, Marc Sumner, Hoifung
+ * Poon, and Daniel Lowd. All rights reserved.
  * 
  * Contact: Pedro Domingos, University of Washington
  * (pedrod@cs.washington.edu).
@@ -28,8 +28,8 @@
  * of this software must display the following
  * acknowledgment: "This product includes software
  * developed by Stanley Kok, Parag Singla, Matthew
- * Richardson, Pedro Domingos, Marc Sumner and Hoifung
- * Poon in the Department of Computer Science and
+ * Richardson, Pedro Domingos, Marc Sumner, Hoifung
+ * Poon, and Daniel Lowd in the Department of Computer Science and
  * Engineering at the University of Washington".
  * 
  * 4. Your publications acknowledge the use or
@@ -175,7 +175,7 @@ class MRF
 
       bool genClausesForAllPredGndings = false;
         // if all groundings of predicate with predId are queries
-      if (allPredGndingsAreQueries && (*allPredGndingsAreQueries)[predId]>=1)
+      if (allPredGndingsAreQueries && (*allPredGndingsAreQueries)[predId] >= 1)
       {
           // if we have not generated gnd clauses containing the queries before
         if ((*allPredGndingsAreQueries)[predId] == 1) 
@@ -352,14 +352,14 @@ class MRF
     if (markHardGndClauses && isHardClause) gndClause->setWtToHardWt();
     assert(gndClause->getWt() != 0);
 
+    bool invertWt = false;
       // We want to normalize soft unit clauses to all be positives
-      // This is only possible when parent weight ptrs aren't being tracked
-    if (!parentWtPtr && !isHardClause &&
-        gndClause->getNumGroundPredicates() == 1 &&
+    if (!isHardClause && gndClause->getNumGroundPredicates() == 1 &&
         !gndClause->getGroundPredicateSense(0))
     {
       gndClause->setGroundPredicateSense(0, true);
       gndClause->setWt(-gndClause->getWt());
+      invertWt = true;
     }
 
     GroundClauseSet::iterator iter = gndClausesSet->find(gndClause);
@@ -371,11 +371,7 @@ class MRF
       gndClause->appendToGndPreds(gndPreds);
         // gndClause's wt is set when it was constructed
       if (parentWtPtr)
-      { 
-        gndClause->appendParentWtPtr(parentWtPtr);
-        gndClause->incrementClauseFrequency(clauseId, 1);
-        assert(gndClause->getWt() == *parentWtPtr);
-      }      
+        gndClause->incrementClauseFrequency(clauseId, 1, invertWt);
 
         // Add the unknown predicates of the clause to unseenPreds if 
         // the predicates are already not in it
@@ -399,10 +395,7 @@ class MRF
       (*iter)->addWt(gndClause->getWt());
 
       if (parentWtPtr)
-      {
-        (*iter)->appendParentWtPtr(parentWtPtr);
-        (*iter)->incrementClauseFrequency(clauseId, 1);
-      }
+        (*iter)->incrementClauseFrequency(clauseId, 1, invertWt);
 
       delete gndClause;
     }
@@ -426,13 +419,6 @@ class MRF
     for (int i = 0; i < gndPreds_->size(); i++)
       (*gndPreds_)[i]->deleteGndClauseSet();
   }  
-
-  
-  void setGndClausesWtsToSumOfParentWts()
-  {
-    for (int i = 0; i < gndClauses_->size(); i++)
-      (*gndClauses_)[i]->setWtToSumOfParentWts();
-  }
 
   const GroundPredicateHashArray* getGndPreds() const { return gndPreds_; }
 

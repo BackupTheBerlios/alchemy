@@ -2,11 +2,11 @@
  * All of the documentation and software included in the
  * Alchemy Software is copyrighted by Stanley Kok, Parag
  * Singla, Matthew Richardson, Pedro Domingos, Marc
- * Sumner and Hoifung Poon.
+ * Sumner, Hoifung Poon, and Daniel Lowd.
  * 
  * Copyright [2004-07] Stanley Kok, Parag Singla, Matthew
- * Richardson, Pedro Domingos, Marc Sumner and Hoifung
- * Poon. All rights reserved.
+ * Richardson, Pedro Domingos, Marc Sumner, Hoifung
+ * Poon, and Daniel Lowd. All rights reserved.
  * 
  * Contact: Pedro Domingos, University of Washington
  * (pedrod@cs.washington.edu).
@@ -28,8 +28,8 @@
  * of this software must display the following
  * acknowledgment: "This product includes software
  * developed by Stanley Kok, Parag Singla, Matthew
- * Richardson, Pedro Domingos, Marc Sumner and Hoifung
- * Poon in the Department of Computer Science and
+ * Richardson, Pedro Domingos, Marc Sumner, Hoifung
+ * Poon, and Daniel Lowd in the Department of Computer Science and
  * Engineering at the University of Washington".
  * 
  * 4. Your publications acknowledge the use or
@@ -95,6 +95,7 @@ class MCSAT : public MCMC
       // We don't need to track clause true counts in up and ss
     //up_ = new UnitPropagation(state_, seed, false);
     mws_ = new MaxWalkSat(state_, seed, false, mcsatParams->mwsParams);
+    mws_->setPrintInfo(false);
 
     if (msdebug)
     {
@@ -219,7 +220,8 @@ class MCSAT : public MCMC
         currentTimeSec = timer.time();
         secondsElapsed = currentTimeSec - startTimeSec;
         cout << "Sample (per pred) " << sample << ", time elapsed = ";
-        Timer::printTime(cout, secondsElapsed); 
+        Timer::printTime(cout, secondsElapsed);
+        cout << ", num. preds = " << state_->getNumAtoms();
 		cout << ", num. clauses = " << state_->getNumClauses();
 		cout << endl;		
       }
@@ -257,6 +259,7 @@ class MCSAT : public MCMC
 	  cout.flush();
     } // while (!done)
 
+    cout << "Final ground predicate number: " << state_->getNumAtoms() << endl;
     cout << "Final ground clause number: " << state_->getNumClauses() << endl;
 
     cout<< "Time taken for MC-SAT sampling = "; 
@@ -319,7 +322,7 @@ class MCSAT : public MCMC
       cout << "Low state:" << endl;
       state_->printLowState(cout);
     }
-    state_->saveLowStateToGndPreds();
+    //state_->saveLowStateToGndPreds();
 
       // Reset parameters needed for MCSat step
     state_->resetFixedAtoms();

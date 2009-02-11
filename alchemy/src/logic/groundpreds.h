@@ -2,11 +2,11 @@
  * All of the documentation and software included in the
  * Alchemy Software is copyrighted by Stanley Kok, Parag
  * Singla, Matthew Richardson, Pedro Domingos, Marc
- * Sumner and Hoifung Poon.
+ * Sumner, Hoifung Poon, and Daniel Lowd.
  * 
  * Copyright [2004-07] Stanley Kok, Parag Singla, Matthew
- * Richardson, Pedro Domingos, Marc Sumner and Hoifung
- * Poon. All rights reserved.
+ * Richardson, Pedro Domingos, Marc Sumner, Hoifung
+ * Poon, and Daniel Lowd. All rights reserved.
  * 
  * Contact: Pedro Domingos, University of Washington
  * (pedrod@cs.washington.edu).
@@ -28,8 +28,8 @@
  * of this software must display the following
  * acknowledgment: "This product includes software
  * developed by Stanley Kok, Parag Singla, Matthew
- * Richardson, Pedro Domingos, Marc Sumner and Hoifung
- * Poon in the Department of Computer Science and
+ * Richardson, Pedro Domingos, Marc Sumner, Hoifung
+ * Poon, and Daniel Lowd in the Department of Computer Science and
  * Engineering at the University of Washington".
  * 
  * 4. Your publications acknowledge the use or
@@ -126,12 +126,18 @@ class GroundPreds
   {
     Predicate* ppred = (Predicate*) pred;
     Predicate* p = NULL;
-    if (oldValue==TRUE)    p = trueGndPreds_->removeItemFastDisorder(ppred);
-    else 
-    if (oldValue==FALSE)   p = falseGndPreds_->removeItemFastDisorder(ppred);
-    else 
-    if (oldValue==UNKNOWN) p = unknownGndPreds_->removeItemFastDisorder(ppred);
     
+      //modified to remove the ambiguity from removeItem(const int & index)
+      //when type is also an int
+    if (oldValue==TRUE)
+      p = trueGndPreds_->removeInputItemFastDisorder(ppred);
+    else
+    if (oldValue==FALSE)
+      p = falseGndPreds_->removeInputItemFastDisorder(ppred);
+    else 
+    if (oldValue==UNKNOWN)
+      p = unknownGndPreds_->removeInputItemFastDisorder(ppred);
+
     assert(p);
     if (newValue == TRUE)         trueGndPreds_->append(p);
     else if (newValue == FALSE)   falseGndPreds_->append(p);

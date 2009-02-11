@@ -2,11 +2,11 @@
  * All of the documentation and software included in the
  * Alchemy Software is copyrighted by Stanley Kok, Parag
  * Singla, Matthew Richardson, Pedro Domingos, Marc
- * Sumner and Hoifung Poon.
+ * Sumner, Hoifung Poon, and Daniel Lowd.
  * 
  * Copyright [2004-07] Stanley Kok, Parag Singla, Matthew
- * Richardson, Pedro Domingos, Marc Sumner and Hoifung
- * Poon. All rights reserved.
+ * Richardson, Pedro Domingos, Marc Sumner, Hoifung
+ * Poon, and Daniel Lowd. All rights reserved.
  * 
  * Contact: Pedro Domingos, University of Washington
  * (pedrod@cs.washington.edu).
@@ -28,8 +28,8 @@
  * of this software must display the following
  * acknowledgment: "This product includes software
  * developed by Stanley Kok, Parag Singla, Matthew
- * Richardson, Pedro Domingos, Marc Sumner and Hoifung
- * Poon in the Department of Computer Science and
+ * Richardson, Pedro Domingos, Marc Sumner, Hoifung
+ * Poon, and Daniel Lowd in the Department of Computer Science and
  * Engineering at the University of Washington".
  * 
  * 4. Your publications acknowledge the use or
@@ -103,7 +103,7 @@ int folDbg = 0;
 %left '*' '/' '%'
 
 %glr-parser
-%expect 13
+%expect 14
 %error-verbose
 %% 
 
@@ -252,11 +252,11 @@ include: ZZ_INCLUDE ZZ_STRING nnewline
 
   // if it is a .cpp file, then we are dealing with linked-in functions and predicates
   if (s.at(len-4)=='.' && s.at(len-3)=='c' && s.at(len-2)=='p' &&
-	  s.at(len-1)=='p') {
-	
-	zzcompileFunctions(str);
-	zzusingLinkedPredicates = true;    
-	zzusingLinkedFunctions = true;    
+	  s.at(len-1)=='p')
+  {
+    zzcompileFunctions(str);
+    zzusingLinkedPredicates = true;    
+    zzusingLinkedFunctions = true;    
     break;
   }
 
@@ -487,18 +487,22 @@ ZZ_DOTDOTDOT ',' ZZ_NUM
 }
 |
 single_numeric_types
+{
+  delete [] zztypeName;
+  zztypeName = NULL;
+}
 ;
 
 // ZZ_NUM ',' single_numeric_types | ZZ_NUM
 single_numeric_types:
-  single_numeric_type
+  single_numeric_types
   ',' 
   {  
     zzconsumeToken(zztokenList, ",");
     if (folDbg >= 1) printf(", "); 
     if (folDbg >= 2) printf("single_numeric_types: single_numeric_type\n"); 
   }
-  single_numeric_types
+  single_numeric_type
 | 
   single_numeric_type
 ;
@@ -520,7 +524,7 @@ single_numeric_type: ZZ_NUM
   else
   {
     const char* prevType = zzdomain->getConstantTypeName(constId);
-    if (strcmp(prevType,zztypeName)!=0)
+    if (strcmp(prevType,zztypeName) != 0)
     {
       char buf[30]; sprintf(buf, "%d", i);
       zzerr("constant %s previously declared to be of type %s is redeclared "
@@ -566,6 +570,37 @@ types  { if (folDbg >= 2) printf("predicate_declaration: types\n"); }
   zzpredTemplate->setId(id);
   zzpredTemplate = NULL;
 }
+|
+ZZ_VARIABLE 
+{
+  const char* predName = zztokenList.removeLast();
+
+  if (folDbg >= 1) printf("ZZ_PREDICATE pc_%s ", predName);  
+    //predicate has not been declared a function
+  zzassert(zzdomain->getFunctionId(predName) < 0, 
+           "not expecting pred name to be declared as a function name");
+  zzassert(zzpredTemplate==NULL,"expecting zzpredTemplate==NULL");
+  zzpredTemplate = new PredicateTemplate();
+  zzpredTemplate->setName(predName);
+  delete [] predName;
+
+	// Declare this predicate to have type "AlchemyPropositionalType"
+  const char* varName = Domain::PROPOSITIONAL_TYPE;
+  if (folDbg >= 1) printf("t_%s ", varName);
+  if (!zzdomain->isType(varName))
+  {
+    int id = zzaddTypeToDomain(zzdomain, varName);
+    zzassert(id >= 0, "expecting var id >= 0");
+  }
+  zzaddType(varName, zzpredTemplate, NULL, false, zzdomain);
+
+  zzassert(zzpredTemplate, "not expecting zzpredTemplate==NULL");
+  int templateId = zzdomain->addPredicateTemplate(zzpredTemplate);
+  zzassert(templateId >= 0, "expecting pred template id >= 0");
+  zzpredTemplate->setId(templateId);
+  zzpredTemplate = NULL;
+}
+;
 
 
 // The first time a function is declared, flex returns it as a variable because
@@ -748,17 +783,8 @@ ZZ_PREDICATE
 
   delete [] predName;
 }
-'(' 
-{ 
-  zzconsumeToken(zztokenList,"("); 
-  if (folDbg >= 1) printf("( "); 
-  if (folDbg >= 2) printf("predicate_definition: constants_in_groundings\n");
-}
-constants_in_groundings ')'
-{ 
-  zzconsumeToken(zztokenList,")"); 
-  if (folDbg >= 1) printf(")\n"); 
-  
+nothing_or_constants
+{  
   zzcheckPredNumTerm(zzpred);
   int predId = zzpred->getId();
   hash_map<int,PredicateHashArray*>::iterator it;
@@ -788,6 +814,28 @@ constants_in_groundings ')'
   }
   zzpred = NULL;
 }
+
+nothing_or_constants:
+  // Nothing (propositional case)
+{
+  // Add the one constant for propositional case
+  const char* constName = Domain::PROPOSITIONAL_CONSTANT;
+  if (folDbg >= 1) printf("cg_%s ", constName);
+  zzaddConstantToPredFunc(constName);
+}
+|
+'(' 
+{ 
+  zzconsumeToken(zztokenList,"("); 
+  if (folDbg >= 1) printf("( "); 
+  if (folDbg >= 2) printf("predicate_definition: constants_in_groundings\n");
+}
+constants_in_groundings ')'
+{ 
+  zzconsumeToken(zztokenList,")"); 
+  if (folDbg >= 1) printf(")\n"); 
+}
+;
 
 // function_return_constant '=' ZZ_FUNCTION '(' constants_in_groundings ')'
 function_definition:
@@ -1182,164 +1230,7 @@ atomic_sentence:
     zzpredFuncListObjs.push(predlo);
     delete [] predName;
   }
-  '(' 
-  {  
-    zzconsumeToken(zztokenList, "(");
-    if (folDbg >= 1) printf("( "); 
-    if (folDbg >= 2) printf("atomic_sentence: terms\n"); 
-    zzformulaStr.append("(");
-
-  }
-  terms 
-  ')'
-  {  
-    zzconsumeToken(zztokenList, ")");
-    if (folDbg >= 1) printf(") "); 
-
-	  //If an internal pred., then need to determine type
-	  //zzinfixPredName is misused here to store internal pred. name
-	if (zzinfixPredName)
-	{
-	  ListObj* predlo = zzpredFuncListObjs.top();
-      predlo->replace(PredicateTemplate::EMPTY_NAME, zzinfixPredName);
-		// types are possibly unknown
-		// If '=' predicate then types are possibly unknown
-		//if (strcmp(zzinfixPredName, PredicateTemplate::EQUAL_NAME)==0) {
-      int lTypeId = zzgetTypeId(zzpred->getTerm(0), (*predlo)[1]->getStr());
-      int rTypeId = zzgetTypeId(zzpred->getTerm(1), (*predlo)[2]->getStr());
-
-      if (lTypeId > 0 && rTypeId > 0) //if both types are known
-      {
-        if (lTypeId != rTypeId)
-          zzerr("The types on the left and right of '=' must match.");
-        if (strcmp(zzinfixPredName, PredicateTemplate::EQUAL_NAME)==0)
-        {
- 	      zzsetEqPredTypeName(lTypeId);
- 	    }
- 	    else
- 	    {
- 	      zzsetInternalPredTypeName(zzinfixPredName, lTypeId);
- 	    }
-      }
-      else  // if only one type is known
-      if ( (lTypeId<=0 && rTypeId>0) || (lTypeId>0 && rTypeId<=0) )
-      {
-        int knownTypeId = (lTypeId>0) ? lTypeId : rTypeId;
-        if (strcmp(zzinfixPredName, PredicateTemplate::EQUAL_NAME)==0)
-        {
-          zzsetEqPredTypeName(knownTypeId);
-        }
-        else
- 	    {
- 	      zzsetInternalPredTypeName(zzinfixPredName, knownTypeId);
- 	    }
-        const char* lvarName = (*predlo)[1]->getStr();
-        const char* rvarName = (*predlo)[2]->getStr();
-        const char* unknownVarName = (lTypeId>0) ?  rvarName : lvarName;
-        zzvarNameToIdMap[unknownVarName].typeId_ = knownTypeId;
-      }
-      else // if both types are unknown
-      {
-          //both sides must be variables
-        const char* lvarName = (*predlo)[1]->getStr();
-        const char* rvarName = (*predlo)[2]->getStr();
-        lTypeId = zzgetVarTypeId(lvarName);
-        rTypeId = zzgetVarTypeId(rvarName);
-	
-        if (lTypeId > 0 && rTypeId > 0) //if both types are known
-        {
-          if (lTypeId != rTypeId)
-            zzerr("The types of %s and %s on the left and right of "
-                   "'=' must match.", lvarName, rvarName);
-          if (strcmp(zzinfixPredName, PredicateTemplate::EQUAL_NAME)==0)
-          {
-          	zzsetEqPredTypeName(lTypeId);
-          }
-          else
- 	      {
- 	      	zzsetInternalPredTypeName(zzinfixPredName, lTypeId);
- 	      }
-        }
-        else  // if only one type is known
-        if ( (lTypeId<=0 && rTypeId>0) || (lTypeId>0 && rTypeId<=0) )
-        {
-          int knownTypeId = (lTypeId>0) ? lTypeId : rTypeId;
-          if (strcmp(zzinfixPredName, PredicateTemplate::EQUAL_NAME)==0)
-          {
-          	zzsetEqPredTypeName(knownTypeId);
-          }
-          else
- 	      {
- 	      	zzsetInternalPredTypeName(zzinfixPredName, knownTypeId);
- 	      }
-          const char* unknowVarName = (lTypeId>0) ?  rvarName : lvarName;
-          zzvarNameToIdMap[unknowVarName].typeId_ = knownTypeId;
-        }
-        else
-        {      
-		  if (strcmp(zzinfixPredName, PredicateTemplate::EQUAL_NAME)==0)
-          {
-          	string unknownEqName = zzappend(PredicateTemplate::EQUAL_NAME, 
-            	                            zzeqTypeCounter++);
-          	zzeqPredList.push_back(ZZUnknownEqPredInfo(unknownEqName,lvarName,
-                                                       rvarName));
-          	predlo->replace(PredicateTemplate::EQUAL_NAME, unknownEqName.c_str());
-          }
-          else
-          {
-          	string unknownIntPredName =
-          	  zzappendWithUnderscore(zzinfixPredName, zzintPredTypeCounter++);
-          	zzintPredList.push_back(ZZUnknownIntPredInfo(unknownIntPredName, lvarName,
-                                                       	 rvarName));
-          	predlo->replace(zzinfixPredName, unknownIntPredName.c_str());
-          }
-        }
-      }
-	  free(zzinfixPredName);
-      zzinfixPredName = NULL;
-	}
-
-    zzcheckPredNumTerm(zzpred);
-    delete zzpred;
-    zzpred = NULL;
-    zzassert(zzpredFuncListObjs.size()==1,
-             "expecting zzpredFuncListObjs.size()==1");
-    ListObj* predlo = zzpredFuncListObjs.top();
-    zzpredFuncListObjs.pop();
-
-    if (zzisAsterisk)
-    {
-      zzisAsterisk = false;
-      ListObj* lo = new ListObj;
-      lo->append("*"); lo->append(predlo);
-      zzformulaListObjs.push(lo);
-    }
-    else
-      zzformulaListObjs.push(predlo);
-
-    zzformulaStr.append(")");
-
-	// If we have replaced a function inside the predicate
-	// then we have to add the conjunction
-	while (!zzfuncConjStack.empty())
-	{
-		// create the second part of the conjunction
-		//zzformulaStr.append(" ^ ");
-      ListObj* topPredlo = zzfuncConjStack.top();
-      zzfuncConjStack.pop();
-      //zzformulaListObjs.push(topPredlo);
-      //zzcreateListObjFromTopTwo(zzformulaListObjs, "^");
-      zzformulaListObjs.push(topPredlo);
-      zzcreateListObjFromTopTwo(zzformulaListObjs, "v");
-	} //while (!zzfuncConjStack.empty())
-
-	if (!zzfuncConjStr.empty())
-	{
-      zzformulaStr.append(zzfuncConjStr);
-      zzfuncConjStr.clear();
-	}
-	zzfunc = NULL;
-  }
+  nothing_or_terms
 | 
   // term internal_predicate_sign term
   {
@@ -1525,6 +1416,183 @@ atomic_sentence:
   }
 ;
 
+nothing_or_terms:
+  // Nothing (propositional case)
+  {
+	// Add the one constant for propositional case
+    const char* constName = Domain::PROPOSITIONAL_CONSTANT;
+    if (folDbg >= 1) printf("c2_%s ", constName); 
+    zztermIsConstant(constName, constName, false);
+
+    zzcheckPredNumTerm(zzpred);
+    delete zzpred;
+    zzpred = NULL;
+    zzassert(zzpredFuncListObjs.size()==1,
+             "expecting zzpredFuncListObjs.size()==1");
+    ListObj* predlo = zzpredFuncListObjs.top();
+    zzpredFuncListObjs.pop();
+    zzformulaListObjs.push(predlo);
+  }
+|
+  '(' 
+  {  
+    zzconsumeToken(zztokenList, "(");
+    if (folDbg >= 1) printf("( "); 
+    if (folDbg >= 2) printf("atomic_sentence: terms\n"); 
+    zzformulaStr.append("(");
+  }
+  terms 
+  ')'
+  {  
+    zzconsumeToken(zztokenList, ")");
+    if (folDbg >= 1) printf(") "); 
+
+	  //If an internal pred., then need to determine type
+	  //zzinfixPredName is misused here to store internal pred. name
+	if (zzinfixPredName)
+	{
+	  ListObj* predlo = zzpredFuncListObjs.top();
+      predlo->replace(PredicateTemplate::EMPTY_NAME, zzinfixPredName);
+		// types are possibly unknown
+		// If '=' predicate then types are possibly unknown
+		//if (strcmp(zzinfixPredName, PredicateTemplate::EQUAL_NAME)==0) {
+      int lTypeId = zzgetTypeId(zzpred->getTerm(0), (*predlo)[1]->getStr());
+      int rTypeId = zzgetTypeId(zzpred->getTerm(1), (*predlo)[2]->getStr());
+
+      if (lTypeId > 0 && rTypeId > 0) //if both types are known
+      {
+        if (lTypeId != rTypeId)
+          zzerr("The types on the left and right of '=' must match.");
+        if (strcmp(zzinfixPredName, PredicateTemplate::EQUAL_NAME)==0)
+        {
+ 	      zzsetEqPredTypeName(lTypeId);
+ 	    }
+ 	    else
+ 	    {
+ 	      zzsetInternalPredTypeName(zzinfixPredName, lTypeId);
+ 	    }
+      }
+      else  // if only one type is known
+      if ( (lTypeId<=0 && rTypeId>0) || (lTypeId>0 && rTypeId<=0) )
+      {
+        int knownTypeId = (lTypeId>0) ? lTypeId : rTypeId;
+        if (strcmp(zzinfixPredName, PredicateTemplate::EQUAL_NAME)==0)
+        {
+          zzsetEqPredTypeName(knownTypeId);
+        }
+        else
+ 	    {
+ 	      zzsetInternalPredTypeName(zzinfixPredName, knownTypeId);
+ 	    }
+        const char* lvarName = (*predlo)[1]->getStr();
+        const char* rvarName = (*predlo)[2]->getStr();
+        const char* unknownVarName = (lTypeId>0) ?  rvarName : lvarName;
+        zzvarNameToIdMap[unknownVarName].typeId_ = knownTypeId;
+      }
+      else // if both types are unknown
+      {
+          //both sides must be variables
+        const char* lvarName = (*predlo)[1]->getStr();
+        const char* rvarName = (*predlo)[2]->getStr();
+        lTypeId = zzgetVarTypeId(lvarName);
+        rTypeId = zzgetVarTypeId(rvarName);
+	
+        if (lTypeId > 0 && rTypeId > 0) //if both types are known
+        {
+          if (lTypeId != rTypeId)
+            zzerr("The types of %s and %s on the left and right of "
+                   "'=' must match.", lvarName, rvarName);
+          if (strcmp(zzinfixPredName, PredicateTemplate::EQUAL_NAME)==0)
+          {
+          	zzsetEqPredTypeName(lTypeId);
+          }
+          else
+ 	      {
+ 	      	zzsetInternalPredTypeName(zzinfixPredName, lTypeId);
+ 	      }
+        }
+        else  // if only one type is known
+        if ( (lTypeId<=0 && rTypeId>0) || (lTypeId>0 && rTypeId<=0) )
+        {
+          int knownTypeId = (lTypeId>0) ? lTypeId : rTypeId;
+          if (strcmp(zzinfixPredName, PredicateTemplate::EQUAL_NAME)==0)
+          {
+          	zzsetEqPredTypeName(knownTypeId);
+          }
+          else
+ 	      {
+ 	      	zzsetInternalPredTypeName(zzinfixPredName, knownTypeId);
+ 	      }
+          const char* unknowVarName = (lTypeId>0) ?  rvarName : lvarName;
+          zzvarNameToIdMap[unknowVarName].typeId_ = knownTypeId;
+        }
+        else
+        {      
+		  if (strcmp(zzinfixPredName, PredicateTemplate::EQUAL_NAME)==0)
+          {
+          	string unknownEqName = zzappend(PredicateTemplate::EQUAL_NAME, 
+            	                            zzeqTypeCounter++);
+          	zzeqPredList.push_back(ZZUnknownEqPredInfo(unknownEqName,lvarName,
+                                                       rvarName));
+          	predlo->replace(PredicateTemplate::EQUAL_NAME, unknownEqName.c_str());
+          }
+          else
+          {
+          	string unknownIntPredName =
+          	  zzappendWithUnderscore(zzinfixPredName, zzintPredTypeCounter++);
+          	zzintPredList.push_back(ZZUnknownIntPredInfo(unknownIntPredName, lvarName,
+                                                       	 rvarName));
+          	predlo->replace(zzinfixPredName, unknownIntPredName.c_str());
+          }
+        }
+      }
+	  free(zzinfixPredName);
+      zzinfixPredName = NULL;
+	}
+
+    zzcheckPredNumTerm(zzpred);
+    delete zzpred;
+    zzpred = NULL;
+    zzassert(zzpredFuncListObjs.size()==1,
+             "expecting zzpredFuncListObjs.size()==1");
+    ListObj* predlo = zzpredFuncListObjs.top();
+    zzpredFuncListObjs.pop();
+
+    if (zzisAsterisk)
+    {
+      zzisAsterisk = false;
+      ListObj* lo = new ListObj;
+      lo->append("*"); lo->append(predlo);
+      zzformulaListObjs.push(lo);
+    }
+    else
+      zzformulaListObjs.push(predlo);
+
+    zzformulaStr.append(")");
+
+	// If we have replaced a function inside the predicate
+	// then we have to add the conjunction
+	while (!zzfuncConjStack.empty())
+	{
+		// create the second part of the conjunction
+		//zzformulaStr.append(" ^ ");
+      ListObj* topPredlo = zzfuncConjStack.top();
+      zzfuncConjStack.pop();
+      //zzformulaListObjs.push(topPredlo);
+      //zzcreateListObjFromTopTwo(zzformulaListObjs, "^");
+      zzformulaListObjs.push(topPredlo);
+      zzcreateListObjFromTopTwo(zzformulaListObjs, "v");
+	} //while (!zzfuncConjStack.empty())
+
+	if (!zzfuncConjStr.empty())
+	{
+      zzformulaStr.append(zzfuncConjStr);
+      zzfuncConjStr.clear();
+	}
+	zzfunc = NULL;
+  }
+;
+
 internal_predicate_sign:
   '>'
   {
@@ -1684,7 +1752,7 @@ term:
   {
     const char* constName = zztokenList.removeLast();
     if (folDbg >= 1) printf("c2_%s ", constName); 
-    zztermIsConstant(constName, constName);
+    zztermIsConstant(constName, constName, true);
     if (zzfunc) zzfdfuncConstants.append(string(constName));
     else        zzfdconstName = constName;
     delete [] constName;
@@ -1696,7 +1764,7 @@ term:
     if (folDbg >= 1) printf("c2_%s ", constName); 
       if (zzconstantMustBeDeclared)
         zzerr("Constant %s must be declared before it is used", constName);
-    zztermIsConstant(constName, constName);
+    zztermIsConstant(constName, constName, true);
     if (zzfunc) zzfdfuncConstants.append(string(constName));
     else        zzfdconstName = constName;
     delete [] constName;
@@ -1711,7 +1779,7 @@ term:
     zzcreateAndCheckIntConstant(intStr, zzfunc, zzpred, zzdomain, constName);
     if (constName == NULL) { break; delete [] intStr; }
 
-    zztermIsConstant(constName, intStr);
+    zztermIsConstant(constName, intStr, true);
     if (zzfunc) zzfdfuncConstants.append(string(constName));
     else        zzfdconstName = constName;
     delete [] intStr;

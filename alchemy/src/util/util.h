@@ -2,11 +2,11 @@
  * All of the documentation and software included in the
  * Alchemy Software is copyrighted by Stanley Kok, Parag
  * Singla, Matthew Richardson, Pedro Domingos, Marc
- * Sumner and Hoifung Poon.
+ * Sumner, Hoifung Poon, and Daniel Lowd.
  * 
  * Copyright [2004-07] Stanley Kok, Parag Singla, Matthew
- * Richardson, Pedro Domingos, Marc Sumner and Hoifung
- * Poon. All rights reserved.
+ * Richardson, Pedro Domingos, Marc Sumner, Hoifung
+ * Poon, and Daniel Lowd. All rights reserved.
  * 
  * Contact: Pedro Domingos, University of Washington
  * (pedrod@cs.washington.edu).
@@ -28,8 +28,8 @@
  * of this software must display the following
  * acknowledgment: "This product includes software
  * developed by Stanley Kok, Parag Singla, Matthew
- * Richardson, Pedro Domingos, Marc Sumner and Hoifung
- * Poon in the Department of Computer Science and
+ * Richardson, Pedro Domingos, Marc Sumner, Hoifung
+ * Poon, and Daniel Lowd in the Department of Computer Science and
  * Engineering at the University of Washington".
  * 
  * 4. Your publications acknowledge the use or
@@ -69,6 +69,8 @@
 #include <string>
 using namespace std;
 #include <sstream>
+#include <sys/time.h>
+#include <sys/resource.h>
 
 class Util
 {
@@ -112,6 +114,41 @@ class Util
 	 ostringstream myStream;
 	 myStream<<i;
 	 return myStream.str();
+  }
+
+  static int factorial(int n)
+  {
+    int f = 1;
+    for (int i = 1; i <= n; i++)
+      f = f*i;
+    return f;
+  }
+
+  static int permute(int n, int k)
+  {
+    int result = 1;
+    if (n == 0 || k == 0)
+      return result;
+    for (int i = n; i > (n-k); i--)
+      result = result*i;
+    return result;
+  }
+
+  static double elapsed_seconds()
+  {
+    double answer;
+
+    static struct rusage prog_rusage;
+    static long prev_rusage_seconds = 0;
+    static long prev_rusage_micro_seconds = 0;
+
+    getrusage(0, &prog_rusage);
+    answer = (double)(prog_rusage.ru_utime.tv_sec-prev_rusage_seconds)
+           + ((double)(prog_rusage.ru_utime.tv_usec-prev_rusage_micro_seconds))
+           / 1000000.0 ;
+    prev_rusage_seconds = prog_rusage.ru_utime.tv_sec ;
+    prev_rusage_micro_seconds = prog_rusage.ru_utime.tv_usec ;
+    return answer;
   }
   
 };

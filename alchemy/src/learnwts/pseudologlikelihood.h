@@ -2,11 +2,11 @@
  * All of the documentation and software included in the
  * Alchemy Software is copyrighted by Stanley Kok, Parag
  * Singla, Matthew Richardson, Pedro Domingos, Marc
- * Sumner and Hoifung Poon.
+ * Sumner, Hoifung Poon, and Daniel Lowd.
  * 
  * Copyright [2004-07] Stanley Kok, Parag Singla, Matthew
- * Richardson, Pedro Domingos, Marc Sumner and Hoifung
- * Poon. All rights reserved.
+ * Richardson, Pedro Domingos, Marc Sumner, Hoifung
+ * Poon, and Daniel Lowd. All rights reserved.
  * 
  * Contact: Pedro Domingos, University of Washington
  * (pedrod@cs.washington.edu).
@@ -28,8 +28,8 @@
  * of this software must display the following
  * acknowledgment: "This product includes software
  * developed by Stanley Kok, Parag Singla, Matthew
- * Richardson, Pedro Domingos, Marc Sumner and Hoifung
- * Poon in the Department of Computer Science and
+ * Richardson, Pedro Domingos, Marc Sumner, Hoifung
+ * Poon, and Daniel Lowd in the Department of Computer Science and
  * Engineering at the University of Washington".
  * 
  * 4. Your publications acknowledge the use or
@@ -76,7 +76,7 @@
 
 //NOTE: "domain index" and "database index" are used interchangeably
 
-// expl and logl aren't available in cygwin / windows, so use exp and log
+  // expl and logl aren't available in cygwin / windows, so use exp and log
 #ifndef expl
 # define expl exp
 # define logl log
@@ -713,7 +713,7 @@ class PseudoLogLikelihood
             ((Term*) gndPred.getTerm(t++))->setId(constId);
 
           if (sampleGndPreds_ && !isSampledGndPred(g,sg)) continue;
-          
+
           if (computeCounts)
           {
             computeAndSetCounts(c, clauseIdxInMLN, predId, gndPred, g, db,
@@ -722,7 +722,6 @@ class PseudoLogLikelihood
           else
             removeCounts(clauseIdxInMLN, predId, g, domainIdx, undoInfos);
         } //for each grounding of pred 
-        //acc.deleteArraysAndClear();
       }
       else
       {  //there are constant terms or repeated variables
@@ -798,7 +797,6 @@ class PseudoLogLikelihood
           }
         }
 
-        //groundings.deleteArraysAndClear();
         for (int j = 0; j < varIdToMults.size(); j++) delete varIdToMults[j];
       } //there are constant terms or repeated variables
     } //for each pred that clause contains

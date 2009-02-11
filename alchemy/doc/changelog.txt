@@ -1,3 +1,23 @@
+Feb 7, 2008
+-----------
+* Bug when activating neg. weighted clauses fixed
+
+Nov 8, 2007
+-----------
+* By default, convergence is not tested in Gibbs.
+* One chain of Gibbs is allowed.
+* By default, hard clauses can not be broken by MaxWalkSat
+
+Oct 25, 2007
+----------
+* Lazy learning with MC-SAT implemented
+* Memory-based stopping of activation in a lazy state
+* Propositional Alchemy implemented
+* Domain-based false evidence index implemented
+* Bug in constant naming with multiple DBs fixed
+* Bug in use of inverted index in MRF creation fixed
+* Output added to MaxWalkSat
+
 Aug 29, 2007
 -----------
 * Bug in flipping atoms in blocks fixed

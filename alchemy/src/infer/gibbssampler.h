@@ -2,11 +2,11 @@
  * All of the documentation and software included in the
  * Alchemy Software is copyrighted by Stanley Kok, Parag
  * Singla, Matthew Richardson, Pedro Domingos, Marc
- * Sumner and Hoifung Poon.
+ * Sumner, Hoifung Poon, and Daniel Lowd.
  * 
  * Copyright [2004-07] Stanley Kok, Parag Singla, Matthew
- * Richardson, Pedro Domingos, Marc Sumner and Hoifung
- * Poon. All rights reserved.
+ * Richardson, Pedro Domingos, Marc Sumner, Hoifung
+ * Poon, and Daniel Lowd. All rights reserved.
  * 
  * Contact: Pedro Domingos, University of Washington
  * (pedrod@cs.washington.edu).
@@ -28,8 +28,8 @@
  * of this software must display the following
  * acknowledgment: "This product includes software
  * developed by Stanley Kok, Parag Singla, Matthew
- * Richardson, Pedro Domingos, Marc Sumner and Hoifung
- * Poon in the Department of Computer Science and
+ * Richardson, Pedro Domingos, Marc Sumner, Hoifung
+ * Poon, and Daniel Lowd in the Department of Computer Science and
  * Engineering at the University of Washington".
  * 
  * 4. Your publications acknowledge the use or
@@ -99,9 +99,10 @@ class GibbsSampler : public MCMC
     epsilonError_ = gibbsParams->epsilonError;
     fracConverged_ = gibbsParams->fracConverged;
     walksatType_ = gibbsParams->walksatType;
+    testConvergence_ = gibbsParams->testConvergence;
     samplesPerTest_ = gibbsParams->samplesPerTest;
     
-      // We don't need to track clause true counts in up and ss
+      // We don't need to track clause true counts in MWS
     mws_ = new MaxWalkSat(state_, seed, false, gibbsParams->mwsParams);
   }
 
@@ -135,6 +136,7 @@ class GibbsSampler : public MCMC
         mws_->infer();
         saveLowStateToChain(c);
       }
+      if (numChains_ == 1) state_->saveLowStateToGndPreds();
     }
       // Initialize randomly
     else
@@ -225,38 +227,51 @@ class GibbsSampler : public MCMC
       {
           // Use convergence criteria stated in "Probability and Statistics",
           // DeGroot and Schervish
-        bool burnConverged 
-          = GelmanConvergenceTest::checkConvergenceOfAll(burnConvergenceTests_,
+        bool burnConverged = false;
+        
+        if (testConvergence_)
+          burnConverged = 
+            GelmanConvergenceTest::checkConvergenceOfAll(burnConvergenceTests_,
                                                          state_->getNumAtoms(),
                                                          true);
         if (   (sample >= burnMinSteps_ && burnConverged)
             || (burnMaxSteps_ >= 0 && sample >= burnMaxSteps_)
             || (maxSeconds_ > 0 && secondsElapsed >= maxSeconds_))
         {
-          cout << "Done burning. " << sample << " samples per pred per chain (" 
-               << (burnConverged? "converged":"didn't converge") 
-               <<" at total of " << numChains_*sample << " samples per pred)" 
-               << endl;
+          cout << "Done burning. " << sample << " samples per pred per chain";
+          if (testConvergence_)
+          {
+            cout << " (" << (burnConverged? "converged":"didn't converge") 
+                 <<" at total of " << numChains_*sample << " samples per pred)";
+          }
+          cout << endl;
           burningIn = false;
           sample = 0;          
         }
       }
       else
       {  // Doing actual gibbs sampling
-        bool gibbsConverged 
-          = ConvergenceTest::checkConvergenceOfAtLeast(gibbsConvergenceTests_, 
+        bool gibbsConverged = false;
+        
+        if (testConvergence_)
+          gibbsConverged =
+            ConvergenceTest::checkConvergenceOfAtLeast(gibbsConvergenceTests_, 
                                                        state_->getNumAtoms(),
                                                        sample, fracConverged_,
                                                        true);
+
         if (   (sample >= minSteps_ && gibbsConverged) 
             || (maxSteps_ >= 0 && sample >= maxSteps_)
             || (maxSeconds_ > 0 && secondsElapsed >= maxSeconds_)) 
         {
           cout << "Done Gibbs sampling. " << sample 
-               << " samples per pred per chain ("
-               << (gibbsConverged? "converged":"didn't converge") 
-               <<" at total of " << numSamplesPerPred << " samples per pred)" 
-               << endl;
+               << " samples per pred per chain";
+          if (testConvergence_)
+          {
+            cout << " (" << (gibbsConverged? "converged":"didn't converge") 
+                 <<" at total of " << numSamplesPerPred << " samples per pred)";
+          }
+          cout << endl;
           done = true;
         }
       }
@@ -326,6 +341,8 @@ class GibbsSampler : public MCMC
   double fracConverged_;
     // 0 = Initialize randomly, 1 = initialize with MaxWalksat
   int walksatType_;
+    // If true, test for convergence, otherwise do not test
+  int testConvergence_;
     // Number of samples between checking for convergence
   int samplesPerTest_;
     // Convergence test for burning in

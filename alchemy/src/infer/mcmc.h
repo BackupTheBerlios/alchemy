@@ -2,11 +2,11 @@
  * All of the documentation and software included in the
  * Alchemy Software is copyrighted by Stanley Kok, Parag
  * Singla, Matthew Richardson, Pedro Domingos, Marc
- * Sumner and Hoifung Poon.
+ * Sumner, Hoifung Poon, and Daniel Lowd.
  * 
  * Copyright [2004-07] Stanley Kok, Parag Singla, Matthew
- * Richardson, Pedro Domingos, Marc Sumner and Hoifung
- * Poon. All rights reserved.
+ * Richardson, Pedro Domingos, Marc Sumner, Hoifung
+ * Poon, and Daniel Lowd. All rights reserved.
  * 
  * Contact: Pedro Domingos, University of Washington
  * (pedrod@cs.washington.edu).
@@ -28,8 +28,8 @@
  * of this software must display the following
  * acknowledgment: "This product includes software
  * developed by Stanley Kok, Parag Singla, Matthew
- * Richardson, Pedro Domingos, Marc Sumner and Hoifung
- * Poon in the Department of Computer Science and
+ * Richardson, Pedro Domingos, Marc Sumner, Hoifung
+ * Poon, and Daniel Lowd in the Department of Computer Science and
  * Engineering at the University of Washington".
  * 
  * 4. Your publications acknowledge the use or
@@ -240,20 +240,33 @@ class MCMC : public Inference
    */
   void initNumTrueLits(const int& numChains)
   {
+      // Single chain
+    if (numChains == 1) state_->resetMakeBreakCostWatch();
     for (int i = 0; i < state_->getNumClauses(); i++)
     {
       GroundClause* gndClause = state_->getGndClause(i);
       for (int j = 0; j < gndClause->getNumGroundPredicates(); j++)
       {
         const int atomIdx = abs(state_->getAtomInClause(j, i)) - 1;
-        for (int c = 0; c < numChains; c++)
+        const bool sense = gndClause->getGroundPredicateSense(j);
+        if (numChains > 1)
         {
-          if (truthValues_[atomIdx][c] == gndClause->getGroundPredicateSense(j))
+          for (int c = 0; c < numChains; c++)
           {
-            numTrueLits_[i][c]++;
-            assert(numTrueLits_[i][c] <= state_->getNumAtoms());
+            if (truthValues_[atomIdx][c] == sense)
+            {
+              numTrueLits_[i][c]++;
+              assert(numTrueLits_[i][c] <= state_->getNumAtoms());
+            }
           }
         }
+        else
+        { // Single chain
+          GroundPredicate* gndPred = state_->getGndPred(atomIdx);
+          if (gndPred->getTruthValue() == sense)
+            state_->incrementNumTrueLits(i);
+          assert(state_->getNumTrueLits(i) <= state_->getNumAtoms());
+        }        
       }
     }
   }
@@ -269,6 +282,7 @@ class MCMC : public Inference
   {
     for (int c = 0; c < numChains; c++)
     {
+      if (mcmcdebug) cout << "Chain " << c << ":" << endl;
         // For each block: select one to set to true
       for (int i = 0; i < state_->getDomain()->getNumPredBlocks(); i++)
       {
@@ -292,7 +306,14 @@ class MCMC : public Inference
 
           if (idx >= 0)
           {
-            truthValues_[idx][c] = true;
+              // Truth values are stored differently for multi-chain
+            if (numChains_ > 1)
+              truthValues_[idx][c] = true;
+            else
+            {
+              GroundPredicate* gndPred = state_->getGndPred(i);
+              gndPred->setTruthValue(true);
+            }
             setOthersInBlockToFalse(c, idx, i);
             ok = true;
           }
@@ -306,7 +327,15 @@ class MCMC : public Inference
         if (state_->getBlockIndex(i) == -1)
         {
           bool tv = genTruthValueForProb(0.5);
-          truthValues_[i][c] = tv;
+            // Truth values are stored differently for multi-chain
+          if (numChains_ > 1)
+            truthValues_[i][c] = tv;
+          else
+          {
+            GroundPredicate* gndPred = state_->getGndPred(i);
+            gndPred->setTruthValue(tv);
+          }
+          if (mcmcdebug) cout << "Pred " << i << " set to " << tv << endl;
         }
       }
     }
@@ -590,6 +619,7 @@ class MCMC : public Inference
           numSatLiterals = numTrueLits_[gndClauseIdx][chainIdx];
         else
           numSatLiterals = state_->getNumTrueLits(gndClauseIdx);
+
         if (numSatLiterals > 1)
         {
             // Some other literal is making it sat, so it doesn't matter
@@ -763,7 +793,7 @@ class MCMC : public Inference
 
         // Different for multi-chain
       if (numChains_ > 1)
-      {        
+      {
         if (truthValues_[gndPredIdx][chainIdx] == sense)
           numTrueLits_[gndClauseIdx][chainIdx]++;
         else
@@ -826,6 +856,12 @@ class MCMC : public Inference
     minSteps_ = params->minSteps;
     maxSteps_ = params->maxSteps;
     maxSeconds_ = params->maxSeconds;    
+  }
+
+  void scaleSamples(double factor)
+  {
+    minSteps_ = (int)(minSteps_ * factor);
+    maxSteps_ = (int)(maxSteps_ * factor);
   }
   
  protected:

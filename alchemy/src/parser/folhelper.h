@@ -2,11 +2,11 @@
  * All of the documentation and software included in the
  * Alchemy Software is copyrighted by Stanley Kok, Parag
  * Singla, Matthew Richardson, Pedro Domingos, Marc
- * Sumner and Hoifung Poon.
+ * Sumner, Hoifung Poon, and Daniel Lowd.
  * 
  * Copyright [2004-07] Stanley Kok, Parag Singla, Matthew
- * Richardson, Pedro Domingos, Marc Sumner and Hoifung
- * Poon. All rights reserved.
+ * Richardson, Pedro Domingos, Marc Sumner, Hoifung
+ * Poon, and Daniel Lowd. All rights reserved.
  * 
  * Contact: Pedro Domingos, University of Washington
  * (pedrod@cs.washington.edu).
@@ -28,8 +28,8 @@
  * of this software must display the following
  * acknowledgment: "This product includes software
  * developed by Stanley Kok, Parag Singla, Matthew
- * Richardson, Pedro Domingos, Marc Sumner and Hoifung
- * Poon in the Department of Computer Science and
+ * Richardson, Pedro Domingos, Marc Sumner, Hoifung
+ * Poon, and Daniel Lowd in the Department of Computer Science and
  * Engineering at the University of Washington".
  * 
  * 4. Your publications acknowledge the use or
@@ -1647,6 +1647,9 @@ int zzcreateBlocks(const Domain* const & domain)
         // One pred has to be true
       if (!trueOne)
       {
+        cout << "Problem with predicate ";
+        newPred->print(cout, domain); 
+        cout << endl;
         zzexit(": No true atom was found for mutually "
                "exclusive and exhaustive variables");
       }
@@ -1827,6 +1830,7 @@ void zzcreateAndCheckIntConstant(const char* const & intStr,
   //ASSUMPTION: users don't define truth values of '=' ground preds e.g. A=A
 void zzaddGndPredsToDb(Database* const & db)
 {
+    // Add explicit evidence to db
   int numPreds = zzdomain->getNumPredicates();
   hash_map<int, PredicateHashArray*>::iterator it;
   for (int i = 0; i < numPreds; i++)
@@ -1835,9 +1839,8 @@ void zzaddGndPredsToDb(Database* const & db)
     {
       PredicateHashArray* predHashArray = (*it).second;
       for (int j = 0; j < predHashArray->size(); j++)
-	  {
         db->addEvidenceGroundPredicate((*predHashArray)[j]);
-	  }
+
       predHashArray->deleteItemsAndClear();
     }
     else
@@ -1846,11 +1849,66 @@ void zzaddGndPredsToDb(Database* const & db)
     }
   }
 
-  //if (db->storeGroundPreds()) db->addAllGroundings();
+    // If the predicate occurs in the mln with a non-evidence atom, then add
+    // it to the index in DB
+    
+    // Keep track of preds already indexed
+  Array<Predicate*> indexedPreds;
+  
+  for (int i = 0; i < zzmln->getNumClauses(); i++)
+  {
+    const Clause* clause = zzmln->getClause(i);
+      // First check if non-evid. pred is in clause
+    Array<bool> nonEvidPred(clause->getNumPredicates(), false);
+    bool oneNonEvidPred = false;
+    for (int j = 0; j < clause->getNumPredicates(); j++)
+    {
+      Predicate* pred = clause->getPredicate(j);
+      if (!db->isClosedWorld(pred->getId()))
+      {
+        nonEvidPred[j] = true;
+        oneNonEvidPred = true;
+      }
+    }
+
+      // If at least one pred is non-evid., then create index for evidence
+    if (oneNonEvidPred)
+    {
+      for (int j = 0; j < clause->getNumPredicates(); j++)
+      {
+        if (!nonEvidPred[j])
+        {
+          Predicate* pred = clause->getPredicate(j);
+          if (pred->isEqualPred()) continue;
+            // Neg. literal means true groundings are added to index which
+            // already happened above in addEvidenceGroundPredicate
+          if (!pred->getSense())
+            continue;
+
+          for (int k = 0; k < indexedPreds.size(); k++)
+          {
+            if (indexedPreds[k]->canBeGroundedAs(pred))
+              continue;
+          }
+            // Add all groundings to index
+          indexedPreds.append(pred);
+            // Generate groundings to add to index
+          Array<Predicate*> predArr;
+          pred->createAllGroundings(zzdomain, predArr);
+          int numPreds = predArr.size();
+          for (int l = 0; l < numPreds; l++)
+          {
+            Predicate* newPred = predArr[l];
+            db->addPredToEvidenceIndex(newPred, pred->getSense());
+            delete newPred;
+          }
+        }
+      }
+    }
+  }
 
   for (unsigned int i = 0; i < zzpredIdToGndPredMap.size(); i++)
     delete zzpredIdToGndPredMap[i]; 
-
 }
 
 
@@ -1878,7 +1936,7 @@ void zzcreateBoolArr(int idx, Array<bool>*& curArray,
 
 
   // vs (variable or string) is the name of the constant
-void zzaddConstantToDomain(const char* const & vs,const char* const & typeName)
+void zzaddConstantToDomain(const char* const & vs, const char* const & typeName)
 {
   //if it is not a string and it does not begin with an uppercase char
   //if (vs[0] != '"' && !isupper(vs[0]))
@@ -1908,7 +1966,7 @@ void zzaddConstantToPredFunc(const char* const & constName)
     if (zzpred) typeName = zzpred->getTermTypeAsStr(zzpred->getNumTerms());
 
       // May be continuing after a parse error
-    if (typeName==NULL) 
+    if (typeName == NULL) 
     {
       zzwarn("Wrong number of terms.");
       typeName=PredicateTemplate::ANY_TYPE_NAME;
@@ -1924,8 +1982,8 @@ void zzaddConstantToPredFunc(const char* const & constName)
 
 
 void zztermIsConstant(const char* const & constName,
-                      const char* const & constStr)
-{  
+                      const char* const & constStr, const bool& appendToFormula)
+{
   int constId = zzdomain->getConstantId(constName);
     //commented out because a constant can be declared with its first appearance
   //if (constId < 0) zzexit("Failed to find constant %s. Have you declared it?",
@@ -1961,7 +2019,7 @@ void zztermIsConstant(const char* const & constName,
     zzassert(zzpredFuncListObjs.size()==1, 
              "expect zzpredFuncListObjs.size()==1");
     zzpredFuncListObjs.top()->append(constName);
-    zzformulaStr.append(constStr);
+    if (appendToFormula) zzformulaStr.append(constStr);
   }
   else 
     zzexit("No function or predicate to hold constant %s", constName);
@@ -2026,7 +2084,7 @@ void zztermIsVariable(const bool& folDbg)
     
     if (zzconstantMustBeDeclared)
       zzerr("Constant %s must be declared before it is used", varName);
-    zztermIsConstant(varName, varName);
+    zztermIsConstant(varName, varName, true);
     delete [] varName;
   }
   else
@@ -2242,6 +2300,7 @@ void zzinit()
   //func->append("int"); //return type
   //func->append("int");
   //func->append("int");
+    // return type
   func->append(PredicateTemplate::ANY_TYPE_NAME);
   func->append(PredicateTemplate::ANY_TYPE_NAME);
   func->append(PredicateTemplate::ANY_TYPE_NAME);
@@ -2253,6 +2312,7 @@ void zzinit()
   //func->append("int"); //return type
   //func->append("int");
   //func->append("int");
+    // return type
   func->append(PredicateTemplate::ANY_TYPE_NAME);
   func->append(PredicateTemplate::ANY_TYPE_NAME);
   func->append(PredicateTemplate::ANY_TYPE_NAME);
@@ -2264,6 +2324,7 @@ void zzinit()
   //func->append("int"); //return type
   //func->append("int");
   //func->append("int");
+    // return type
   func->append(PredicateTemplate::ANY_TYPE_NAME);
   func->append(PredicateTemplate::ANY_TYPE_NAME);
   func->append(PredicateTemplate::ANY_TYPE_NAME);
@@ -2275,6 +2336,7 @@ void zzinit()
   //func->append("int"); //return type
   //func->append("int");
   //func->append("int");
+    // return type
   func->append(PredicateTemplate::ANY_TYPE_NAME);
   func->append(PredicateTemplate::ANY_TYPE_NAME);
   func->append(PredicateTemplate::ANY_TYPE_NAME);
@@ -2286,6 +2348,7 @@ void zzinit()
   //func->append("int"); //return type
   //func->append("int");
   //func->append("int");
+    // return type
   func->append(PredicateTemplate::ANY_TYPE_NAME);
   func->append(PredicateTemplate::ANY_TYPE_NAME);
   func->append(PredicateTemplate::ANY_TYPE_NAME);
@@ -2297,6 +2360,7 @@ void zzinit()
   //func->append("string"); //return type
   //func->append("string");
   //func->append("string");
+    // return type
   func->append(PredicateTemplate::ANY_TYPE_NAME);
   func->append(PredicateTemplate::ANY_TYPE_NAME);
   func->append(PredicateTemplate::ANY_TYPE_NAME);
@@ -2422,32 +2486,36 @@ void zzfillClosedWorldArray(Array<bool>& isClosedWorldArr,
 
   int numPreds = zzdomain->getNumPredicates();
   isClosedWorldArr.growToSize(numPreds, true);
-    // If a predicate has no evidence atoms, it is open-world (unless it's in
-    // cwPredNames), if it has evidence atoms, it is closed-world (unless it's in
-    // owPredNames).
-  for (int i = 0; i < numPreds; i++)
+  if (!allPredsExceptQueriesAreClosedWorld)
   {
-    hash_map<int, PredicateHashArray*>::iterator it;
+      // If a predicate has no evidence atoms, it is open-world (unless it's in
+      // cwPredNames), if it has evidence atoms, it is closed-world (unless it's
+      // in owPredNames).
     for (int i = 0; i < numPreds; i++)
     {
-      if ((it = zzpredIdToGndPredMap.find(i)) != zzpredIdToGndPredMap.end())
+      hash_map<int, PredicateHashArray*>::iterator it;
+      for (int i = 0; i < numPreds; i++)
       {
-          // At least one evidence grounding is present
-        isClosedWorldArr[i] = true;
-      }
-      else
-      {
-          //  equality and internal predicates are handled specially by database
-        const PredicateTemplate* pt = zzdomain->getPredicateTemplate(i);          
-        if (!pt->isEqualPredicateTemplate() &&
-            !pt->isInternalPredicateTemplate())
-          isClosedWorldArr[i] = false;
-        else
+        if ((it = zzpredIdToGndPredMap.find(i)) != zzpredIdToGndPredMap.end())
+        {
+            // At least one evidence grounding is present
           isClosedWorldArr[i] = true;
+        }
+        else
+        {
+            // equality and internal predicates are handled specially by
+            // database
+          const PredicateTemplate* pt = zzdomain->getPredicateTemplate(i);          
+          if (!pt->isEqualPredicateTemplate() &&
+              !pt->isInternalPredicateTemplate())
+            isClosedWorldArr[i] = false;
+          else
+            isClosedWorldArr[i] = true;
+        }
       }
-    }
-  }  
-
+    }  
+  }
+  
     // Force these to be open-world
   if (openWorldPredNames)
   {
@@ -2570,8 +2638,10 @@ void zzappendFormulaClausesToMLN(const ListObj* const & formula,
       Array<Clause*> clauses;
       zzcreateClauses(cnf, clauses, flippedClause);
 
-      cout << "\tCNF has  " << clauses.size() << " clause"
-           << ((clauses.size()>1)?"s":"") << endl;
+        // Output message of cnf size only if more than one
+      if (clauses.size() > 1)
+        cout << "\tCNF has  " << clauses.size() << " clauses" << endl;
+
       delete cnf; delete vars;
 
       double perClauseWt = 0;

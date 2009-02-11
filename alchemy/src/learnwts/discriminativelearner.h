@@ -2,11 +2,11 @@
  * All of the documentation and software included in the
  * Alchemy Software is copyrighted by Stanley Kok, Parag
  * Singla, Matthew Richardson, Pedro Domingos, Marc
- * Sumner and Hoifung Poon.
+ * Sumner, Hoifung Poon, and Daniel Lowd.
  * 
  * Copyright [2004-07] Stanley Kok, Parag Singla, Matthew
- * Richardson, Pedro Domingos, Marc Sumner and Hoifung
- * Poon. All rights reserved.
+ * Richardson, Pedro Domingos, Marc Sumner, Hoifung
+ * Poon, and Daniel Lowd. All rights reserved.
  * 
  * Contact: Pedro Domingos, University of Washington
  * (pedrod@cs.washington.edu).
@@ -28,8 +28,8 @@
  * of this software must display the following
  * acknowledgment: "This product includes software
  * developed by Stanley Kok, Parag Singla, Matthew
- * Richardson, Pedro Domingos, Marc Sumner and Hoifung
- * Poon in the Department of Computer Science and
+ * Richardson, Pedro Domingos, Marc Sumner, Hoifung
+ * Poon, and Daniel Lowd in the Department of Computer Science and
  * Engineering at the University of Washington".
  * 
  * 4. Your publications acknowledge the use or
@@ -181,32 +181,17 @@ class DiscriminativeLearner
     }
 
     totalTrueCnts_.growToSize(domainCnt_);
+    totalFalseCnts_.growToSize(domainCnt_);
     defaultTrueCnts_.growToSize(domainCnt_);
+    defaultFalseCnts_.growToSize(domainCnt_);
     relevantClausesPerDomain_.growToSize(domainCnt_);
     //relevantClausesFormulas_ is set in findRelevantClausesFormulas()
 
     findRelevantClauses(nonEvidPredNames);
     findRelevantClausesFormulas();
 
-      // Initialize the clause wts for lazy version
-    if (lazyInference_)
-    {
-      findCountsInitializeWtsAndSetNonEvidPredsToUnknownInDB(nonEvidPredNames);
-    
-      for (int i = 0; i < domainCnt_; i++)
-      {
-        const MLN* mln = inferences_[i]->getState()->getMLN();
-        Array<double>& logOdds = logOddsPerDomain_[i];
-        assert(mln->getNumClauses() == logOdds.size());
-        for (int j = 0; j < mln->getNumClauses(); j++)
-          ((Clause*) mln->getClause(j))->setWt(logOdds[j]);
-      }
-    }
-      // Initialize the clause wts for eager version
-    else
-    {      
-      initializeWts(nonEvidPredNames);
-    }
+      // Initialize the clause wts
+    initializeWts(nonEvidPredNames);
     
       // Initialize the inference / state
     for (int i = 0; i < inferences_.size(); i++)
@@ -216,7 +201,10 @@ class DiscriminativeLearner
   ~DiscriminativeLearner() 
   {
     for (int i = 0; i < trainTrueCnts_.size(); i++)
+    {
       delete[] trainTrueCnts_[i];
+      delete[] trainFalseCnts_[i];
+    }
   }
 
     // set the prior means and std devs.
@@ -356,32 +344,33 @@ class DiscriminativeLearner
 
   void getVariance(Array<double>& variance, int numWeights)
   {
-    // Compute variance and gradient for each clause
+    if (dldebug)
+      cout << "Variances:" << endl;
+
+      // Compute variance and gradient for each clause
     for (int clauseno = 0; clauseno < numWeights; clauseno++)
     {
       variance[clauseno] = 0.0;
 
-      // Takes into account the prior
+        // Takes into account the prior
       if (usePrior_)
       {
          double sd = priorStdDevs_[clauseno];
          variance[clauseno] = 1.0/(sd * sd);
       }
 
-      // Sum variance over all domains
+        // Sum variance over all domains
       for (int i = 0; i < domainCnt_; i++)
       {
-        const Array<double>* trueCnts   
-            = inferences_[i]->getClauseTrueCnts();
-        const Array<double>* trueSqCnts 
-            = inferences_[i]->getClauseTrueSqCnts();
+        const Array<double>* trueCnts = inferences_[i]->getClauseTrueCnts();
+        const Array<double>* trueSqCnts = inferences_[i]->getClauseTrueSqCnts();
         int totalSamples = inferences_[i]->getNumSamples();
 
         double x   = (*trueCnts)[clauseno];
         double xsq = (*trueSqCnts)[clauseno];
         double n   = totalSamples;
 
-        // Add variance for this domain
+          // Add variance for this domain
         variance[clauseno] += xsq/n - (x/n)*(x/n);
       }
       
@@ -393,7 +382,7 @@ class DiscriminativeLearner
 
   const Array<double>* getHessianVectorProduct(const Array<double>& d)
   {
-    // Compute Hessian vector product using counts from all inferences
+      // Compute Hessian vector product using counts from all inferences
     const Array<double>* Hd = inferences_[0]->getHessianVectorProduct(d);
     for (int i = 1; i < domainCnt_; i++) 
     {
@@ -412,7 +401,7 @@ class DiscriminativeLearner
   {
     int numWeights = d.size();
 
-    // Compute step length using trust region approach
+      // Compute step length using trust region approach
     double dHd = dotprod(d, (*Hd), numWeights);
     double dd = dotprod(d, d, numWeights);
     double dg = dotprod(gradient, d, numWeights);
@@ -435,7 +424,7 @@ class DiscriminativeLearner
       // let the caller deal with it.
     if (alpha < 0.0) 
     {
-      //alpha = 0.0;
+        //alpha = 0.0;
       if (dldebug)
       {
         cout << "Alpha < 0!  Bad direction or Hessian." << endl;
@@ -496,6 +485,7 @@ class DiscriminativeLearner
       // step if we've already committed to reverting our weights.
     bool backtracked = false;
 
+    //int itersSinceSignificant = 0;
 
     for (int iter = 1; iter <= maxIter; iter++) 
     {
@@ -534,7 +524,24 @@ class DiscriminativeLearner
         }
       }
 
+#if 0
+      int tcounts[numWeights]; 
+      int tcountsTotal[numWeights]; 
+      int icounts[numWeights]; 
+      int icountsTotal[numWeights]; 
+#endif
+
+      // Set the weights and run inference
+      setMLNWeights(weights);
+    
+      if (withEM_) fillInMissingValues();
+      cout << "Running inference ..." << endl;
+      infer();
+      cout << "Done with inference" << endl;
+
       cout << "Getting gradient..." << endl;
+      //getGradient(weights, gradient, numWeights,
+      //        tcounts, tcountsTotal, icounts, icountsTotal);
       getGradient(weights, gradient, numWeights);
 
       double realdist = 1.0;
@@ -611,10 +618,6 @@ class DiscriminativeLearner
         // Adjust lambda using technique of (Fletcher, 1987)
         double delta = realdist/preddist;
 
-        // TEMP HACK DEBUG!  
-        // Disable all updates to lambda in a hackish way.
-        //delta = 0.5;
-
         if (!backtracked && preddist == 0)
           cg_lambda_ /= 4;
 
@@ -636,7 +639,8 @@ class DiscriminativeLearner
 #else
         if (!backtracked && preddist != 0 && delta > 0.75)
           cg_lambda_ /= 2;
-        if (delta < 0.25)
+        // if (delta < 0.25)   // Update schedule from (Fletcher, 1987)
+        if (delta < 0.0)       // Gentler update schedule, to handle noise
         {
           if (cg_lambda_ * 4 > cg_max_lambda_)
             cg_lambda_ = cg_max_lambda_;
@@ -681,6 +685,63 @@ class DiscriminativeLearner
         for (int i = 0; i < domainCnt_; i++)
           inferences_[i]->saveCnts();
       }
+
+
+#if 0
+      // Check for convergence.  If we're backtracking, skip these tests.
+      if (!backtracked)
+      {
+       for (int i = 0; i < numWeights; i++) 
+       {
+        // Smooth with Laplace prior
+        double priorCounts = 1.0;  
+        tcounts[i]      += priorCounts;
+        tcountsTotal[i] += priorCounts * 2.0;
+        icounts[i]      += priorCounts;
+        icountsTotal[i] += priorCounts * 2.0;
+
+        // Adjust training counts by the Gaussian prior
+        double sd = priorStdDevs_[i];
+        double effectiveCounts = tcounts[i] - 
+            (weights[i] - priorMeans_[i])/(sd*sd);
+
+        if (tcountsTotal[i] == 0) 
+          continue;
+
+        double p = effectiveCounts/tcountsTotal[i];
+        if (p < 0.0) { p = 0.0; }
+        if (p > 1.0) { p = 1.0; }
+        double cdf = // compute CDF for binomial here...
+
+        // TODO: make the significance level a command-line parameter
+        if (cdf < 0.05 || cdf > 0.95) 
+        {
+          // DEBUG
+          cout << "i = " << i << endl;
+          cout << "tc' = " << effectiveCounts << endl;
+          cout << "tc = " << tcounts[i] << "; tct = " << tcountsTotal[i] << endl;
+          cout << "ic = " << icounts[i] << "; ict = " << icountsTotal[i] << endl;
+          cout << "Base prob: " << p << endl;
+          cout << "Inferred prob: " << (double)icounts[i]/icountsTotal[i] << endl;
+          cout << "cdf = " << cdf << endl;
+
+          itersSinceSignificant = 0;
+          break;
+        }
+       }
+
+       // If no difference has been significant for 10 iterations, stop.
+       // TODO: make the constant 10 a command-line parameter.
+       itersSinceSignificant++;
+       if (itersSinceSignificant > 10) 
+       {
+          cout << "No significant difference in any dimension after "
+              << "10 iterations; halting!";
+          break;
+       }
+      }
+#endif
+
 
         // Scaled conjugate gradient: compute conjugate gradient direction
         //     using Polak-Ribiere and step size using Hessian matrix.
@@ -800,10 +861,11 @@ class DiscriminativeLearner
         double maxchange = -dotprod(gradient, wchange, numWeights);
         cout << "Maximum estimated improvement: " << maxchange << endl;
         if ((method_ == CG || method_ == DN) &&
-                maxchange < MIN_LL_CHANGE) {
-            cout << "Upper bound is less than " << MIN_LL_CHANGE
-                << "; halting learning." << endl;
-            break;
+            maxchange < MIN_LL_CHANGE)
+        {
+          cout << "Upper bound is less than " << MIN_LL_CHANGE
+               << "; halting learning." << endl;
+          break;
         }
 
         // Save weights, gradient, and direction and adjust the weights
@@ -983,133 +1045,209 @@ class DiscriminativeLearner
   }
 
 
+  /**
+   * Initializes the weights of the clauses. Assumption is that the inferences_
+   * (and their states) have been constructed.
+   * 
+   * @param nonEvidPredNames Names of the non-evidence predicate names in the
+   * domain.
+   */
   void initializeWts(const StringHashArray& nonEvidPredNames)
   {
     cout << "Initializing weights ..." << endl;
-    Array<double *> trainFalseCnts;
-    trainTrueCnts_.growToSize(domainCnt_);
-    trainFalseCnts.growToSize(domainCnt_);
+    
+    bool hasUnknownPreds;
+    
+    Array<Predicate*> gpreds;
+    Array<Predicate*> ppreds;
+    Array<TruthValue> gpredValues;
+    Array<TruthValue> tmpValues;
 
+    if (!lazyInference_)
+    { // Eager inference
+      trainTrueCnts_.growToSize(domainCnt_);
+      trainFalseCnts_.growToSize(domainCnt_);
+    }
+    
     for (int i = 0; i < domainCnt_; i++)
     {
       if (dldebug) cout << "Domain " << i << endl;
       int clauseCnt = clauseCntPerDomain_[i];
       if (dldebug) cout << "Clause count: " << clauseCnt << endl;
       VariableState* state = inferences_[i]->getState();
-      const GroundPredicateHashArray* unePreds = state->getUnePreds();
-      const GroundPredicateHashArray* knePreds = state->getKnePreds();
+      Domain* domain = (Domain*)state->getDomain();
 
-      trainTrueCnts_[i] = new double[clauseCnt];
-      trainFalseCnts[i] = new double[clauseCnt];
-
-      if (dldebug)
+      if (lazyInference_)
       {
-        cout << "Unknown non-evid preds: " << unePreds->size() << endl;
-        cout << "Known non-evid preds: " << knePreds->size() << endl;
-      }
-      int totalPreds = unePreds->size() + knePreds->size();
-        // Used to store gnd preds to be ignored in the count because they are
-        // UNKNOWN
-      Array<bool>* unknownPred = new Array<bool>;
-      unknownPred->growToSize(totalPreds, false);
-      for (int predno = 0; predno < totalPreds; predno++) 
-      {
-        GroundPredicate* p;
-        if (predno < unePreds->size())
-          p = (*unePreds)[predno];
-        else
-          p = (*knePreds)[predno - unePreds->size()];
-        TruthValue tv = state->getDomain()->getDB()->getValue(p);
-
-        //assert(tv != UNKNOWN);
-        //bool activate = true;
-        bool activate = false;
-        if (tv == TRUE)
+        domain->getDB()->setPerformingInference(false);
+  
+        //cout << endl << "Getting the counts for the domain " << i << endl;
+        gpreds.clear();
+        gpredValues.clear();
+        tmpValues.clear();
+        for (int predno = 0; predno < nonEvidPredNames.size(); predno++) 
         {
-          state->setValueOfAtom(predno + 1, true, activate, -1);
-          p->setTruthValue(true);
+          ppreds.clear();
+          int predid = domain->getPredicateId(nonEvidPredNames[predno].c_str());
+          Predicate::createAllGroundings(predid, domain, ppreds);
+          gpreds.append(ppreds);
         }
-        else
+      
+        domain->getDB()->alterTruthValue(&gpreds, UNKNOWN, FALSE, &gpredValues);
+      
+        hasUnknownPreds = false;
+      
+        Array<double>& trueCnt = totalTrueCnts_[i];
+        Array<double>& falseCnt = totalFalseCnts_[i];
+        trueCnt.growToSize(clauseCnt);
+        falseCnt.growToSize(clauseCnt);
+        calculateCounts(trueCnt, falseCnt, i, hasUnknownPreds);
+
+        //cout << "got the total counts..\n\n\n" << endl;
+        
+        hasUnknownPreds = true;
+
+        domain->getDB()->setValuesToUnknown(&gpreds, &tmpValues);
+
+        Array<double>& dTrueCnt = defaultTrueCnts_[i];
+        Array<double>& dFalseCnt = defaultFalseCnts_[i];
+        dTrueCnt.growToSize(clauseCnt);
+        dFalseCnt.growToSize(clauseCnt);
+        calculateCounts(dTrueCnt, dFalseCnt, i, hasUnknownPreds);
+
+        for (int predno = 0; predno < gpreds.size(); predno++) 
+          delete gpreds[predno];
+
+        domain->getDB()->setPerformingInference(true);        
+      }
+      else
+      { // Eager inference
+        const GroundPredicateHashArray* unePreds = state->getUnePreds();
+        const GroundPredicateHashArray* knePreds = state->getKnePreds();
+
+        trainTrueCnts_[i] = new double[clauseCnt];
+        trainFalseCnts_[i] = new double[clauseCnt];
+
+        if (dldebug)
         {
-          state->setValueOfAtom(predno + 1, false, activate, -1);
-          p->setTruthValue(false);
-            // Can have unknown truth values when using EM. We want to ignore
-            // these when performing the counts
-          if (tv == UNKNOWN)
+          cout << "Unknown non-evid preds: " << unePreds->size() << endl;
+          cout << "Known non-evid preds: " << knePreds->size() << endl;
+        }
+        int totalPreds = unePreds->size() + knePreds->size();
+          // Used to store gnd preds to be ignored in the count because they are
+          // UNKNOWN
+        Array<bool>* unknownPred = new Array<bool>;
+        unknownPred->growToSize(totalPreds, false);
+        for (int predno = 0; predno < totalPreds; predno++) 
+        {
+          GroundPredicate* p;
+          if (predno < unePreds->size())
+            p = (*unePreds)[predno];
+          else
+            p = (*knePreds)[predno - unePreds->size()];
+          TruthValue tv = state->getDomain()->getDB()->getValue(p);
+
+          //assert(tv != UNKNOWN);
+          //bool activate = true;
+          bool activate = false;
+          if (tv == TRUE)
           {
-            (*unknownPred)[predno] = true;
+            state->setValueOfAtom(predno + 1, true, activate, -1);
+            p->setTruthValue(true);
+          }
+          else
+          {
+            state->setValueOfAtom(predno + 1, false, activate, -1);
+            p->setTruthValue(false);
+              // Can have unknown truth values when using EM. We want to ignore
+              // these when performing the counts
+            if (tv == UNKNOWN)
+            {
+              (*unknownPred)[predno] = true;
+            }
           }
         }
-      }
 
-      state->initMakeBreakCostWatch();
-      //cout<<"getting true cnts => "<<endl;
-      state->getNumClauseGndingsWithUnknown(trainTrueCnts_[i], clauseCnt, true,
-                                            unknownPred);
-      //cout<<endl;
-      //cout<<"getting false cnts => "<<endl;
-      state->getNumClauseGndingsWithUnknown(trainFalseCnts[i], clauseCnt, false,
-                                            unknownPred);
-      delete unknownPred;
-      if (dldebug)
-      {
-        for (int clauseno = 0; clauseno < clauseCnt; clauseno++)
+        state->initMakeBreakCostWatch();
+        //cout<<"getting true cnts => "<<endl;
+        state->getNumClauseGndingsWithUnknown(trainTrueCnts_[i], clauseCnt, true,
+                                              unknownPred);
+        //cout<<endl;
+        //cout<<"getting false cnts => "<<endl;
+        state->getNumClauseGndingsWithUnknown(trainFalseCnts_[i], clauseCnt,
+                                              false, unknownPred);
+        delete unknownPred;
+        if (dldebug)
         {
-          cout << clauseno << " : tc = " << trainTrueCnts_[i][clauseno]
-               << " ** fc = " << trainFalseCnts[i][clauseno] << endl;
+          for (int clauseno = 0; clauseno < clauseCnt; clauseno++)
+          {
+            cout << clauseno << " : tc = " << trainTrueCnts_[i][clauseno]
+                 << " ** fc = " << trainFalseCnts_[i][clauseno] << endl;
+          }
         }
       }
     }
 
-    combinedTrueCnts_.growToSize(clauseCntPerDomain_[0]);
-    combinedTotalCnts_.growToSize(clauseCntPerDomain_[0]);
-
     double tc,fc;
+    int nonEvidPreds = 0;
     cout << "List of CNF Clauses : " << endl;
     for (int clauseno = 0; clauseno < clauseCntPerDomain_[0]; clauseno++)
     {
-      if (!relevantClausesPerDomain_[0][clauseno])
-      {
-        for (int i = 0; i < domainCnt_; i++)
-        {
-          Array<double>& logOdds = logOddsPerDomain_[i];
-          logOdds[clauseno] = 0.0;
-        }
-        continue;
-      }
-      //cout << endl << endl;
-      cout << clauseno << ":";
-      const Clause* clause =
-        inferences_[0]->getState()->getMLN()->getClause(clauseno);
-      //cout << (*fncArr)[clauseno]->formula <<endl;
-      clause->print(cout, inferences_[0]->getState()->getDomain());
-      cout << endl;
-      
       tc = 0.0; fc = 0.0;
-      for (int i = 0; i < domainCnt_;i++)
+      for (int i = 0; i < domainCnt_; i++) 
       {
-        tc += trainTrueCnts_[i][clauseno];
-        fc += trainFalseCnts[i][clauseno];
+        Domain* domain = (Domain*)inferences_[i]->getState()->getDomain();
+        Array<bool>& relevantClauses = relevantClausesPerDomain_[i];
+        Array<double>& logOdds = logOddsPerDomain_[i];
+      
+        if (!relevantClauses[clauseno])
+        {
+          domain->setNumTrueNonEvidGndings(clauseno, 0);
+          domain->setNumFalseNonEvidGndings(clauseno, 0);
+          logOdds[clauseno] = 0.0;
+          continue;
+        }
+        
+        cout << clauseno << ":";
+        const Clause* clause =
+          inferences_[i]->getState()->getMLN()->getClause(clauseno);
+        clause->print(cout, inferences_[0]->getState()->getDomain());
+        cout << endl;
+      
+        double domainTrueCnts = 0.0;
+        double domainFalseCnts = 0.0;
+        if (lazyInference_)
+        {
+          domainTrueCnts = totalTrueCnts_[i][clauseno] -
+                           defaultTrueCnts_[i][clauseno];
+          domainFalseCnts = totalFalseCnts_[i][clauseno] -
+                            defaultFalseCnts_[i][clauseno];
+        }
+        else
+        {
+          domainTrueCnts = trainTrueCnts_[i][clauseno];
+          domainFalseCnts = trainFalseCnts_[i][clauseno];
+        }
+
+        tc += domainTrueCnts;
+        fc += domainFalseCnts;
+        domain->setNumTrueNonEvidGndings(clauseno, domainTrueCnts);
+        domain->setNumFalseNonEvidGndings(clauseno, domainFalseCnts);
+
+        if (dldebug)
+          cout << clauseno << " : tc = " << tc << " ** fc = "<< fc <<endl;      
+
+        for (int i = 0; i < clause->getNumPredicates(); i++)
+        {
+          const char* predName = clause->getPredicate(i)->getTemplate()->getName();
+          if (nonEvidPredNames.contains(predName)) 
+            nonEvidPreds++;
+        }
       }
-	
-      //cout << "true count  = " << tc << endl;
-      //cout << "false count = " << fc << endl;
-	
+      
       double weight = 0.0;
       double totalCnt = tc + fc;
 
-      int nonEvidPreds = 0;
-      for (int i = 0; i < clause->getNumPredicates(); i++)
-      {
-          const char* predName 
-              = clause->getPredicate(i)->getTemplate()->getName();
-          if (nonEvidPredNames.contains(predName)) 
-            nonEvidPreds++;
-      }
-
-      combinedTrueCnts_[clauseno]  = (tc > 0) ? tc : 1;
-      combinedTotalCnts_[clauseno] = (totalCnt > 0) ? totalCnt : 1;
-		
       if (totalCnt == 0 || nonEvidPreds == 0) 
       {
         //cout << "NOTE: Total count is 0 for clause " << clauseno << endl;
@@ -1123,172 +1261,26 @@ class DiscriminativeLearner
           tc = 0.00001;
 
         double priorodds = (pow(2.0, nonEvidPreds) - 1.0)/1.0;
-
         weight = log(tc/fc) - log(priorodds);
-
-          /*
-        double prob =  tc / (tc+fc);
-        if (prob == 0) prob = 0.00001;
-        if (prob == 1) prob = 0.99999;
-        weight = log(prob/(1-prob));
-          //if weight exactly equals 0, make it small non zero, so that clause  
-          //is not ignored during the construction of the MRF
-        //if(weight == 0) weight = 0.0001;
-          //commented above - make sure all weights are positive in the
-          //beginning
-        //if(weight < EPSILON) weight = EPSILON;
-        if (abs(weight) < EPSILON) weight = EPSILON;
-          //cout << "Prob " << prob << " becomes weight of " << weight << endl;
-          */
       }
+
       for (int i = 0; i < domainCnt_; i++) 
       {
       	Array<double>& logOdds = logOddsPerDomain_[i];
         logOdds[clauseno] = weight;
       }
     }
-    cout << endl;
-    
-    for (int i = 0; i < trainFalseCnts.size(); i++)
-      delete[] trainFalseCnts[i];
   }
 
-  /**
-   * Finds the training counts and intialize the weights for the lazy version.
-   * True and false groundings have to be counted for each first-order clause
-   * (this is stored in each grounding while building the mrf in the eager
-   * version).
-   * 
-   * @param nonEvidPredNames List of non-evidence predicates.
-   */
-  void findCountsInitializeWtsAndSetNonEvidPredsToUnknownInDB(
-                                       const StringHashArray& nonEvidPredNames)
-  {
-    bool hasUnknownPreds;
-    Array<Array<double> > totalFalseCnts; 
-    Array<Array<double> > defaultFalseCnts;
-    totalFalseCnts.growToSize(domainCnt_);
-    defaultFalseCnts.growToSize(domainCnt_);
-    
-    Array<Predicate*> gpreds;
-    Array<Predicate*> ppreds;
-    Array<TruthValue> gpredValues;
-    Array<TruthValue> tmpValues;
-
-    for (int i = 0; i < domainCnt_; i++) 
-    {
-      const Domain* domain = inferences_[i]->getState()->getDomain();
-      int clauseCnt = clauseCntPerDomain_[i];
-      domain->getDB()->setPerformingInference(false);
-
-      //cout << endl << "Getting the counts for the domain " << i << endl;
-      gpreds.clear();
-      gpredValues.clear();
-      tmpValues.clear();
-      for (int predno = 0; predno < nonEvidPredNames.size(); predno++) 
-      {
-        ppreds.clear();
-        int predid = domain->getPredicateId(nonEvidPredNames[predno].c_str());
-        Predicate::createAllGroundings(predid, domain, ppreds);
-        //cout<<"size of gnd for pred " << predid << " = "<<ppreds.size()<<endl;
-        gpreds.append(ppreds);
-      }
-      
-      domain->getDB()->alterTruthValue(&gpreds, UNKNOWN, FALSE, &gpredValues);
-	  
-      //cout <<"size of unknown set for domain "<<i<<" = "<<gpreds.size()<<endl;
-      //cout << "size of the values " << i << " = " << gpredValues.size()<<endl;
-	
-      hasUnknownPreds = false;
-      
-      Array<double>& trueCnt = totalTrueCnts_[i];
-      Array<double>& falseCnt = totalFalseCnts[i];
-      trueCnt.growToSize(clauseCnt);
-      falseCnt.growToSize(clauseCnt);
-      calculateCounts(trueCnt, falseCnt, i, hasUnknownPreds);
-
-      //cout << "got the total counts..\n\n\n" << endl;
-      
-      hasUnknownPreds = true;
-
-      domain->getDB()->setValuesToUnknown(&gpreds, &tmpValues);
-
-      Array<double>& dTrueCnt = defaultTrueCnts_[i];
-      Array<double>& dFalseCnt = defaultFalseCnts[i];
-      dTrueCnt.growToSize(clauseCnt);
-      dFalseCnt.growToSize(clauseCnt);
-      calculateCounts(dTrueCnt, dFalseCnt, i, hasUnknownPreds);
-
-      //commented out: no need to revert the grounded non-evidence predicates
-      //               to their initial values because we want to set ALL of
-      //               them to UNKNOWN
-      //assert(gpreds.size() == gpredValues.size());
-      //domain->getDB()->setValuesToGivenValues(&gpreds, &gpredValues);
-	  
-      //cout << "the ground predicates are :" << endl;
-      for (int predno = 0; predno < gpreds.size(); predno++) 
-        delete gpreds[predno];
-
-      domain->getDB()->setPerformingInference(true);
-    }
-    //cout << endl << endl;
-    //cout << "got the default counts..." << endl;     
-    for (int clauseno = 0; clauseno < clauseCntPerDomain_[0]; clauseno++) 
-    {
-      double tc = 0;
-      double fc = 0;
-      for (int i = 0; i < domainCnt_; i++) 
-      {
-      	Array<bool>& relevantClauses = relevantClausesPerDomain_[i];
-      	Array<double>& logOdds = logOddsPerDomain_[i];
-      
-        if (!relevantClauses[clauseno]) { logOdds[clauseno] = 0; continue; }
-        tc += totalTrueCnts_[i][clauseno] - defaultTrueCnts_[i][clauseno];
-        fc += totalFalseCnts[i][clauseno] - defaultFalseCnts[i][clauseno];
-
-        if (dldebug)
-          cout << clauseno << " : tc = " << tc << " ** fc = "<< fc <<endl;      
-      }
-      
-      double weight = 0.0;
-
-      if ((tc + fc) == 0) 
-      {
-        //cout << "NOTE: Total count is 0 for clause " << clauseno << endl;
-      } 
-      else 
-      {
-        double prob = tc / (tc+fc);
-        if (prob == 0) prob = 0.00001;
-        if (prob == 1) prob = 0.99999;
-        weight = log(prob / (1-prob));
-            //if weight exactly equals 0, make it small non zero, so that clause
-            //is not ignored during the construction of the MRF
-        //if (weight == 0) weight = 0.0001;
-        if (abs(weight) < EPSILON) weight = EPSILON;
-          //cout << "Prob " << prob << " becomes weight of " << weight << endl;
-      }
-      
-      	// Set logOdds in all domains to the weight calculated
-      for(int i = 0; i < domainCnt_; i++) 
-      { 
-      	Array<double>& logOdds = logOddsPerDomain_[i];
-        logOdds[clauseno] = weight;
-      }
-    }
-  }
- 
   
   /**
    * Runs inference using the current set of parameters.
    */
   void infer() 
   {
-    //const int INIT_FREQUENCY = 5;
-    //static int inferCount = 0;
-
     for (int i = 0; i < domainCnt_; i++) 
     {
+      if (dldebug) cout << "in domain " << i << endl;
       VariableState* state = inferences_[i]->getState();
       state->setGndClausesWtsToSumOfParentWts();
       // MWS: Search is started from state at end of last iteration
@@ -1334,26 +1326,15 @@ class DiscriminativeLearner
       }
 
         // Compute counts
-      if (lazyInference_)
-      {
-        Array<double>& trueCnt = totalTrueCnts_[i];
-        Array<double> falseCnt;
-        bool hasUnknownPreds = false;
-        falseCnt.growToSize(trueCnt.size());
-        calculateCounts(trueCnt, falseCnt, i, hasUnknownPreds);
-      }
-      else
-      {
-        int clauseCnt = clauseCntPerDomain_[i];
-        state->initMakeBreakCostWatch();
-        //cout<<"getting true cnts => "<<endl;
-        const Array<double>* clauseTrueCnts =
-          inferences_[i]->getClauseTrueCnts();
-        assert(clauseTrueCnts->size() == clauseCnt);
-        int numSamples = inferences_[i]->getNumSamples();
-        for (int j = 0; j < clauseCnt; j++)
-          trainTrueCnts_[i][j] = (*clauseTrueCnts)[j]/numSamples;
-      }
+      int clauseCnt = clauseCntPerDomain_[i];
+      state->initMakeBreakCostWatch();
+      //cout<<"getting true cnts => "<<endl;
+      const Array<double>* clauseTrueCnts =
+        inferences_[i]->getClauseTrueCnts();
+      assert(clauseTrueCnts->size() == clauseCnt);
+      int numSamples = inferences_[i]->getNumSamples();
+      for (int j = 0; j < clauseCnt; j++)
+        trainTrueCnts_[i][j] = (*clauseTrueCnts)[j]/numSamples;
 
         // Set evidence values back
       //assert(uePreds.size() == ueValues[i].size());
@@ -1366,6 +1347,78 @@ class DiscriminativeLearner
     cout << "Done filling in missing data" << endl;    
   }
 
+#if 0
+  // This was used by the statistical significance convergence test,
+  // to see if our counts could be drawn from the same distribution
+  // as the true counts.
+
+  void getCountsForDomain(int* const & clauseTrainCnts, 
+          int* const & clauseTrainTotal, int* const & clauseInferredCnts, 
+          int* const & clauseInferredTotal, int domainIdx)
+  {
+    Array<bool>& relevantClauses = relevantClausesPerDomain_[domainIdx];
+    int clauseCnt = clauseCntPerDomain_[domainIdx];
+    double* trainCnts = NULL;
+    double* inferredCnts = NULL;
+    Array<double>& totalTrueCnts = totalTrueCnts_[domainIdx];
+    //Array<double>& totalFalseCnts = totalFalseCnts_[domainIdx];
+    Array<double>& defaultTrueCnts = defaultTrueCnts_[domainIdx];    
+    const MLN* mln = inferences_[domainIdx]->getState()->getMLN();
+    const Domain* domain = inferences_[domainIdx]->getState()->getDomain();
+
+    memset(clauseTrainCnts, 0, clauseCnt*sizeof(double));
+    memset(clauseInferredCnts, 0, clauseCnt*sizeof(double));
+    memset(clauseTrainTotal, 0, clauseCnt*sizeof(double));
+    memset(clauseInferredTotal, 0, clauseCnt*sizeof(double));
+
+    if (!lazyInference_)
+    {
+      if (!inferredCnts) inferredCnts = new double[clauseCnt];
+
+      const Array<double>* clauseTrueCnts =
+        inferences_[domainIdx]->getClauseTrueCnts();
+      assert(clauseTrueCnts->size() == clauseCnt);
+      for (int i = 0; i < clauseCnt; i++)
+        inferredCnts[i] = (*clauseTrueCnts)[i];
+
+      trainCnts = trainTrueCnts_[domainIdx];
+    }
+      //loop over all the training examples
+    //cout << "\t\ttrain count\t\t\t\tinferred count" << endl << endl;
+    for (int clauseno = 0; clauseno < clauseCnt; clauseno++) 
+    {
+      if (!relevantClauses[clauseno]) continue;
+      
+      // Compute total groundings
+      int totalGndings = (int)(trainFalseCnts_[domainIdx][clauseno] 
+              + trainTrueCnts_[domainIdx][clauseno]);
+      clauseTrainTotal[clauseno] += totalGndings;
+      clauseInferredTotal[clauseno] += totalGndings * 
+          inferences_[domainIdx]->getNumSamples();
+      
+      if (lazyInference_)
+      {
+      	Clause* clause = (Clause*) mln->getClause(clauseno);
+
+      	double trainCnt = totalTrueCnts[clauseno];
+      	double inferredCnt =
+          clause->getNumTrueGroundings(domain, domain->getDB(), false);
+      	trainCnt -= defaultTrueCnts[clauseno];
+      	inferredCnt -= defaultTrueCnts[clauseno];
+      	clauseTrainCnts[clauseno] += (int)trainCnt;
+      	clauseInferredCnts[clauseno] += (int)inferredCnt;
+      }
+      else
+      {
+        clauseTrainCnts[clauseno] += (int)trainCnts[clauseno];
+        clauseInferredCnts[clauseno] += (int)inferredCnts[clauseno];
+      }
+      //cout << clauseno << ":\t\t" <<trainCnt<<"\t\t\t\t"<<inferredCnt<<endl;
+    }
+
+    delete[] inferredCnts;
+  }
+#endif
   
   // Get the gradient of the negative log likelihood for one domain
   void getGradientForDomain(double* const & gradient, const int& domainIdx)
@@ -1376,48 +1429,40 @@ class DiscriminativeLearner
     double* inferredCnts = NULL;
     double* clauseTrainCnts = new double[clauseCnt]; 
     double* clauseInferredCnts = new double[clauseCnt];
-    double trainCnt, inferredCnt;
-    Array<double>& totalTrueCnts = totalTrueCnts_[domainIdx];
-    Array<double>& defaultTrueCnts = defaultTrueCnts_[domainIdx];    
-    const MLN* mln = inferences_[domainIdx]->getState()->getMLN();
-    const Domain* domain = inferences_[domainIdx]->getState()->getDomain();
+    //double trainCnt, inferredCnt;
+    //Array<double>& totalTrueCnts = totalTrueCnts_[domainIdx];
+    //Array<double>& defaultTrueCnts = defaultTrueCnts_[domainIdx];    
+    //const MLN* mln = inferences_[domainIdx]->getState()->getMLN();
+    //const Domain* domain = inferences_[domainIdx]->getState()->getDomain();
 
     memset(clauseTrainCnts, 0, clauseCnt*sizeof(double));
     memset(clauseInferredCnts, 0, clauseCnt*sizeof(double));
 
-    if (!lazyInference_)
-    {
-      if (!inferredCnts) inferredCnts = new double[clauseCnt];
+    if (!inferredCnts) inferredCnts = new double[clauseCnt];
 
-      const Array<double>* clauseTrueCnts =
-        inferences_[domainIdx]->getClauseTrueCnts();
-      assert(clauseTrueCnts->size() == clauseCnt);
-      int numSamples = inferences_[domainIdx]->getNumSamples();
-      for (int i = 0; i < clauseCnt; i++)
-        inferredCnts[i] = (*clauseTrueCnts)[i]/numSamples;
-      trainCnts = trainTrueCnts_[domainIdx];
+    const Array<double>* clauseTrueCnts =
+      inferences_[domainIdx]->getClauseTrueCnts();
+    assert(clauseTrueCnts->size() == clauseCnt);
+    int numSamples = inferences_[domainIdx]->getNumSamples();
+    for (int i = 0; i < clauseCnt; i++)
+    {
+      inferredCnts[i] = (*clauseTrueCnts)[i] / numSamples;
+    }
+    if (!lazyInference_) trainCnts = trainTrueCnts_[domainIdx];
 
       // DEBUG
-      cout << "numSamples = " << numSamples << endl;
-    }
+    cout << "numSamples = " << numSamples << endl;
       //loop over all the training examples
     //cout << "\t\ttrain count\t\t\t\tinferred count" << endl << endl;
     for (int clauseno = 0; clauseno < clauseCnt; clauseno++) 
     {
       if (!relevantClauses[clauseno]) continue;
-      
       if (lazyInference_)
       {
-      	Clause* clause = (Clause*) mln->getClause(clauseno);
-
-      	trainCnt = totalTrueCnts[clauseno];
-      	inferredCnt =
-          clause->getNumTrueGroundings(domain, domain->getDB(), false);
-      	trainCnt -= defaultTrueCnts[clauseno];
-      	inferredCnt -= defaultTrueCnts[clauseno];
-      
-      	clauseTrainCnts[clauseno] += trainCnt;
-      	clauseInferredCnts[clauseno] += inferredCnt;
+        clauseTrainCnts[clauseno] = clauseTrainCnts[clauseno] + 
+                                    totalTrueCnts_[domainIdx][clauseno] -
+                                    defaultTrueCnts_[domainIdx][clauseno];
+        clauseInferredCnts[clauseno] += inferredCnts[clauseno];        
       }
       else
       {
@@ -1429,7 +1474,7 @@ class DiscriminativeLearner
 
     if (dldebug)
     {
-      cout << "net counts : " << endl;
+      cout << "Domain " << domainIdx << " net counts : " << endl;
       cout << "\t\ttrain count\t\t\t\tinferred count" << endl << endl;
     }
 
@@ -1465,18 +1510,6 @@ class DiscriminativeLearner
   void getGradient(double* const & weights, double* const & gradient,
                    const int numWts) 
   {
-    // Set the weights and run inference
-    
-    setMLNWeights(weights);
-    
-    //cout << "New Weights = **** " << endl << endl;
-    //for (int i = 0; i < numWts; i++) cout << i << " : " << weights[i] << endl;
-
-    if (withEM_) fillInMissingValues();
-    cout << "Running inference ..." << endl;
-    infer();
-    cout << "Done with inference" << endl;
-
       // Compute the gradient
     memset(gradient, 0, numWts*sizeof(double));
 
@@ -1547,17 +1580,17 @@ class DiscriminativeLearner
 
 	// Used in lazy version
   Array<Array<double> > totalTrueCnts_; 
+  Array<Array<double> > totalFalseCnts_; 
   Array<Array<double> > defaultTrueCnts_;
+  Array<Array<double> > defaultFalseCnts_;
 
   Array<Array<bool> > relevantClausesPerDomain_;
   Array<bool> relevantClausesFormulas_;
 
 	// Used to compute cnts from mrf
   Array<double*> trainTrueCnts_;
+  Array<double*> trainFalseCnts_;
       
-  Array<double>  combinedTrueCnts_;
-  Array<double>  combinedTotalCnts_;
-
   bool usePrior_;
   const double* priorMeans_, * priorStdDevs_; 
 

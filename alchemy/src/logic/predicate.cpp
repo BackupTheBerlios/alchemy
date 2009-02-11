@@ -2,11 +2,11 @@
  * All of the documentation and software included in the
  * Alchemy Software is copyrighted by Stanley Kok, Parag
  * Singla, Matthew Richardson, Pedro Domingos, Marc
- * Sumner and Hoifung Poon.
+ * Sumner, Hoifung Poon, and Daniel Lowd.
  * 
  * Copyright [2004-07] Stanley Kok, Parag Singla, Matthew
- * Richardson, Pedro Domingos, Marc Sumner and Hoifung
- * Poon. All rights reserved.
+ * Richardson, Pedro Domingos, Marc Sumner, Hoifung
+ * Poon, and Daniel Lowd. All rights reserved.
  * 
  * Contact: Pedro Domingos, University of Washington
  * (pedrod@cs.washington.edu).
@@ -28,8 +28,8 @@
  * of this software must display the following
  * acknowledgment: "This product includes software
  * developed by Stanley Kok, Parag Singla, Matthew
- * Richardson, Pedro Domingos, Marc Sumner and Hoifung
- * Poon in the Department of Computer Science and
+ * Richardson, Pedro Domingos, Marc Sumner, Hoifung
+ * Poon, and Daniel Lowd in the Department of Computer Science and
  * Engineering at the University of Washington".
  * 
  * 4. Your publications acknowledge the use or
@@ -169,7 +169,6 @@ void Predicate::createAllGroundings(const int& predId,
       pred->appendTerm(new Term(constId, (void*)pred, true));
     returnArray.append(pred);    
   }
-  //acc.deleteArraysAndClear();  
 }
 
 //get all the groundings unifying with the term given 
@@ -222,7 +221,6 @@ void Predicate::createAllGroundingsUnifyingWithTerm(const int& predId,
       pred->appendTerm(new Term(constId, (void*)pred, true));
     returnArray.append(pred);
   }
-  //acc.deleteArraysAndClear();
 }
 
 
@@ -330,7 +328,6 @@ void Predicate::createAllGroundings(const Domain* const & domain,
     combination++;
   }
   if (grounding >= 0) assert(combination == grounding);
-  //acc.deleteArraysAndClear();
   
     // Restore variables
   for (int i = 0; i < vgtArr.size(); i++) 
@@ -341,3 +338,46 @@ void Predicate::createAllGroundings(const Domain* const & domain,
     delete vgtArr[i];
   }  
 }
+
+
+ostream& Predicate::printWithStrVar(ostream& out,
+                                    const Domain* const & domain) const
+{
+  if (isEqualPred()) return printEqualPredWithStrVar(out,domain);
+  if (isInternalPred()) return printInternalPredWithStrVar(out,domain);
+
+  if (!sense_) out << "!";
+  out << template_->getName();
+    // If dealing with a propositional variable
+  if (strcmp(getTermTypeAsStr(0), Domain::PROPOSITIONAL_TYPE) == 0)
+    return out;
+
+  out << "(";
+  for (int i = 0; i < terms_->size(); i++)
+  {
+    (*terms_)[i]->printWithStrVar(out, domain); 
+    out << ((i != terms_->size() - 1) ? "," : ")");
+  }
+  return out;
+}
+
+ostream& Predicate::print(ostream& out, const Domain* const & domain) const
+{
+  if (isEqualPred()) return printEqualPred(out, domain);
+  if (isInternalPred()) return printInternalPred(out, domain);
+
+  if (!sense_) out << "!";
+  out << template_->getName();
+    // If dealing with a propositional variable
+  if (strcmp(getTermTypeAsStr(0), Domain::PROPOSITIONAL_TYPE) == 0)
+    return out;
+
+  out << "(";
+  for (int i = 0; i < terms_->size(); i++)
+  {
+    (*terms_)[i]->print(out, domain); 
+    out << ((i != terms_->size() - 1) ? "," : ")");
+  }
+  return out;
+}
+

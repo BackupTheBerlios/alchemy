@@ -2,11 +2,11 @@
  * All of the documentation and software included in the
  * Alchemy Software is copyrighted by Stanley Kok, Parag
  * Singla, Matthew Richardson, Pedro Domingos, Marc
- * Sumner and Hoifung Poon.
+ * Sumner, Hoifung Poon, and Daniel Lowd.
  * 
  * Copyright [2004-07] Stanley Kok, Parag Singla, Matthew
- * Richardson, Pedro Domingos, Marc Sumner and Hoifung
- * Poon. All rights reserved.
+ * Richardson, Pedro Domingos, Marc Sumner, Hoifung
+ * Poon, and Daniel Lowd. All rights reserved.
  * 
  * Contact: Pedro Domingos, University of Washington
  * (pedrod@cs.washington.edu).
@@ -28,8 +28,8 @@
  * of this software must display the following
  * acknowledgment: "This product includes software
  * developed by Stanley Kok, Parag Singla, Matthew
- * Richardson, Pedro Domingos, Marc Sumner and Hoifung
- * Poon in the Department of Computer Science and
+ * Richardson, Pedro Domingos, Marc Sumner, Hoifung
+ * Poon, and Daniel Lowd in the Department of Computer Science and
  * Engineering at the University of Washington".
  * 
  * 4. Your publications acknowledge the use or
@@ -343,13 +343,20 @@ class PredicateTemplate
 
   virtual ostream& printWithStrVar(ostream& out) const
   {
-    out << name_ << "(";
+    out << name_;
+      // If dealing with a propositional variable
+    if (strcmp(getTermTypeAsStr(0), "AlchemyPropositionalType") == 0)
+    {
+      return out;
+    }
+    
+    out << "(";
     for (int i = 0; i < termTypesAsStr_->size(); i++)
     {
       out << "a" << i+1; 
       if (uniqueVarIndexes_->contains(i))
         out << "!";
-      out << ((i!=termTypesAsStr_->size()-1)?",":")");
+      out << ((i != termTypesAsStr_->size() - 1) ? "," : ")");
     }
     return out;
   }

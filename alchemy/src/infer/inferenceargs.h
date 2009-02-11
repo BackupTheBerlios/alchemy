@@ -2,11 +2,11 @@
  * All of the documentation and software included in the
  * Alchemy Software is copyrighted by Stanley Kok, Parag
  * Singla, Matthew Richardson, Pedro Domingos, Marc
- * Sumner and Hoifung Poon.
+ * Sumner, Hoifung Poon, and Daniel Lowd.
  * 
  * Copyright [2004-07] Stanley Kok, Parag Singla, Matthew
- * Richardson, Pedro Domingos, Marc Sumner and Hoifung
- * Poon. All rights reserved.
+ * Richardson, Pedro Domingos, Marc Sumner, Hoifung
+ * Poon, and Daniel Lowd. All rights reserved.
  * 
  * Contact: Pedro Domingos, University of Washington
  * (pedrod@cs.washington.edu).
@@ -28,8 +28,8 @@
  * of this software must display the following
  * acknowledgment: "This product includes software
  * developed by Stanley Kok, Parag Singla, Matthew
- * Richardson, Pedro Domingos, Marc Sumner and Hoifung
- * Poon in the Department of Computer Science and
+ * Richardson, Pedro Domingos, Marc Sumner, Hoifung
+ * Poon, and Daniel Lowd in the Department of Computer Science and
  * Engineering at the University of Washington".
  * 
  * 4. Your publications acknowledge the use or
@@ -95,6 +95,8 @@ bool  agibbsInfer = false;
 bool  amcsatInfer = false;
   // Simulated Tempering
 bool  asimtpInfer = false;
+  // Belief propagation
+bool  abpInfer = false;
 
   // Lazy state or not?
 bool aLazy = false;
@@ -129,16 +131,23 @@ int amcmcMaxSteps     = 1000;
 int amcmcMaxSeconds   = -1;
 
   // Gibbs params
-double agibbsDelta          = 0.05;
-double agibbsEpsilonError   = 0.01;
-double agibbsFracConverged  = 0.95;
-int    agibbsWalksatType    = 1;
-int    agibbsSamplesPerTest = 100;
+double agibbsDelta           = 0.05;
+double agibbsEpsilonError    = 0.01;
+double agibbsFracConverged   = 0.95;
+int    agibbsWalksatType     = 1;
+bool   agibbsTestConvergence = false;
+int    agibbsSamplesPerTest  = 100;
 
   // Simulated Tempering params
 int asimtpSubInterval = 2;
 int asimtpNumST       = 3;
 int asimtpNumSwap     = 10;
+
+  // Belief Propagation params
+bool aliftedInfer = false;
+double abpConvergenceThresh = 1e-4;
+int abpConvergeRequiredItrCnt = 20;
+bool aexplicitRep = false;
 
   // Produce clause counts
 bool aclauseCounts = false;

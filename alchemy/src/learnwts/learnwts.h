@@ -2,11 +2,11 @@
  * All of the documentation and software included in the
  * Alchemy Software is copyrighted by Stanley Kok, Parag
  * Singla, Matthew Richardson, Pedro Domingos, Marc
- * Sumner and Hoifung Poon.
+ * Sumner, Hoifung Poon, and Daniel Lowd.
  * 
  * Copyright [2004-07] Stanley Kok, Parag Singla, Matthew
- * Richardson, Pedro Domingos, Marc Sumner and Hoifung
- * Poon. All rights reserved.
+ * Richardson, Pedro Domingos, Marc Sumner, Hoifung
+ * Poon, and Daniel Lowd. All rights reserved.
  * 
  * Contact: Pedro Domingos, University of Washington
  * (pedrod@cs.washington.edu).
@@ -28,8 +28,8 @@
  * of this software must display the following
  * acknowledgment: "This product includes software
  * developed by Stanley Kok, Parag Singla, Matthew
- * Richardson, Pedro Domingos, Marc Sumner and Hoifung
- * Poon in the Department of Computer Science and
+ * Richardson, Pedro Domingos, Marc Sumner, Hoifung
+ * Poon, and Daniel Lowd in the Department of Computer Science and
  * Engineering at the University of Washington".
  * 
  * 4. Your publications acknowledge the use or
@@ -170,7 +170,6 @@ void createDomainAndMLN(Array<Domain*>& domains, Array<MLN*>& mlns,
   MLN* mln = new MLN();
   
     // Unknown evidence atoms are filled in by EM
-  //bool allPredsExceptQueriesAreCW = true;
   bool warnAboutDupGndPreds = true;
   bool mustHaveWtOrFullStop = false;
   bool flipWtsOfFlippedClause = false;
@@ -292,6 +291,7 @@ void createDomainsAndMLNs(Array<Domain*>& domains, Array<MLN*>& mlns,
       ((Domain*)domains[i])->reorderConstants(
                                    (ConstDualMap*)domains[0]->getConstDualMap(),
                           (Array<Array<int>*>*)domains[0]->getConstantsByType(),
+                  (Array<Array<int>*>*)domains[0]->getExternalConstantsByType(),
                                               mlns[i]);
     }
 
@@ -338,10 +338,17 @@ void createDomainsAndMLNs(Array<Domain*>& domains, Array<MLN*>& mlns,
 
     for (int i = 1; i < mlns.size(); i++)
     {
-      mlns[i]->replaceClauses(new ClauseHashArray(*(ClauseHashArray*)mlns[0]->getClauses()));
-      mlns[i]->replaceMLNClauseInfos(new Array<MLNClauseInfo*>(*(Array<MLNClauseInfo*>*)mlns[0]->getMLNClauseInfos()));
-      mlns[i]->replacePredIdToClausesMap(new Array<Array<IndexClause*>*>(*(Array<Array<IndexClause*>*>*)mlns[0]->getPredIdToClausesMap()));
-      mlns[i]->replaceFormulaAndClausesArray(new FormulaAndClausesArray(*(FormulaAndClausesArray*)mlns[0]->getFormulaAndClausesArray()));      
+      mlns[i]->replaceClauses(new
+        ClauseHashArray(*(ClauseHashArray*)mlns[0]->getClauses()));
+      mlns[i]->replaceMLNClauseInfos(new
+        Array<MLNClauseInfo*>(*(Array<MLNClauseInfo*>*)mlns[0]->
+          getMLNClauseInfos()));
+      mlns[i]->replacePredIdToClausesMap(new
+        Array<Array<IndexClause*>*>(*(Array<Array<IndexClause*>*>*)mlns[0]->
+          getPredIdToClausesMap()));
+      mlns[i]->replaceFormulaAndClausesArray(new
+        FormulaAndClausesArray(*(FormulaAndClausesArray*)mlns[0]->
+          getFormulaAndClausesArray()));
       mlns[i]->replaceExternalClause((*externalClausesPerMLN)[i]);
     }
 

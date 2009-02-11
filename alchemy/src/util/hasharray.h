@@ -2,11 +2,11 @@
  * All of the documentation and software included in the
  * Alchemy Software is copyrighted by Stanley Kok, Parag
  * Singla, Matthew Richardson, Pedro Domingos, Marc
- * Sumner and Hoifung Poon.
+ * Sumner, Hoifung Poon, and Daniel Lowd.
  * 
  * Copyright [2004-07] Stanley Kok, Parag Singla, Matthew
- * Richardson, Pedro Domingos, Marc Sumner and Hoifung
- * Poon. All rights reserved.
+ * Richardson, Pedro Domingos, Marc Sumner, Hoifung
+ * Poon, and Daniel Lowd. All rights reserved.
  * 
  * Contact: Pedro Domingos, University of Washington
  * (pedrod@cs.washington.edu).
@@ -28,8 +28,8 @@
  * of this software must display the following
  * acknowledgment: "This product includes software
  * developed by Stanley Kok, Parag Singla, Matthew
- * Richardson, Pedro Domingos, Marc Sumner and Hoifung
- * Poon in the Department of Computer Science and
+ * Richardson, Pedro Domingos, Marc Sumner, Hoifung
+ * Poon, and Daniel Lowd in the Department of Computer Science and
  * Engineering at the University of Washington".
  * 
  * 4. Your publications acknowledge the use or
@@ -171,6 +171,14 @@ class HashArray
     return append(items); 
   }
 
+   // Assignment operator
+  HashArray<Type, HashFn, EqualFn>& 
+      operator=(const HashArray<Type, HashFn, EqualFn>& x)
+  { 
+      copyFrom(x);
+      return *this;
+  }
+
 
   bool growToSize(const int& newSize)
   {
@@ -289,17 +297,18 @@ class HashArray
   }
 
 
-  Type removeItem(Type& item)
+    //modified to remove the ambiguity from removeItem(const int & index)
+    //when type is also an int - also need to make sure that idx >= 0
+  Type removeInputItem(Type & item)
   {
     int idx = find(item);
+    if (idx < 0) return NULL;
     return removeItem(idx);
   }
   
-
   Type removeLastItem() { return removeItem(numItems_-1); }
 
-
-    // removes the item but doesn't leave the array in the same order as before
+  // removes the item but doesn't leave the array in the same order as before
   Type removeItemFastDisorder(const int& index) 
   {
     Type removedItem = items_[index];
@@ -317,16 +326,17 @@ class HashArray
     return removedItem;
   }
 
-
-  Type removeItemFastDisorder(Type& item)
+    //modified to remove the ambiguity from removeItem(const int & index)
+    //when type is also an int
+  Type removeInputItemFastDisorder(Type & item)
   {
     int idx = find(item);
     if (idx < 0) return NULL;
     return removeItemFastDisorder(idx);
-  }
+  } 
 
 
-    // resizes the array to be exactly the number of elements in it
+  // resizes the array to be exactly the number of elements in it
   void compress()  { if (maxItems_ > numItems_)  allocateMemory(numItems_); }
 
 

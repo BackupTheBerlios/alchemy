@@ -2,11 +2,11 @@
  * All of the documentation and software included in the
  * Alchemy Software is copyrighted by Stanley Kok, Parag
  * Singla, Matthew Richardson, Pedro Domingos, Marc
- * Sumner and Hoifung Poon.
+ * Sumner, Hoifung Poon, and Daniel Lowd.
  * 
  * Copyright [2004-07] Stanley Kok, Parag Singla, Matthew
- * Richardson, Pedro Domingos, Marc Sumner and Hoifung
- * Poon. All rights reserved.
+ * Richardson, Pedro Domingos, Marc Sumner, Hoifung
+ * Poon, and Daniel Lowd. All rights reserved.
  * 
  * Contact: Pedro Domingos, University of Washington
  * (pedrod@cs.washington.edu).
@@ -28,8 +28,8 @@
  * of this software must display the following
  * acknowledgment: "This product includes software
  * developed by Stanley Kok, Parag Singla, Matthew
- * Richardson, Pedro Domingos, Marc Sumner and Hoifung
- * Poon in the Department of Computer Science and
+ * Richardson, Pedro Domingos, Marc Sumner, Hoifung
+ * Poon, and Daniel Lowd in the Department of Computer Science and
  * Engineering at the University of Washington".
  * 
  * 4. Your publications acknowledge the use or
@@ -405,7 +405,7 @@ ARGS ARGS::Args[] =
        "[no limit] (For CG only) Maximum value of parameter to limit step size"),
 
   ARGS("cgNoPrecond", ARGS::Tog, cg_noprecond,
-       "[false] (For CG only) precondition with the diagonal Hessian"),
+       "[false] (For CG only) precondition without the diagonal Hessian"),
        
   ARGS("queryEvidence", ARGS::Tog, isQueryEvidence, 
        "[false] If this flag is set, then all the groundings of query preds not "
@@ -656,7 +656,8 @@ int main(int argc, char* argv[])
         return -1;
     }
  
-    allPredsExceptQueriesAreCW = owPredNames.empty();
+    //allPredsExceptQueriesAreCW = owPredNames.empty();
+    allPredsExceptQueriesAreCW = false;
   }
     // Parse as if lazy inference is set to true to set evidence atoms in DB
     // If lazy is not used, this is removed from DB
@@ -855,6 +856,8 @@ int main(int argc, char* argv[])
         }
       }
 
+      Array<Predicate*> gpreds;
+      Array<TruthValue> gpredValues;
         // Eager version: Build query preds from command line and set known
         // non-evidence to unknown for building the states
       if (!aLazy)
@@ -902,6 +905,24 @@ int main(int argc, char* argv[])
           }
           unePreds->clear();
         }
+      }
+      else
+      {
+        Array<Predicate*> ppreds;
+
+        domain->getDB()->setPerformingInference(false);
+
+        gpreds.clear();
+        gpredValues.clear();
+        for (int predno = 0; predno < nonEvidPredNames.size(); predno++) 
+        {
+          ppreds.clear();
+          int predid = domain->getPredicateId(nonEvidPredNames[predno].c_str());
+          Predicate::createAllGroundings(predid, domain, ppreds);
+          gpreds.append(ppreds);
+        }
+        //domain->getDB()->alterTruthValue(&gpreds, UNKNOWN, FALSE, &gpredValues);
+        domain->getDB()->setValuesToUnknown(&gpreds, &gpredValues);
       }
       
         // Create state for inferred counts using unknown and known (set to
@@ -958,6 +979,20 @@ int main(int argc, char* argv[])
         {
           domain->getDB()->setValue((*unePreds)[predno], FALSE);
         }
+      }
+      else
+      {
+        domain->getDB()->setValuesToGivenValues(&gpreds, &gpredValues);
+      
+        //cout << "the ground predicates are :" << endl;
+        for (int predno = 0; predno < gpreds.size(); predno++) 
+        {
+          //gpreds[predno]->printWithStrVar(cout, domain);
+          //cout << endl;
+          delete gpreds[predno];
+        }
+
+        domain->getDB()->setPerformingInference(true);
       }
     }
     cout << endl << "done constructing variable states" << endl << endl;

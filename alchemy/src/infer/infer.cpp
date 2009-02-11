@@ -2,11 +2,11 @@
  * All of the documentation and software included in the
  * Alchemy Software is copyrighted by Stanley Kok, Parag
  * Singla, Matthew Richardson, Pedro Domingos, Marc
- * Sumner and Hoifung Poon.
+ * Sumner, Hoifung Poon, and Daniel Lowd.
  * 
  * Copyright [2004-07] Stanley Kok, Parag Singla, Matthew
- * Richardson, Pedro Domingos, Marc Sumner and Hoifung
- * Poon. All rights reserved.
+ * Richardson, Pedro Domingos, Marc Sumner, Hoifung
+ * Poon, and Daniel Lowd. All rights reserved.
  * 
  * Contact: Pedro Domingos, University of Washington
  * (pedrod@cs.washington.edu).
@@ -28,8 +28,8 @@
  * of this software must display the following
  * acknowledgment: "This product includes software
  * developed by Stanley Kok, Parag Singla, Matthew
- * Richardson, Pedro Domingos, Marc Sumner and Hoifung
- * Poon in the Department of Computer Science and
+ * Richardson, Pedro Domingos, Marc Sumner, Hoifung
+ * Poon, and Daniel Lowd in the Department of Computer Science and
  * Engineering at the University of Washington".
  * 
  * 4. Your publications acknowledge the use or
@@ -71,7 +71,6 @@
 #include "fol.h"
 #include "arguments.h"
 #include "util.h"
-//#include "learnwts.h"
 #include "infer.h"
 
 extern const char* ZZ_TMP_FILE_POSTFIX; //defined in fol.y
@@ -115,6 +114,10 @@ ARGS ARGS::Args[] =
        "Run inference using MC-SAT and return probabilities "
        "for all query atoms"),
 
+  ARGS("bp", ARGS::Tog, abpInfer,
+       "Run inference using belief propagation and return probabilities "
+       "for all query atoms"),
+
   ARGS("simtp", ARGS::Tog, asimtpInfer,
        "Run inference using simulated tempering and return probabilities "
        "for all query atoms"),
@@ -149,9 +152,9 @@ ARGS ARGS::Args[] =
        "[the best possible] (MaxWalkSat) MaxWalkSat tries to find a solution "
        "with weight <= specified weight."),
 
-  ARGS("hard", ARGS::Opt, amwsHard, 
-       "[false] (MaxWalkSat) MaxWalkSat never breaks a hard clause in order to "
-       "satisfy a soft one."),
+  ARGS("breakHardClauses", ARGS::Tog, amwsHard, 
+       "[false] (MaxWalkSat) If true, MaxWalkSat can break a hard clause in "
+       "order to satisfy a soft one."),
   
   ARGS("heuristic", ARGS::Opt, amwsHeuristic,
        "[2] (MaxWalkSat) Heuristic used in MaxWalkSat (0 = RANDOM, 1 = BEST, "
@@ -197,11 +200,20 @@ ARGS ARGS::Args[] =
         "[10] (Simulated Tempering) Number of swapping chains"),
     // END: Simulated tempering args
 
-    // BEGIN: MC-SAT args
-  //ARGS("numStepsEveryMCSat", ARGS::Opt, amcsatNumStepsEveryMCSat,
-  //     "[1] (MC-SAT) Number of total steps (mcsat + gibbs) for every mcsat "
-  //     "step"),
-    // END: MC-SAT args
+    // BEGIN: BP args
+  ARGS("lifted", ARGS::Tog, aliftedInfer, 
+       "[false] If true, lifted inference is run"),
+
+  ARGS("convThresh", ARGS::Opt, abpConvergenceThresh,
+        "[1e-4] (BP) Max difference in probabilities to determine convergence"),
+
+  ARGS("convIterations", ARGS::Opt, abpConvergeRequiredItrCnt,
+        "[20] (BP) Number of converging iterations to determine convergence"),
+
+  ARGS("explicitRep", ARGS::Tog, aexplicitRep, 
+       "[false] If true, explicit representation type is used in lifted "
+       "inference; otherwise, implicit representation type is used"), 
+    // END: BP args
 
     // BEGIN: SampleSat args
   ARGS("numSolutions", ARGS::Opt, amwsNumSolutions,
@@ -238,6 +250,9 @@ ARGS ARGS::Args[] =
   ARGS("walksatType", ARGS::Opt, agibbsWalksatType, 
        "[1] (Gibbs) Use Max Walksat to initialize ground atoms' truth values "
        "in Gibbs sampling (1: use Max Walksat, 0: random initialization)."),
+
+  ARGS("testConvergence", ARGS::Opt, agibbsTestConvergence, 
+       "[false] Perform convergence test for Gibbs sampling."),
 
   ARGS("samplesPerTest", ARGS::Opt, agibbsSamplesPerTest, 
        "[100] Perform convergence test once after this many number of samples "
@@ -282,11 +297,11 @@ ARGS ARGS::Args[] =
  * the results.
  */
 void printResults(const string& queryFile, const string& queryPredsStr,
-				  Domain *domain, ostream& out, 
-				  GroundPredicateHashArray* const &queries,
-				  Inference* const &inference, VariableState* const &state,
-					Array<Predicate *> const &queryPreds,
-					Array<TruthValue> const &queryPredValues)
+                  Domain *domain, ostream& out, 
+                  GroundPredicateHashArray* const &queries,
+                  Inference* const &inference, VariableState* const &state,
+                  Array<Predicate*> const &queryPreds,
+                  Array<TruthValue> const &queryPredValues)
 {
     // Lazy version: Have to generate the queries from the file or query string.
     // This involves calling createQueryFilePreds / createComLineQueryPreds
@@ -296,15 +311,16 @@ void printResults(const string& queryFile, const string& queryPredsStr,
       // These are the ground preds which have been brought into memory. All
       // others have always been false throughout sampling.
 
-	for (int i = 0; i < queryPreds.size(); i++)
-	{
-		int val=(queryPredValues[i] == TRUE)?1:0;
+    for (int i = 0; i < queryPreds.size(); i++)
+    {
+      int val = (queryPredValues[i] == TRUE) ? 1 : 0;
 
-		// Prob is smoothed in inference->getProbability
-		double prob = inference->getProbability((GroundPredicate*)queryPreds[i]);
+        // Prob is smoothed in inference->getProbability
+      double prob = inference->getProbability((GroundPredicate*)queryPreds[i]);
 
-		queryPreds[i]->print(out, domain); out << " " << prob << " " << val << endl;
-	}
+      queryPreds[i]->print(out, domain);
+      out << " " << prob << " " << val << endl;
+    }
 
 	/*
 	if (!(amapPos || amapAll))
@@ -424,11 +440,18 @@ void printResults(const string& queryFile, const string& queryPredsStr,
       inference->printTruePreds(out);
     else
     {
-      for (int i = 0; i < queries->size(); i++)
+      if (abpInfer)
       {
-          // Prob is smoothed in inference->getProbability
-        double prob = inference->getProbability((*queries)[i]);
-        (*queries)[i]->print(out, domain); out << " " << prob << endl;
+        inference->printProbabilities(out);
+      }
+      else
+      {
+        for (int i = 0; i < queries->size(); i++)
+        {
+            // Prob is smoothed in inference->getProbability
+          double prob = inference->getProbability((*queries)[i]);
+          (*queries)[i]->print(out, domain); out << " " << prob << endl;
+        }
       }
     }
   }
@@ -464,13 +487,8 @@ int main(int argc, char* argv[])
   {
     inference->init();
     inference->infer();
-    
-	if (aisQueryEvidence) printResults(queryFile, queryPredsStr, domain,
-                                       resultsOut, &queries,
-                                       inference, inference->getState(),
-                                       queryPreds, queryPredValues);
-	else printResults(queryFile, queryPredsStr, domain, resultsOut, &queries,
-                      inference, inference->getState());
+	printResults(queryFile, queryPredsStr, domain, resultsOut, &queries,
+                 inference, inference->getState());
   }
 
   resultsOut.close();

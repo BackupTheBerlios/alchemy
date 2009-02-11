@@ -2,11 +2,11 @@
  * All of the documentation and software included in the
  * Alchemy Software is copyrighted by Stanley Kok, Parag
  * Singla, Matthew Richardson, Pedro Domingos, Marc
- * Sumner and Hoifung Poon.
+ * Sumner, Hoifung Poon, and Daniel Lowd.
  * 
  * Copyright [2004-07] Stanley Kok, Parag Singla, Matthew
- * Richardson, Pedro Domingos, Marc Sumner and Hoifung
- * Poon. All rights reserved.
+ * Richardson, Pedro Domingos, Marc Sumner, Hoifung
+ * Poon, and Daniel Lowd. All rights reserved.
  * 
  * Contact: Pedro Domingos, University of Washington
  * (pedrod@cs.washington.edu).
@@ -28,8 +28,8 @@
  * of this software must display the following
  * acknowledgment: "This product includes software
  * developed by Stanley Kok, Parag Singla, Matthew
- * Richardson, Pedro Domingos, Marc Sumner and Hoifung
- * Poon in the Department of Computer Science and
+ * Richardson, Pedro Domingos, Marc Sumner, Hoifung
+ * Poon, and Daniel Lowd in the Department of Computer Science and
  * Engineering at the University of Washington".
  * 
  * 4. Your publications acknowledge the use or
@@ -122,6 +122,8 @@ class VariableState
                 const MLN* const & mln, const Domain* const & domain,
                 const bool& lazy)
   {
+    stillActivating_ = true;
+    breakHardClauses_ = false;
       // By default MaxWalkSAT mode
     inferenceMode_ = MODE_MWS;
     Timer timer;
@@ -165,8 +167,11 @@ class VariableState
         // One atom in each block is set to true and activated
       initBlocksRandom();
 
-      bool ignoreActivePreds = false;
+      //bool ignoreActivePreds = false;
+      bool ignoreActivePreds = true;
+      cout << "Getting initial active atoms ... " << endl;
       getActiveClauses(newClauses_, ignoreActivePreds);
+      cout << "done." << endl;
       int defaultCnt = newClauses_.size();
       long double defaultCost = 0;
 
@@ -202,7 +207,9 @@ class VariableState
 
         // Get the initial set of active clauses
       ignoreActivePreds = false;
+      cout << "Getting initial active clauses ... ";
       getActiveClauses(newClauses_, ignoreActivePreds);      
+      cout << "done." << endl;
 	} // End lazy version
       // Eager version: Use KBMC to produce the state
     else
@@ -259,14 +266,33 @@ class VariableState
    */ 
   ~VariableState()
   {
-    if (!lazy_)
+    if (lazy_)
+    {
+      if (gndClauses_)
+        for (int i = 0; i < gndClauses_->size(); i++)
+          delete (*gndClauses_)[i];
+
+      for (int i = 0; i < gndPredHashArray_.size(); i++)
+      {
+        gndPredHashArray_[i]->removeGndClauses();
+        delete gndPredHashArray_[i];
+      }
+    }
+    else
     {
         // MRF from eager version is deleted
-      if (mrf_) delete mrf_;
+      if (mrf_)
+      {
+        delete mrf_;
+        mrf_ = NULL;
+      }
       //if (unePreds_) delete unePreds_;
       //if (knePreds_) delete knePreds_;
       //if (knePredValues_) delete knePredValues_;
     }
+    //delete gndClauses_;
+    //delete gndPreds_;
+    //delete mln_;
   }
 
 
@@ -315,7 +341,7 @@ class VariableState
     gndClauses_->clearAndCompress();
     gndPreds_->clearAndCompress();
     for (int i = 0; i < occurence_.size(); i++)
-      occurence_.clearAndCompress();
+      occurence_[i].clearAndCompress();
     occurence_.clearAndCompress();
     
       // Add the clauses and preds and fill info arrays
@@ -365,6 +391,37 @@ class VariableState
           bool isTrue = random() % 2;
           bool activate = false;
           setValueOfAtom(i, isTrue, activate, -1);
+        }
+        else if (inferenceMode_ == MODE_SAMPLESAT)
+        {
+          bool isInPrevUnsat = false;
+          Array<int> oca = getPosOccurenceArray(i);
+          for (int k = 0; k < oca.size(); k++)
+            if (!prevSatisfiedClause_[oca[k]])
+            {
+              isInPrevUnsat = true;
+              break;
+            }
+            
+          if (!isInPrevUnsat)
+          {
+            oca = getNegOccurenceArray(i);
+            for (int k = 0; k < oca.size(); k++)
+              if (!prevSatisfiedClause_[oca[k]])
+              {
+                isInPrevUnsat = true;
+                break;
+              }
+          }
+          if (isInPrevUnsat)
+          {
+            bool isTrue = random() % 2;
+            if (isTrue)
+            {
+              if (activateAtom(i, false, false))
+                setValueOfAtom(i, true, false, -1);
+            }
+          }
         }
       }
     }
@@ -627,6 +684,7 @@ class VariableState
   {
     if (numFalseClauses_ == 0) return NOVALUE;
     int clauseIdx = falseClause_[random()%numFalseClauses_];
+
       // Pos. clause: return index of random atom
     if (clauseCost_[clauseIdx] >= 0)
     {
@@ -871,7 +929,7 @@ class VariableState
         // Don't look at dead or satisfied clauses
       if (deadClause_[clauseIdx] || isSatisfied_[clauseIdx]) continue;
 
-	  // The false lit became a true lit
+        // The false lit became a true lit
       int numTrueLits = incrementNumTrueLits(clauseIdx);
       long double cost = getClauseCost(clauseIdx);
       int watch1 = getWatch1(clauseIdx);
@@ -956,6 +1014,8 @@ class VariableState
    */
   long double getImprovementByFlipping(const int& atomIdx)
   {
+    if (!breakHardClauses_ && breakCost_[atomIdx] >= hardWt_)
+      return -LDBL_MAX;
     long double improvement = makeCost_[atomIdx] - breakCost_[atomIdx];
     return improvement;
   }
@@ -2090,7 +2150,7 @@ class VariableState
     for (int i = 0; i < gndClauses_->size(); i++)
     {
       GroundClause* gndClause = (*gndClauses_)[i];
-      gndClause->setWtToSumOfParentWts();
+      gndClause->setWtToSumOfParentWts(mln_);
       if (vsdebug) cout << "Setting cost of clause " << i << " to "
                         << gndClause->getWt() << endl;
       clauseCost_[i] = gndClause->getWt();
@@ -2113,17 +2173,30 @@ class VariableState
 
   /**
    * Gets the number of (true or false) clause groundings in this state. If
-   * eager, the first order clause frequencies in the mrf are used.
+   * eager, the first order clause frequencies in the mrf are used. If lazy, the
+   * f.o. clause frequencies computed when activating are used.
    * 
-   * @param numGndings Array being filled with values
-   * @param clauseCnt
-   * @param tv
+   * @param numGndings Array being filled with values.
+   * @param clauseCnt Number of first-order clauses (size of numGndings)
+   * @param tv If true, number of true groundings are retrieved, otherwise
+   * false groundings are retrieved.
    */
   void getNumClauseGndings(Array<double>* const & numGndings, bool tv)
   {
-    // TODO: lazy version
-    IntPairItr itr;
-    IntPair *clauseFrequencies;
+      // If lazy, then all groundings of pos. clauses not materialized in this
+      // state are true (non-materialized groundings of neg. clauses are false),
+      // so if tv is false and clause is pos. (or tv is true and clause is
+      // neg.), then eager and lazy counts are equivalent. If tv is
+      // true and clause is pos. (or tv is false and clause is neg.), then we
+      // need to keep track of true *and* false groundings and
+      // then subtract from total groundings of the f.o. clause.
+      
+      // This holds the false groundings when tv is true and lazy.
+    Array<double> lazyFalseGndings(numGndings->size(), 0);
+    Array<double> lazyTrueGndings(numGndings->size(), 0);
+
+    IntBoolPairItr itr;
+    IntBoolPair *clauseFrequencies;
     
       // numGndings should have been initialized with non-negative values
     int clauseCnt = numGndings->size();
@@ -2140,58 +2213,82 @@ class VariableState
         int lit = gndClause->getGroundPredicateIndex(j);
         if (isTrueLiteral(lit)) satLitcnt++;
       }
-      //int satLitcnt = getNumTrueLits(i);
-      if (tv && satLitcnt == 0)
-        continue;
-      if (!tv && satLitcnt > 0)
-        continue;
 
       clauseFrequencies = gndClause->getClauseFrequencies();
       for (itr = clauseFrequencies->begin();
            itr != clauseFrequencies->end(); itr++)
       {
         int clauseno = itr->first;
-        int frequency = itr->second;
+        int frequency = itr->second.first;
+        bool invertWt = itr->second.second;
+          // If flipped unit clause, then we want opposite kind of grounding
+        if (invertWt)
+        {
+            // Want true and is true => don't count it
+          if (tv && satLitcnt > 0)
+          {
+              // Lazy: We need to keep track of false groundings also
+            if (lazy_) lazyFalseGndings[clauseno] += frequency;
+            continue;
+          }
+            // Want false and is false => don't count it
+          if (!tv && satLitcnt == 0)
+          {
+              // Lazy: We need to keep track of false groundings also
+            if (lazy_) lazyTrueGndings[clauseno] += frequency;
+            continue;
+          }
+        }
+        else
+        {
+            // Want true and is false => don't count it
+          if (tv && satLitcnt == 0)
+          {
+              // Lazy: We need to keep track of false groundings also
+            if (lazy_) lazyFalseGndings[clauseno] += frequency;
+            continue;
+          }
+            // Want false and is true => don't count it
+          if (!tv && satLitcnt > 0)
+          {
+              // Lazy: We need to keep track of false groundings also
+            if (lazy_) lazyTrueGndings[clauseno] += frequency;
+            continue;
+          }
+        }
         (*numGndings)[clauseno] += frequency;
       }
     }
-  }
-
-  /**
-   * Gets the number of (true or false) clause groundings in this state. If
-   * eager, the first order clause frequencies in the mrf are used.
-   * 
-   * @param numGndings
-   * @param clauseCnt
-   * @param tv
-   */
-  void getNumClauseGndings(double numGndings[], int clauseCnt, bool tv)
-  {
-    // TODO: lazy version
-    IntPairItr itr;
-    IntPair *clauseFrequencies;
     
-    for (int clauseno = 0; clauseno < clauseCnt; clauseno++)
-      numGndings[clauseno] = 0;
-    
-    for (int i = 0; i < gndClauses_->size(); i++)
+      // Getting true counts in lazy: we have to add the remaining groundings
+      // not materialized (they are by definition true groundings if clause is
+      // positive, or false groundings if clause is negative)
+    if (lazy_)
     {
-      GroundClause *gndClause = (*gndClauses_)[i];
-      int satLitcnt = getNumTrueLits(i);
-      if (tv && satLitcnt == 0)
-        continue;
-      if (!tv && satLitcnt > 0)
-        continue;
-
-      clauseFrequencies = gndClause->getClauseFrequencies();
-      for (itr = clauseFrequencies->begin();
-           itr != clauseFrequencies->end(); itr++)
+      for (int c = 0; c < mln_->getNumClauses(); c++)
       {
-        int clauseno = itr->first;
-        int frequency = itr->second;
-        numGndings[clauseno] += frequency;
+        const Clause* clause = mln_->getClause(c);
+          // Getting true counts and positive clause
+        if (tv && clause->getWt() >= 0)
+        {
+          double totalGndings = domain_->getNumNonEvidGroundings(c);
+          assert(totalGndings >= (*numGndings)[c] + lazyFalseGndings[c]);
+          double remainingTrueGndings = totalGndings - lazyFalseGndings[c] -
+                                        (*numGndings)[c];
+          (*numGndings)[c] += remainingTrueGndings;
+        }
+          // Getting false counts and negative clause
+        else if (!tv && clause->getWt() < 0)
+        {
+          double totalGndings = domain_->getNumNonEvidGroundings(c);
+          assert(totalGndings >= (*numGndings)[c] + lazyTrueGndings[c]);
+          double remainingFalseGndings = totalGndings - lazyTrueGndings[c] -
+                                        (*numGndings)[c];
+          (*numGndings)[c] += remainingFalseGndings;
+        }
       }
     }
+
   }
 
   /**
@@ -2209,9 +2306,10 @@ class VariableState
                                       bool tv,
                                       const Array<bool>* const& unknownPred)
   {
+    // TODO: lazy version
     assert(unknownPred->size() == getNumAtoms());
-    IntPairItr itr;
-    IntPair *clauseFrequencies;
+    IntBoolPairItr itr;
+    IntBoolPair *clauseFrequencies;
     
     for (int clauseno = 0; clauseno < clauseCnt; clauseno++)
       numGndings[clauseno] = 0;
@@ -2231,18 +2329,33 @@ class VariableState
         }
         if (isTrueLiteral(lit)) satLitcnt++;
       }
-      
-      if (tv && satLitcnt == 0)
-        continue;
-      if (!tv && (satLitcnt > 0 || unknown))
-        continue;
 
       clauseFrequencies = gndClause->getClauseFrequencies();
       for (itr = clauseFrequencies->begin();
            itr != clauseFrequencies->end(); itr++)
       {
         int clauseno = itr->first;
-        int frequency = itr->second;
+        int frequency = itr->second.first;
+        bool invertWt = itr->second.second;
+          // If flipped unit clause, then we want opposite kind of grounding
+        if (invertWt)
+        {
+            // Want true and is true or unknown => don't count it
+          if (tv && (satLitcnt > 0 || unknown))
+            continue;
+            // Want false and is false => don't count it
+          if (!tv && satLitcnt == 0)
+            continue;
+        }
+        else
+        {
+            // Want true and is false => don't count it
+          if (tv && satLitcnt == 0)
+            continue;
+            // Want false and is true => don't count it
+          if (!tv && (satLitcnt > 0 || unknown))
+            continue;
+        }
         numGndings[clauseno] += frequency;
       }
     }
@@ -2926,8 +3039,12 @@ class VariableState
       const int clauseId = mln_->findClauseIdx(fclause);
       newClauses->clear();
 
-      fclause->getActiveClauses(inputPred, domain_, newClauses,
-                                &gndPredHashArray_, ignoreActivePreds);
+      if (stillActivating_)
+        stillActivating_ = fclause->getActiveClauses(inputPred, domain_,
+                                                     newClauses,
+                                                     &gndPredHashArray_,
+                                                     ignoreActivePreds);
+
       for (int i = 0; i < newClauses->size(); i++)
       {
         long double wt = fclause->getWt();
@@ -2940,7 +3057,7 @@ class VariableState
           continue;
         }
 
-
+        bool invertWt = false;
           // We want to normalize soft unit clauses to all be positives
         if (!fclause->isHardClause() &&
             newClause->getNumGroundPredicates() == 1 &&
@@ -2949,19 +3066,30 @@ class VariableState
           newClause->setGroundPredicateSense(0, true);
           newClause->setWt(-newClause->getWt());
           wt = -wt;
+          invertWt = true;
           int addToIndex = gndClauses_->find(newClause);
           if (addToIndex >= 0)
           {
             (*gndClauses_)[addToIndex]->addWt(wt);
+            if (parentWtPtr)
+              (*gndClauses_)[addToIndex]->incrementClauseFrequency(clauseId, 1,
+                                                                   invertWt);
             delete newClause;
             continue;
           }
         }
-
+        
         int pos = clauseHashArray.find(newClause);
           // If clause already present, then just add weight
         if (pos >= 0)
         {
+            // Check if already added from this f.o. clause. If so, don't add
+            // again
+          if (clauseHashArray[pos]->getClauseFrequency(clauseId) > 0)
+          {
+            delete newClause;
+            continue;
+          }
           if (vsdebug)
           {
             cout << "Adding weight " << wt << " to clause ";
@@ -2970,10 +3098,8 @@ class VariableState
           }
           clauseHashArray[pos]->addWt(wt);
           if (parentWtPtr)
-          {
-            clauseHashArray[pos]->appendParentWtPtr(parentWtPtr);
-            clauseHashArray[pos]->incrementClauseFrequency(clauseId, 1);
-          }
+            clauseHashArray[pos]->incrementClauseFrequency(clauseId, 1,
+                                                           invertWt);
           delete newClause;
           continue;
         }
@@ -2981,11 +3107,7 @@ class VariableState
           // If here, then clause is not yet present        
         newClause->setWt(wt);
         if (parentWtPtr)
-        {
-          newClause->appendParentWtPtr(parentWtPtr);
-          newClause->incrementClauseFrequency(clauseId, 1);
-          assert(newClause->getWt() == *parentWtPtr);
-        }      
+          newClause->incrementClauseFrequency(clauseId, 1, invertWt);
 
         if (vsdebug)
         {
@@ -3029,6 +3151,10 @@ class VariableState
     return activeAtoms_; 
   }
 
+  const void setBreakHardClauses(const bool& breakHardClauses)
+  {
+    breakHardClauses_ = breakHardClauses;
+  }
   ////////////// END: Lazy Functions //////////////
 
   
@@ -3227,9 +3353,17 @@ class VariableState
     // Number of non-evidence atoms in the domain
   int numNonEvAtoms_;
 
-   // Inference mode: decide how getActiveClauses and addNewClauses
-   // filter and set cost
+    // Inference mode: decide how getActiveClauses and addNewClauses
+    // filter and set cost
   int inferenceMode_;
+  
+    // Indicates if atoms are still being activated. If main memory is full,
+    // then activating atoms is disabled and inference is run in the partial
+    // network
+  bool stillActivating_;
+  
+    // If true, hard clauses can be broken
+  bool breakHardClauses_;
 
 };
 

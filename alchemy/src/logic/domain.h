@@ -2,11 +2,11 @@
  * All of the documentation and software included in the
  * Alchemy Software is copyrighted by Stanley Kok, Parag
  * Singla, Matthew Richardson, Pedro Domingos, Marc
- * Sumner and Hoifung Poon.
+ * Sumner, Hoifung Poon, and Daniel Lowd.
  * 
  * Copyright [2004-07] Stanley Kok, Parag Singla, Matthew
- * Richardson, Pedro Domingos, Marc Sumner and Hoifung
- * Poon. All rights reserved.
+ * Richardson, Pedro Domingos, Marc Sumner, Hoifung
+ * Poon, and Daniel Lowd. All rights reserved.
  * 
  * Contact: Pedro Domingos, University of Washington
  * (pedrod@cs.washington.edu).
@@ -28,8 +28,8 @@
  * of this software must display the following
  * acknowledgment: "This product includes software
  * developed by Stanley Kok, Parag Singla, Matthew
- * Richardson, Pedro Domingos, Marc Sumner and Hoifung
- * Poon in the Department of Computer Science and
+ * Richardson, Pedro Domingos, Marc Sumner, Hoifung
+ * Poon, and Daniel Lowd in the Department of Computer Science and
  * Engineering at the University of Washington".
  * 
  * 4. Your publications acknowledge the use or
@@ -91,6 +91,13 @@ typedef hash_map<const char*, const FunctionTemplate*, hash<const char*>,
 class Domain
 {
  public:
+    // Name of type used in a unary predicate to simulate propositional constant
+  static const char* PROPOSITIONAL_TYPE;
+    // Name of constant used in a unary predicate to simulate propositional
+    // constant
+  static const char* PROPOSITIONAL_CONSTANT;
+
+ public:
   Domain() : typeDualMap_(new DualMap), constDualMap_(new ConstDualMap),
              predDualMap_(new DualMap), funcDualMap_(new DualMap),
              strToPredTemplateMap_(new StrToPredTemplateMap),
@@ -103,7 +110,9 @@ class Domain
              blockSizes_(new Array<int>),
              blockEvidence_(new Array<bool>),
              //externalConstant_(new Array<bool>),
-             numNonEvidAtomsPerPred_(new Array<int>)
+             numNonEvidAtomsPerPred_(new Array<int>),
+             numTrueNonEvidGndingsPerClause_(new Array<double>),             
+             numFalseNonEvidGndingsPerClause_(new Array<double>)             
   {
     equalPredTemplate_ = new PredicateTemplate();
     equalPredTemplate_->setName(PredicateTemplate::EQUAL_NAME);
@@ -270,6 +279,8 @@ class Domain
   const Array<Array<int>*>* getConstantsByType() const 
   { return constantsByType_; }
 
+  const Array<Array<int>*>* getExternalConstantsByType() const 
+  { return externalConstantsByType_; }
 
   void replaceFuncSet(FunctionSet* const & funcSet)
   {
@@ -319,7 +330,8 @@ class Domain
 
     // for domain1-N - postprocess
   void reorderConstants(ConstDualMap* const & map,
-                        Array<Array<int>*>* const & cbt, MLN* const & mln);
+                        Array<Array<int>*>* const & cbt,  
+                        Array<Array<int>*>* const & ecbt, MLN* const & mln);
 
 
     //Caller is responsible for deleting returned pointer
@@ -403,6 +415,7 @@ class Domain
     Array<int>* ecbt = (*externalConstantsByType_)[typeId];
     for (int i = 0; i < ecbt->size(); i++)
       retArr->append((*ecbt)[i]);
+    retArr->quicksort();
     return retArr;
   }
 
@@ -1095,7 +1108,63 @@ class Domain
    */
   void computeNumNonEvidAtoms();
    
-    
+  void setNumTrueNonEvidGndingsPerClause(Array<double>*
+                                         numTrueNonEvidGndingsPerClause)
+  {
+    numTrueNonEvidGndingsPerClause_ = numTrueNonEvidGndingsPerClause;
+  }
+  
+  void setNumFalseNonEvidGndingsPerClause(Array<double>*
+                                          numFalseNonEvidGndingsPerClause)
+  {
+    numFalseNonEvidGndingsPerClause_ = numFalseNonEvidGndingsPerClause;
+  }
+
+  void setNumTrueNonEvidGndings(const int & clauseIdx, const double & count)
+  {
+    if (numTrueNonEvidGndingsPerClause_->size() <= clauseIdx)
+      numTrueNonEvidGndingsPerClause_->growToSize(clauseIdx + 1);
+    (*numTrueNonEvidGndingsPerClause_)[clauseIdx] = count;
+  }
+
+  void setNumFalseNonEvidGndings(const int & clauseIdx, const double & count)
+  {
+    if (numFalseNonEvidGndingsPerClause_->size() <= clauseIdx)
+      numFalseNonEvidGndingsPerClause_->growToSize(clauseIdx + 1);
+    (*numFalseNonEvidGndingsPerClause_)[clauseIdx] = count;
+  }
+
+  const double getNumTrueNonEvidGroundings(const int & clauseIdx) const
+  {
+    return (*numTrueNonEvidGndingsPerClause_)[clauseIdx];
+  }  
+
+  const double getNumFalseNonEvidGroundings(const int & clauseIdx) const
+  {
+    return (*numFalseNonEvidGndingsPerClause_)[clauseIdx];
+  }  
+
+  const double getNumNonEvidGroundings(const int & clauseIdx) const
+  {
+    return ((*numTrueNonEvidGndingsPerClause_)[clauseIdx] +
+            (*numFalseNonEvidGndingsPerClause_)[clauseIdx]);
+  }  
+
+    //get the predicate corresponding to the tuple of constants
+    //Note: caller is responsible for deleting it
+  Predicate * getPredicate(Array<int> * const & constants, int predId)
+  {
+    Term *term;
+    const PredicateTemplate *pt = getPredicateTemplate(predId);
+    Predicate *pred = new Predicate(pt);
+    for (int i = 0; i < constants->size(); i++)
+    {
+      term = new Term((*constants)[i]);
+      pred->appendTerm(term);
+    }
+    return pred;
+  }
+
  private:
  
   void changePredTermsToNewIds(Predicate* const & p,
@@ -1144,16 +1213,14 @@ class Domain
     // Flags indicating if block is fulfilled by evidence
   Array<bool>* blockEvidence_;
   
-    // externalConstant_[c] indicates if constant with id c is external, i.e. it
-    // originates from another domain (can occur when per-constant rules are
-    // used with multiple dbs). In this case, the constant is not used when
-    // grounding out preds and clauses.
-  //Array<bool>* externalConstant_;
-  
     // numNonEvidAtomsPerPred_[p] holds the number of non-evidence groundings
     // of the first-order predicate with index p
   Array<int>* numNonEvidAtomsPerPred_;
-  
+
+    // numTrueNonEvidGndingsPerClause_[c] holds the total number of true
+    // groundings of the first-order clause not satisfied by evidence
+  Array<double>* numTrueNonEvidGndingsPerClause_;
+  Array<double>* numFalseNonEvidGndingsPerClause_;
 };
 
 

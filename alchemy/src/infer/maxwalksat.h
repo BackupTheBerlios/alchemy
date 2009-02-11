@@ -2,11 +2,11 @@
  * All of the documentation and software included in the
  * Alchemy Software is copyrighted by Stanley Kok, Parag
  * Singla, Matthew Richardson, Pedro Domingos, Marc
- * Sumner and Hoifung Poon.
+ * Sumner, Hoifung Poon, and Daniel Lowd.
  * 
  * Copyright [2004-07] Stanley Kok, Parag Singla, Matthew
- * Richardson, Pedro Domingos, Marc Sumner and Hoifung
- * Poon. All rights reserved.
+ * Richardson, Pedro Domingos, Marc Sumner, Hoifung
+ * Poon, and Daniel Lowd. All rights reserved.
  * 
  * Contact: Pedro Domingos, University of Washington
  * (pedrod@cs.washington.edu).
@@ -28,8 +28,8 @@
  * of this software must display the following
  * acknowledgment: "This product includes software
  * developed by Stanley Kok, Parag Singla, Matthew
- * Richardson, Pedro Domingos, Marc Sumner and Hoifung
- * Poon in the Department of Computer Science and
+ * Richardson, Pedro Domingos, Marc Sumner, Hoifung
+ * Poon, and Daniel Lowd in the Department of Computer Science and
  * Engineering at the University of Washington".
  * 
  * 4. Your publications acknowledge the use or
@@ -101,7 +101,7 @@ class MaxWalkSat : public SAT
    */
   MaxWalkSat(VariableState* state, int seed, const bool& trackClauseTrueCnts,
              MaxWalksatParams* params)
-    : SAT(state, seed, trackClauseTrueCnts)
+    : SAT(state, seed, trackClauseTrueCnts), printInfo_(true)
   {
     int numAtoms = state_->getNumAtoms();
 
@@ -110,6 +110,8 @@ class MaxWalkSat : public SAT
     maxTries_ = params->maxTries;
     targetCost_ = params->targetCost;
     hard_ = params->hard;
+      // Set this in the state
+    state_->setBreakHardClauses(hard_);
     numSolutions_ = params->numSolutions;
     heuristic_ = params->heuristic;
     tabuLength_ = params->tabuLength;
@@ -142,7 +144,16 @@ class MaxWalkSat : public SAT
   /**
    * Destructor (destructors from superclasses are called)
    */
-  ~MaxWalkSat() { }
+  ~MaxWalkSat()
+  {
+/*
+    if (state_)
+    {
+      delete state_;
+      state_ = NULL;
+    }
+*/
+  }
 
   /**
    * Initializes the MaxWalkSat algorithm. A random assignment is given to the
@@ -187,6 +198,8 @@ class MaxWalkSat : public SAT
     {
       numtry++;
       numFlips_ = 0;
+      long double tryLowCost = LDBL_MAX;
+      int tryLowBad = INT_MAX;
       bool lowStateInThisTry = false;
       if (lazyLowState_)
         varsFlippedSinceLowState_.clear();
@@ -195,7 +208,7 @@ class MaxWalkSat : public SAT
         // (for first try, init() should have been called)
       if (numtry > 1 && numsuccesstry == 0) init();
 
-      if (mwsdebug)
+      if (printInfo_ || mwsdebug)
       {
         cout << "\nIn the beginning of try " << numtry << ": " << endl;
         cout << "Number of clauses: " << state_->getNumClauses() << endl;
@@ -226,7 +239,13 @@ class MaxWalkSat : public SAT
         flipInBlock_ = NOVALUE;
         
         long double costOfFalseClauses = state_->getCostOfFalseClauses();
-        //long double lowCost = state_->getLowCost();
+          // Keep track of lowest num. and cost in this try
+        if (costOfFalseClauses < tryLowCost)
+        {
+          tryLowCost = costOfFalseClauses;
+          tryLowBad = state_->getNumFalseClauses();
+        }
+        
           // If the cost of false clauses is less than the low cost
           // of all tries, then save this as the low state. Or if we have
           // reached a solution the cost could be equal
@@ -259,11 +278,11 @@ class MaxWalkSat : public SAT
         reconstructLowState();
       state_->saveLowStateToDB();
       
-      if (mwsdebug)
+      if (printInfo_ || mwsdebug)
       {
         cout<< "In the end of try " << numtry << ": " << endl;
-        cout<< "Lowest num. of false clauses: " << state_->getLowBad() << endl;
-        cout<< "Lowest cost of false clauses: " << state_->getLowCost() << endl;
+        cout<< "Lowest num. of false clauses: " << tryLowBad << endl;
+        cout<< "Lowest cost of false clauses: " << tryLowCost << endl;
         cout<< "Number of flips: " << numFlips_ << endl;
         //cout<< "Active atoms " << state_->getNumActiveAtoms() << endl; 
       }
@@ -292,6 +311,16 @@ class MaxWalkSat : public SAT
   void setMaxSteps(const int& maxSteps)
   {
     maxSteps_ = maxSteps;
+  }
+
+  void setPrintInfo(const bool& printInfo)
+  {
+    printInfo_ = printInfo;
+  }
+
+  const bool getPrintInfo()
+  {
+    return printInfo_;
   }
   
  protected:
@@ -356,7 +385,8 @@ class MaxWalkSat : public SAT
     //if (mwsdebug) cout << "Entering MaxWalkSat::pickRandom" << endl;
     assert(inBlock_ == -1);
     int atomIdx = state_->getIndexOfAtomInRandomFalseClause();
-    assert(atomIdx > 0);
+    if (atomIdx == NOVALUE) return NOVALUE;
+    if (state_->getImprovementByFlipping(atomIdx) == -LDBL_MAX) return NOVALUE;
 
       // if false => fix atoms
     bool ignoreActivePreds = false;
@@ -498,7 +528,7 @@ class MaxWalkSat : public SAT
       if (mwsdebug)
         cout << "Improvement of var " << var << " is: " << improvement << endl;
 
-      if (improvement >= bestvalue)
+      if (improvement > -LDBL_MAX && improvement >= bestvalue)
       { // Tied or better than previous best
         if (improvement > bestvalue)
         {
@@ -587,7 +617,34 @@ class MaxWalkSat : public SAT
       // With prob. do a noisy pick
     bool noisyPick = (numerator_ > 0 && random()%denominator_ < numerator_); 
 
-    for (int i = 0; i < clauseSize; i++)
+      // if random move, exclude illegitimate ones and place others in a lottery
+    if (noisyPick)
+    {
+      for (int i = 0; i < clauseSize; i++)
+      {       
+        register int lit = state_->getAtomInClause(i, toFix);
+          // Neg. clause: Only look at true literals
+        if (cost < 0 && !state_->isTrueLiteral(lit)) continue;
+          // var is the index of the atom
+        register int var = abs(lit);
+
+        if (state_->isFixedAtom(var)) continue;
+        bool ignoreActivePreds = false;
+        bool groundOnly = false;
+        if (!state_->activateAtom(var, ignoreActivePreds, groundOnly))
+          return NOVALUE;
+
+          // We don't need improvement, but this function fills the block arrays
+        calculateImprovement(var, canNotFlip[i],
+                             candidateBlockedVars[i],
+                             othersToFlip[i], blockIdx[i]);
+
+        best.append(i);
+        numbest++;
+      }
+    }
+      // greedy: pick the best value
+    else for (int i = 0; i < clauseSize; i++)
     {
       register int lit = state_->getAtomInClause(i, toFix);
         // Neg. clause: Only look at true literals
@@ -595,7 +652,7 @@ class MaxWalkSat : public SAT
         // var is the index of the atom
       register int var = abs(lit);
       
-	  if (state_->isFixedAtom(var)) continue;
+      if (state_->isFixedAtom(var)) continue;
       bool ignoreActivePreds = false;
       bool groundOnly = false;
       if (!state_->activateAtom(var, ignoreActivePreds, groundOnly))
@@ -619,14 +676,10 @@ class MaxWalkSat : public SAT
         best.append(i);
         numbest++;
       }
-      else if (tabuLength_ < numFlips_ - changed_[var])
+      else if (improvement > -LDBL_MAX && 
+               tabuLength_ < numFlips_ - changed_[var])
       {
-        if (noisyPick)
-        { 
-          best.append(i);
-          numbest++;
-        }
-        else if (improvement >= bestvalue)
+        if (improvement >= bestvalue)
         { // Tied or better than previous best
           if (improvement > bestvalue)
           {
@@ -718,8 +771,9 @@ class MaxWalkSat : public SAT
 
         // If pos. or no improvement, then the atom will be flipped
         // Or neg. improvement: According to temp. flip atom anyway
-      if ((improvement >= 0) ||
-          (random() <= exp(improvement/(saTemp_/100.0)) * RAND_MAX))
+      if (improvement > -LDBL_MAX && 
+          ((improvement >= 0) ||
+          (random() <= exp(improvement/(saTemp_/100.0)) * RAND_MAX)))
       {
           // If atom can not be flipped, then null flip
         if (canNotFlip.contains(toFlip)) toFlip = NOVALUE;
@@ -836,6 +890,8 @@ class MaxWalkSat : public SAT
             int idx = state_->getIndexOfGroundPredicate(gndPred);
             if (idx == -1)
             {
+              delete gndPred;
+              delete pred;
               continue;
               // TODO: Other atom not yet in state (lazy) - must activate it              
             }
@@ -901,7 +957,7 @@ class MaxWalkSat : public SAT
     // Function pointer holds which function is to be used to pick an atom
     // = {pickRandom, pickBest, pickTabu, pickSS};
   int (MaxWalkSat::*pickcode[15])(void);
-    // If true, never break a highest cost clause
+    // If true, then a hard clause can be broken
   bool hard_;
 
     // Make random flip with numerator/denominator probability
@@ -920,6 +976,9 @@ class MaxWalkSat : public SAT
     // List of variables flipped since last low state was found. This is used
     // to reconstruct the low state when lazyLowState_ is set.
   hash_set<int> varsFlippedSinceLowState_;
+
+    // If true, information for each try is printed out.
+  bool printInfo_;
 };
 
 #endif

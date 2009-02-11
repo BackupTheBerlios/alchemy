@@ -2,11 +2,11 @@
  * All of the documentation and software included in the
  * Alchemy Software is copyrighted by Stanley Kok, Parag
  * Singla, Matthew Richardson, Pedro Domingos, Marc
- * Sumner and Hoifung Poon.
+ * Sumner, Hoifung Poon, and Daniel Lowd.
  * 
  * Copyright [2004-07] Stanley Kok, Parag Singla, Matthew
- * Richardson, Pedro Domingos, Marc Sumner and Hoifung
- * Poon. All rights reserved.
+ * Richardson, Pedro Domingos, Marc Sumner, Hoifung
+ * Poon, and Daniel Lowd. All rights reserved.
  * 
  * Contact: Pedro Domingos, University of Washington
  * (pedrod@cs.washington.edu).
@@ -28,8 +28,8 @@
  * of this software must display the following
  * acknowledgment: "This product includes software
  * developed by Stanley Kok, Parag Singla, Matthew
- * Richardson, Pedro Domingos, Marc Sumner and Hoifung
- * Poon in the Department of Computer Science and
+ * Richardson, Pedro Domingos, Marc Sumner, Hoifung
+ * Poon, and Daniel Lowd in the Department of Computer Science and
  * Engineering at the University of Washington".
  * 
  * 4. Your publications acknowledge the use or
@@ -82,6 +82,33 @@ class EqualInt
 };
 
 typedef HashArray<int, HashInt, EqualInt> IntHashArray;
+
+
+class HashIntArray
+{
+ public:
+  size_t operator()(Array<int>* const & arr1) const
+  {
+    return Hash::hash(*arr1);
+  }
+};
+
+
+class EqualIntArray
+{
+ public:
+  bool operator()(Array<int>* const & arr1, Array<int>* const & arr2) const
+  { 
+    if (arr1->size() != arr2->size()) return false;
+    const int* items1 = arr1->getItems();
+    const int* items2 = arr2->getItems();
+    return (memcmp(items1, items2, arr1->size()*sizeof(int)) == 0);
+  }
+};
+
+typedef HashArray<Array<int> *, HashIntArray, EqualIntArray> IntArrayHashArray;
+typedef hash_map<Array<int>*, int, HashIntArray, EqualIntArray> IntArrayToIntMap;
+
 
 
 #endif

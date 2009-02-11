@@ -2,11 +2,11 @@
  * All of the documentation and software included in the
  * Alchemy Software is copyrighted by Stanley Kok, Parag
  * Singla, Matthew Richardson, Pedro Domingos, Marc
- * Sumner and Hoifung Poon.
+ * Sumner, Hoifung Poon, and Daniel Lowd.
  * 
  * Copyright [2004-07] Stanley Kok, Parag Singla, Matthew
- * Richardson, Pedro Domingos, Marc Sumner and Hoifung
- * Poon. All rights reserved.
+ * Richardson, Pedro Domingos, Marc Sumner, Hoifung
+ * Poon, and Daniel Lowd. All rights reserved.
  * 
  * Contact: Pedro Domingos, University of Washington
  * (pedrod@cs.washington.edu).
@@ -28,8 +28,8 @@
  * of this software must display the following
  * acknowledgment: "This product includes software
  * developed by Stanley Kok, Parag Singla, Matthew
- * Richardson, Pedro Domingos, Marc Sumner and Hoifung
- * Poon in the Department of Computer Science and
+ * Richardson, Pedro Domingos, Marc Sumner, Hoifung
+ * Poon, and Daniel Lowd in the Department of Computer Science and
  * Engineering at the University of Washington".
  * 
  * 4. Your publications acknowledge the use or
@@ -79,6 +79,7 @@
 #include "mcsat.h"
 #include "gibbssampler.h"
 #include "simulatedtempering.h"
+#include "bp.h"
 
 // Variables for holding inference command line args are in inferenceargs.h
 
@@ -97,30 +98,27 @@ GroundPredicateHashArray knownQueries;
  * serves to print out ground preds and their probs / truth
  * values to a stream if printToFile is set to true.
  * 
- * @param queryPredsStr Comma-separated string of predicate
- * names which is parsed.
+ * @param queryPredsStr Comma-separated string of predicate names which is
+ * parsed.
  * @param domain Domain from which predicates are generated.
  * @param db Database containing truth values of the preds.
- * @param queries Array being filled with groundings of preds
- * specified in queryPredsStr (those with unknown values in db).
- * @param knownQueries Array being filled with groundings of preds
- * specified in queryPredsStr (those with known values in db).
- * @param allPredGndingsAreQueries Boolean array indicating
- * which predicates have all their gndings as queries
- * (indexed by the predicate's id in domain)
- * @param printToFile If true, atom, and their truth values,
- * are printed to file, not collected in HashArray.
- * @param out stream to which the groundings are printed when
- * printToFile is set to true.
- * @param amapPos If true, only positive atoms are printed out.
- * Otherwise, all atoms with 0/1 are printed. Used in
- * conjunction printToFile.
- * @param trueQueries If specified, probabilities from the ground
- * preds here are written to out. Used in conjunction with
- * printToFile.
+ * @param queries Array being filled with groundings of preds specified in
+ * queryPredsStr (those with unknown values in db).
+ * @param knownQueries Array being filled with groundings of preds specified in
+ * queryPredsStr (those with known values in db).
+ * @param allPredGndingsAreQueries Boolean array indicating which predicates
+ * have all their gndings as queries (indexed by the predicate's id in domain)
+ * @param printToFile If true, atom, and their truth values, are printed to
+ * file, not collected in HashArray.
+ * @param out stream to which the groundings are printed when printToFile is set
+ * to true.
+ * @param amapPos If true, only positive atoms are printed out. Otherwise, all
+ * atoms with 0/1 are printed. Used in conjunction with printToFile.
+ * @param trueQueries If specified, probabilities from the ground preds here are
+ * written to out. Used in conjunction with printToFile.
  * 
- * @return false, if a pred name or constant is not defined, or if
- * a pred has the wrong number of terms; otherwise, true. 
+ * @return false, if a pred name or constant is not defined, or if a pred has
+ * the wrong number of terms; otherwise, true. 
  */
 bool createComLineQueryPreds(const string& queryPredsStr,
                              const Domain* const & domain,
@@ -218,7 +216,8 @@ bool createComLineQueryPreds(const string& queryPredsStr,
     }
     else
     {   // if only the predicate name is specified
-      (*allPredGndingsAreQueries)[ptemplate->getId()] = true;
+        // HACK DEBUG
+      //(*allPredGndingsAreQueries)[ptemplate->getId()] = true;
       for (int i = 0; i < ptemplate->getNumTerms(); i++)
         ppred.appendTerm(new Term(--varIdCnt, (void*)&ppred, true));
     }  
@@ -244,7 +243,6 @@ bool createComLineQueryPreds(const string& queryPredsStr,
       assert(!db->isClosedWorld(ppred.getId()));
       TruthValue tv = db->getValue(&ppred);
       GroundPredicate* gndPred = new GroundPredicate(&ppred);
-      
         // If just printing to file, then all values must be known
       if (printToFile) assert(tv != UNKNOWN);
       if (tv == UNKNOWN)
@@ -778,77 +776,6 @@ bool createQueryFilePreds(const string& queryFile, const Domain* const & domain,
                               false, cout, false, NULL, NULL);
 }
 
-void readPredValuesAndSetToUnknown(const StringHashArray& predNames,
-                                   Domain *domain,
-                                   Array<Predicate *> &queryPreds,
-                                   Array<TruthValue> &queryPredValues,
-                                   bool isQueryEvidence)
-{
-  Array<Predicate*> ppreds;
-
-    //cout << endl << "Getting the counts for the domain " << i << endl;
-  queryPreds.clear();
-  queryPredValues.clear();
-  for (int predno = 0; predno < predNames.size(); predno++) 
-  {
-    ppreds.clear();
-    int predid = domain->getPredicateId(predNames[predno].c_str());
-    Predicate::createAllGroundings(predid, domain, ppreds);
-    for (int gpredno = 0; gpredno < ppreds.size(); gpredno++)
-    {
-      Predicate *pred = ppreds[gpredno];
-      TruthValue tv = domain->getDB()->getValue(pred);
-      if (tv == UNKNOWN)
-        domain->getDB()->setValue(pred,FALSE);
-          
-        // if first order query pred groundings are allowed to be evidence
-        // - we assume all the predicates not in db to be false
-        // evidence - need a better way code this.
-      if (isQueryEvidence && tv == UNKNOWN)
-        delete pred;
-      else
-        queryPreds.append(pred);
-    }
-  }
-    //set all the query preds to unknown, reading in the TRUE/FALSE status
-    //for verification at a later time
-  domain->getDB()->setValuesToUnknown(&queryPreds, &queryPredValues);
-}
-
-/**
- * Sets the truth values of all groundings the specified predicates
- * to the specified values.
- * 
- * @param predNames HashArray of predicate names whose groundings
- * are to be set.
- * @param domain Domain in which the truth values are set.
- * @param gpredValues Array of truth values to which the
- * groundings are set.
- */
-void setPredsToGivenValues(const StringHashArray& predNames, Domain *domain,
-                           Array<TruthValue> &gpredValues)
-{
-  Array<Predicate*> gpreds;
-  Array<Predicate*> ppreds;
-  Array<TruthValue> tmpValues;
-    
-    //cout << endl << "Getting the counts for the domain " << i << endl;
-  gpreds.clear();
-  tmpValues.clear();
-  for (int predno = 0; predno < predNames.size(); predno++)
-  {
-    ppreds.clear();
-    int predid = domain->getPredicateId(predNames[predno].c_str());
-    Predicate::createAllGroundings(predid, domain, ppreds);
-      //cout<<"size of gnd for pred " << predid << " = "<<ppreds.size()<<endl;
-    gpreds.append(ppreds);
-  }
-  
-  domain->getDB()->setValuesToGivenValues(&gpreds, &gpredValues);
-  for (int gpredno = 0; gpredno < gpreds.size(); gpredno++)
-    delete gpreds[gpredno];
-}
-
 
 /**
  * Parses the .mln and .db files and builds an inference procedure.
@@ -887,19 +814,18 @@ int buildInference(Inference*& inference, Domain*& domain,
   if (queryPredsStr.length() == 0 && queryFile.length() == 0)
   { cout << "No query predicates specified" << endl; return -1; }
 
-  if (agibbsInfer && amcmcNumChains < 2) 
+  if (agibbsInfer && agibbsTestConvergence && amcmcNumChains < 2) 
   {
-    cout << "ERROR: there must be at least 2 MCMC chains in Gibbs sampling" 
+    cout << "ERROR: If testing for convergence, there must be at least 2 "
+         << "MCMC chains in Gibbs sampling" 
          << endl; return -1;
   }
 
-  if (!asimtpInfer && !amapPos && !amapAll && !agibbsInfer && !amcsatInfer)
+  if (!asimtpInfer && !amapPos && !amapAll && !agibbsInfer && !amcsatInfer &&
+      !abpInfer)
   {
       // If nothing specified, use MC-SAT
     amcsatInfer = true;
-    
-    //cout << "ERROR: must specify one of -ms/-simtp/-m/-a/-p flags." << endl;
-    //return -1;
   }
 
     //extract names of all query predicates
@@ -983,11 +909,12 @@ int buildInference(Inference*& inference, Domain*& domain,
   gibbsparams->maxSteps     = amcmcMaxSteps;
   gibbsparams->maxSeconds   = amcmcMaxSeconds;
 
-  gibbsparams->gamma          = 1 - agibbsDelta;
-  gibbsparams->epsilonError   = agibbsEpsilonError;
-  gibbsparams->fracConverged  = agibbsFracConverged;
-  gibbsparams->walksatType    = agibbsWalksatType;
-  gibbsparams->samplesPerTest = agibbsSamplesPerTest;
+  gibbsparams->gamma           = 1 - agibbsDelta;
+  gibbsparams->epsilonError    = agibbsEpsilonError;
+  gibbsparams->fracConverged   = agibbsFracConverged;
+  gibbsparams->walksatType     = agibbsWalksatType;
+  gibbsparams->testConvergence = agibbsTestConvergence;
+  gibbsparams->samplesPerTest  = agibbsSamplesPerTest;
   
     // Set Sim. Tempering parameters
   SimulatedTemperingParams* stparams = new SimulatedTemperingParams;
@@ -1002,6 +929,15 @@ int buildInference(Inference*& inference, Domain*& domain,
   stparams->subInterval = asimtpSubInterval;
   stparams->numST       = asimtpNumST;
   stparams->numSwap     = asimtpNumSwap;
+
+    // Set BP parameters
+  BPParams* bpparams = new BPParams;
+  bpparams->maxSteps               = amcmcMaxSteps;
+  bpparams->maxSeconds             = amcmcMaxSeconds;
+  bpparams->lifted                 = aliftedInfer;
+  bpparams->convergenceThresh      = abpConvergenceThresh;
+  bpparams->convergeRequiredItrCnt = abpConvergeRequiredItrCnt;
+  bpparams->implicitRep            = !aexplicitRep;
 
   //////////////////// read in clauses & evidence predicates //////////////////
 
@@ -1024,8 +960,8 @@ int buildInference(Inference*& inference, Domain*& domain,
   bool mustHaveWtOrFullStop = true;
   bool warnAboutDupGndPreds = true;
   bool flipWtsOfFlippedClause = true;
-  //bool allPredsExceptQueriesAreCW = true;
-  bool allPredsExceptQueriesAreCW = owPredNames.empty();
+  bool allPredsExceptQueriesAreCW = false;
+  //bool allPredsExceptQueriesAreCW = owPredNames.empty();
   Domain* forCheckingPlusTypes = NULL;
 
     // Parse as if lazy inference is set to true to set evidence atoms in DB
@@ -1040,13 +976,6 @@ int buildInference(Inference*& inference, Domain*& domain,
   }
 
   unlink(wkMLNFile.c_str());
-
-  if (aisQueryEvidence)
-  {
-    readPredValuesAndSetToUnknown(queryPredNames, domain, queryPreds,
-                                  queryPredValues, aisQueryEvidence);
-  }
-
 
     //////////////////////////// run inference /////////////////////////////////
 
@@ -1069,79 +998,95 @@ int buildInference(Inference*& inference, Domain*& domain,
     allPredGndingsAreQueries.growToSize(domain->getNumPredicates(), false);
     if (queryPredsStr.length() > 0)
     {
+      // unePreds = unknown non-evidence predicates
+      // nePreds  = known non-evidence predicates
+      GroundPredicateHashArray unePreds;
+      GroundPredicateHashArray knePreds;
+      bool ok = createComLineQueryPreds(queryPredsStr, domain, 
+                                  domain->getDB(), &unePreds, &knePreds,
+                                  &allPredGndingsAreQueries);
+      if (!ok) { cout<<"Failed to create query predicates."<<endl; exit(-1); }
+
       if (aisQueryEvidence)
       {
-        // If first order query pred groundings are allowed to be evidence
-        // - we assume all the predicates not in db to be false
-        // evidence - need a better way to code this.
+        // If the isQueryEvidence flag is set, then all query predicates
+        // that are specified in the database are assumed to be the
+        // set of queries we're actually interested in, while all
+        // unspecified query predicates are assumed to be false evidence.
+        // This is useful for doing inference with canopies,
+        // e.g., (Singla & Domingos, 2005).
 
-        // Note that knownQueries and queries are flipped in the
-        // argument order here.  This is intentional!  Anything known
-        // in the database is actually going to be a query, while anything
-        // unknown is actually false evidence.
-        bool ok = createComLineQueryPreds(queryPredsStr, domain, 
-                                    domain->getDB(), &knownQueries, &queries, 
-                                    &allPredGndingsAreQueries);
-        if (!ok) { cout<<"Failed to create query predicates."<<endl; exit(-1); }
+        // All unknown queries are actually false evidence 
+        queryPredValues.clear();
+        for (int predno = 0; predno < unePreds.size(); predno++) 
+          domain->getDB()->setValue(unePreds[predno], FALSE);
+        knownQueries = unePreds;
 
-        // All unknown queries are false evidence
-        for (int predno = 0; predno < queries.size(); predno++) 
-          domain->getDB()->setValue(queries[predno], UNKNOWN);
-
-        // All known queries should actually be unknown
-        for (int predno = 0; predno < knownQueries.size(); predno++) 
-          domain->getDB()->setValue(knownQueries[predno], FALSE);
+        // All known queries are actually unknown 
+        for (int predno = 0; predno < knePreds.size(); predno++) 
+        {
+          TruthValue origValue 
+              = domain->getDB()->setValue(knePreds[predno], UNKNOWN);
+          queryPredValues.append(origValue);
+        }
+        queries = knePreds;
       }
       else
       {
-        bool ok = createComLineQueryPreds(queryPredsStr, domain, 
-                                    domain->getDB(), &queries, &knownQueries, 
-                                    &allPredGndingsAreQueries);
-        if (!ok) { cout<<"Failed to create query predicates."<<endl; exit(-1); }
+        queries = unePreds;
+        knownQueries = knePreds;
       }
     }
   }
 
-    // Create inference algorithm and state based on queries and mln / domain
-  bool markHardGndClauses = true;
-  bool trackParentClauseWts = false;
-    // Lazy version: queries and allPredGndingsAreQueries are empty,
-    // markHardGndClause and trackParentClauseWts are not used
-  VariableState* state = new VariableState(&queries, NULL, NULL,
-                                           &allPredGndingsAreQueries,
-                                           markHardGndClauses,
-                                           trackParentClauseWts,
-                                           mln, domain, aLazy);
   bool trackClauseTrueCnts = false;
-    // MAP inference, MC-SAT, Gibbs or Sim. Temp.
-  if (amapPos || amapAll || amcsatInfer || agibbsInfer || asimtpInfer)
+  VariableState* state = NULL;
+  if (abpInfer)
   {
-    if (amapPos || amapAll)
-    { // MaxWalkSat
-        // When standalone MWS, numSolutions is always 1
-        // (maybe there is a better way to do this?)
-      mwsparams->numSolutions = 1;
-      inference = new MaxWalkSat(state, aSeed, trackClauseTrueCnts, mwsparams);
-    }
-    else if (amcsatInfer)
-    { // MC-SAT
-      inference = new MCSAT(state, aSeed, trackClauseTrueCnts, msparams);
-    }
-    else if (asimtpInfer)
-    { // Simulated Tempering
-        // When MWS is used in Sim. Temp., numSolutions is always 1
-        // (maybe there is a better way to do this?)
-      mwsparams->numSolutions = 1;
-      inference = new SimulatedTempering(state, aSeed, trackClauseTrueCnts,
-                                         stparams);
-    }
-    else if (agibbsInfer)
-    { // Gibbs sampling
-        // When MWS is used in Gibbs, numSolutions is always 1
-        // (maybe there is a better way to do this?)
-      mwsparams->numSolutions = 1;
-      inference = new GibbsSampler(state, aSeed, trackClauseTrueCnts,
-                                   gibbsparams);
+    inference = new BP(state, aSeed, trackClauseTrueCnts, bpparams, mln, domain);
+  }
+  else
+  {
+      // Create inference algorithm and state based on queries and mln / domain
+    bool markHardGndClauses = true;
+    bool trackParentClauseWts = false;
+      // Lazy version: queries and allPredGndingsAreQueries are empty,
+      // markHardGndClause and trackParentClauseWts are not used
+    state = new VariableState(&queries, NULL, NULL,
+                              &allPredGndingsAreQueries,
+                              markHardGndClauses,
+                              trackParentClauseWts,
+                              mln, domain, aLazy);
+      // MAP inference, MC-SAT, Gibbs or Sim. Temp.
+    if (amapPos || amapAll || amcsatInfer || agibbsInfer || asimtpInfer)
+    {
+      if (amapPos || amapAll)
+      { // MaxWalkSat
+          // When standalone MWS, numSolutions is always 1
+          // (maybe there is a better way to do this?)
+        mwsparams->numSolutions = 1;
+        inference = new MaxWalkSat(state, aSeed, trackClauseTrueCnts, mwsparams);
+      }
+      else if (amcsatInfer)
+      { // MC-SAT
+        inference = new MCSAT(state, aSeed, trackClauseTrueCnts, msparams);
+      }
+      else if (asimtpInfer)
+      { // Simulated Tempering
+          // When MWS is used in Sim. Temp., numSolutions is always 1
+          // (maybe there is a better way to do this?)
+        mwsparams->numSolutions = 1;
+        inference = new SimulatedTempering(state, aSeed, trackClauseTrueCnts,
+                                           stparams);
+      }
+      else if (agibbsInfer)
+      { // Gibbs sampling
+          // When MWS is used in Gibbs, numSolutions is always 1
+          // (maybe there is a better way to do this?)
+        mwsparams->numSolutions = 1;
+        inference = new GibbsSampler(state, aSeed, trackClauseTrueCnts,
+                                     gibbsparams);
+      }
     }
   }
   return 1;

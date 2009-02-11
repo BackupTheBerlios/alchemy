@@ -2,11 +2,11 @@
  * All of the documentation and software included in the
  * Alchemy Software is copyrighted by Stanley Kok, Parag
  * Singla, Matthew Richardson, Pedro Domingos, Marc
- * Sumner and Hoifung Poon.
+ * Sumner, Hoifung Poon, and Daniel Lowd.
  * 
  * Copyright [2004-07] Stanley Kok, Parag Singla, Matthew
- * Richardson, Pedro Domingos, Marc Sumner and Hoifung
- * Poon. All rights reserved.
+ * Richardson, Pedro Domingos, Marc Sumner, Hoifung
+ * Poon, and Daniel Lowd. All rights reserved.
  * 
  * Contact: Pedro Domingos, University of Washington
  * (pedrod@cs.washington.edu).
@@ -28,8 +28,8 @@
  * of this software must display the following
  * acknowledgment: "This product includes software
  * developed by Stanley Kok, Parag Singla, Matthew
- * Richardson, Pedro Domingos, Marc Sumner and Hoifung
- * Poon in the Department of Computer Science and
+ * Richardson, Pedro Domingos, Marc Sumner, Hoifung
+ * Poon, and Daniel Lowd in the Department of Computer Science and
  * Engineering at the University of Washington".
  * 
  * 4. Your publications acknowledge the use or
@@ -359,13 +359,21 @@ class Predicate
     return isGrounded_;    
   }
 
-  
-  bool canBeGroundedAs(Predicate* const & gndPred)
+
+  /**
+   * Checks if this predicate can be grounded as another (potentially)
+   * partially grounded predicate.
+   * 
+   * @param partGndPred Partially grounded predicate to which this predicate
+   * is being compared.
+   * @return true, if this predicate can be grounded as partGndPred.
+   */  
+  bool canBeGroundedAs(Predicate* const & partGndPred)
   {
-    assert(gndPred->isGrounded());
-    if (template_->getId() != gndPred->getId()) return false;
+    //assert(partGndPred->isGrounded());
+    if (template_->getId() != partGndPred->getId()) return false;
     if (allTermsAreDiffVars()) return true;
-    if (isGrounded()) return same(gndPred);
+    if (isGrounded() && partGndPred->isGrounded()) return same(partGndPred);
     
     int varGndings[MAX_VAR];
     memset(varGndings, -1, MAX_VAR*sizeof(int));
@@ -375,7 +383,7 @@ class Predicate
       
       if (termType == Term::CONSTANT) 
       {
-        if ((*terms_)[i]->getId() != gndPred->getTerm(i)->getId()) 
+        if ((*terms_)[i]->getId() != partGndPred->getTerm(i)->getId()) 
           return false;
       }
       else 
@@ -385,9 +393,9 @@ class Predicate
         assert(varId > 0);
         assert(varId < MAX_VAR);
         if (varGndings[varId] < 0) // if variable has not been grounded
-          varGndings[varId] = gndPred->getTerm(i)->getId();
+          varGndings[varId] = partGndPred->getTerm(i)->getId();
         else 
-          if (varGndings[varId] != gndPred->getTerm(i)->getId())
+          if (varGndings[varId] != partGndPred->getTerm(i)->getId())
             return false;
       }
       else
@@ -401,6 +409,18 @@ class Predicate
 
   bool canBeGroundedAs(const GroundPredicate* const & gndPred);
 
+  Array<int> * getPredicateConstants(Array<int> * const & constants)
+  {
+    Array<int> * pconstants = new Array<int>();
+    for (int termno = 0; termno < getNumTerms(); termno++)
+    {
+      const Term *term = getTerm(termno);
+      int id = term->getId();
+      assert(id < 0);
+      pconstants->append((*constants)[-id]);
+    }
+    return pconstants;
+  }
 
   void setDirty();
   bool isDirty() const { return dirty_; }
@@ -418,7 +438,8 @@ class Predicate
     //if (isGrounded() || isEqualPred()) return false;
     if (isEqualPred()) return false;
     
-    return (!getSense());
+    //return (!getSense());
+    return true;
   }
 
   void createVarsTypeIdArr(Array<VarsTypeId*>*& varsTypeIdArr)
@@ -433,7 +454,7 @@ class Predicate
       {
         int id = -(t->getId());
         assert(id > 0);
-        if (id >= varsTypeIdArr->size()) varsTypeIdArr->growToSize(id+1,NULL);
+        if (id >= varsTypeIdArr->size()) varsTypeIdArr->growToSize(id+1, NULL);
         VarsTypeId*& vti = (*varsTypeIdArr)[id];
         if (vti == NULL) 
         {
@@ -504,37 +525,9 @@ class Predicate
     return out;
   }
 
+  ostream& printWithStrVar(ostream& out, const Domain* const & domain) const;
 
-  ostream& printWithStrVar(ostream& out, const Domain* const & domain) const
-  {
-    if (isEqualPred()) return printEqualPredWithStrVar(out,domain);
-    if (isInternalPred()) return printInternalPredWithStrVar(out,domain);
-
-    if (!sense_) out << "!";
-    out << template_->getName() << "(";
-    for (int i = 0; i < terms_->size(); i++)
-    {
-      (*terms_)[i]->printWithStrVar(out, domain); 
-      out << ((i!=terms_->size()-1)?",":")");
-    }
-    return out;
-  }
-
-
-  ostream& print(ostream& out, const Domain* const & domain) const
-  {
-    if (isEqualPred()) return printEqualPred(out, domain);
-    if (isInternalPred()) return printInternalPred(out, domain);
-
-    if (!sense_) out << "!";
-    out << template_->getName() << "(";
-    for (int i = 0; i < terms_->size(); i++)
-    {
-      (*terms_)[i]->print(out, domain); 
-      out << ((i!=terms_->size()-1)?",":")");
-    }
-    return out;
-  }
+  ostream& print(ostream& out, const Domain* const & domain) const;
 
 
  private:

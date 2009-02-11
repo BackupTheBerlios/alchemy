@@ -2,11 +2,11 @@
  * All of the documentation and software included in the
  * Alchemy Software is copyrighted by Stanley Kok, Parag
  * Singla, Matthew Richardson, Pedro Domingos, Marc
- * Sumner and Hoifung Poon.
+ * Sumner, Hoifung Poon, and Daniel Lowd.
  * 
  * Copyright [2004-07] Stanley Kok, Parag Singla, Matthew
- * Richardson, Pedro Domingos, Marc Sumner and Hoifung
- * Poon. All rights reserved.
+ * Richardson, Pedro Domingos, Marc Sumner, Hoifung
+ * Poon, and Daniel Lowd. All rights reserved.
  * 
  * Contact: Pedro Domingos, University of Washington
  * (pedrod@cs.washington.edu).
@@ -28,8 +28,8 @@
  * of this software must display the following
  * acknowledgment: "This product includes software
  * developed by Stanley Kok, Parag Singla, Matthew
- * Richardson, Pedro Domingos, Marc Sumner and Hoifung
- * Poon in the Department of Computer Science and
+ * Richardson, Pedro Domingos, Marc Sumner, Hoifung
+ * Poon, and Daniel Lowd in the Department of Computer Science and
  * Engineering at the University of Washington".
  * 
  * 4. Your publications acknowledge the use or
@@ -66,10 +66,11 @@
 #include "groundclause.h"
 #include "groundpredicate.h"
 #include "clause.h"
+#include "mln.h"
 
 GroundClause::GroundClause(const Clause* const & c, 
                            GroundPredicateHashArray* const & gndPredHashArray) 
-  : wt_(c->getWt()), foClauseFrequencies_(NULL), parentWtPtrs_(NULL)
+  : wt_(c->getWt()), foClauseFrequencies_(NULL)
 {
   if (gcdebug) cout << "Constructing GroundClause" << endl;
   if (gcdebug)
@@ -160,6 +161,30 @@ void GroundClause::appendToGndPreds(
       // Tell the ground pred that it occurs in this ground clause
     (*gndPredHashArray)[index]->appendGndClause(this, sense);
     //assert(ok); ok = true;  // avoid compilation warning
+  }
+}
+
+/**
+ * The weight of this ground clause is set to the sum of its parent weights.
+ * If the weight has been inverted from the parent, this is taken into account.
+ * 
+ * @param mln Reference MLN to which the clause indices in foClauseFrequencies_
+ * correspond.
+ */
+void GroundClause::setWtToSumOfParentWts(const MLN* const & mln)
+{
+  wt_ = 0;
+
+  IntBoolPairItr itr;
+  for (itr = foClauseFrequencies_->begin();
+       itr != foClauseFrequencies_->end(); itr++)
+  {
+    int clauseno = itr->first;
+    int frequency = itr->second.first;
+    bool invertWt = itr->second.second;
+    double parentWeight = mln->getClause(clauseno)->getWt();
+    if (invertWt) wt_ -= parentWeight*frequency;
+    else wt_ += parentWeight*frequency;
   }
 }
 
@@ -277,12 +302,10 @@ double GroundClause::sizeKB()
     size += (gndPredIndexes_->size()*sizeof(int) / 1024.0);
     // wt_
   size += (sizeof(double) / 1024.0);
-    // parentWtPtrs_
-  if (parentWtPtrs_)
-    size += (parentWtPtrs_->size()*sizeof(const double*) / 1024.0);
     // foClauseFrequencies_
   if (foClauseFrequencies_)
-    size += (foClauseFrequencies_->size()*2*sizeof(int) / 1024.0);
+    size += (foClauseFrequencies_->size()*
+             (2*sizeof(int) + sizeof(bool)) / 1024.0);
   
   return size;
 }

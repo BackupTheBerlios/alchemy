@@ -2,11 +2,11 @@
  * All of the documentation and software included in the
  * Alchemy Software is copyrighted by Stanley Kok, Parag
  * Singla, Matthew Richardson, Pedro Domingos, Marc
- * Sumner and Hoifung Poon.
+ * Sumner, Hoifung Poon, and Daniel Lowd.
  * 
  * Copyright [2004-07] Stanley Kok, Parag Singla, Matthew
- * Richardson, Pedro Domingos, Marc Sumner and Hoifung
- * Poon. All rights reserved.
+ * Richardson, Pedro Domingos, Marc Sumner, Hoifung
+ * Poon, and Daniel Lowd. All rights reserved.
  * 
  * Contact: Pedro Domingos, University of Washington
  * (pedrod@cs.washington.edu).
@@ -28,8 +28,8 @@
  * of this software must display the following
  * acknowledgment: "This product includes software
  * developed by Stanley Kok, Parag Singla, Matthew
- * Richardson, Pedro Domingos, Marc Sumner and Hoifung
- * Poon in the Department of Computer Science and
+ * Richardson, Pedro Domingos, Marc Sumner, Hoifung
+ * Poon, and Daniel Lowd in the Department of Computer Science and
  * Engineering at the University of Washington".
  * 
  * 4. Your publications acknowledge the use or
@@ -77,8 +77,8 @@ using namespace __gnu_cxx;
 using namespace std;
 
 // containers    /////////////////////////////////////////////
-typedef map<int,int> IntPair;
-typedef IntPair::iterator IntPairItr;  
+typedef map<int, pair<int,bool> > IntBoolPair;
+typedef IntBoolPair::iterator IntBoolPairItr;  
 //////////////////////////////////////////////////////////////
 
 // Constants
@@ -86,6 +86,7 @@ const double HARD_GROUNDCLAUSE_WT = DBL_MAX;
 const bool gcdebug = false;
 
 // Forward declarations
+class MLN;
 class Domain;
 class Clause;
 class GroundPredicate;
@@ -108,19 +109,7 @@ class GroundClause
   ~GroundClause() 
   { 
     if (gndPredIndexes_) delete gndPredIndexes_;
-    if (parentWtPtrs_) delete parentWtPtrs_;
     if (foClauseFrequencies_) delete foClauseFrequencies_;
-  }
-
-  void deleteParentWtPtrs()
-  { 
-    if (parentWtPtrs_) 
-    {
-      for (int i = 0; i < parentWtPtrs_->size(); i++)
-        delete (*parentWtPtrs_)[i];
-      delete parentWtPtrs_;
-    }
-    parentWtPtrs_ = NULL;
   }
 
   void deleteFoClauseFrequencies()
@@ -181,22 +170,16 @@ class GroundClause
     return gndPredIndexes_;
   }
 
-  void appendParentWtPtr(const double* const & wtPtr) 
-  {
-    if (parentWtPtrs_ == NULL)
-      parentWtPtrs_ = new Array<const double*>;
-    parentWtPtrs_->append(wtPtr);
-  }
-
-  void setWtToSumOfParentWts()
-  {
-    assert(parentWtPtrs_);
-    wt_ = 0;
-    for (int i = 0; i < parentWtPtrs_->size(); i++)
-      wt_ += *((*parentWtPtrs_)[i]);
-  }
+  /**
+   * The weight of this ground clause is set to the sum of its parent weights.
+   * If the weight has been inverted from the parent, this is taken into account.
+   * 
+   * @param mln Reference MLN to which the clause indices in foClauseFrequencies_
+   * correspond.
+   */
+  void setWtToSumOfParentWts(const MLN* const & mln);
   
-  IntPair *getClauseFrequencies()
+  IntBoolPair *getClauseFrequencies()
   {
     return foClauseFrequencies_;
   }
@@ -204,22 +187,23 @@ class GroundClause
   int getClauseFrequency(int clauseno)
   {
 	if (!foClauseFrequencies_) return 0;
-	IntPairItr itr = foClauseFrequencies_->find(clauseno);
+	IntBoolPairItr itr = foClauseFrequencies_->find(clauseno);
 	if (itr == foClauseFrequencies_->end()) 
 	  return 0;
 	else
-	  return itr->second;
+	  return itr->second.first;
   }
   
-  void incrementClauseFrequency(int clauseno, int increment)
+  void incrementClauseFrequency(int clauseno, int increment, bool invertWt)
   {
 	if (!foClauseFrequencies_)
-      foClauseFrequencies_ = new IntPair;
-	IntPairItr itr = foClauseFrequencies_->find(clauseno);
+      foClauseFrequencies_ = new IntBoolPair;
+	IntBoolPairItr itr = foClauseFrequencies_->find(clauseno);
 	if (itr == foClauseFrequencies_->end()) 
-	  foClauseFrequencies_->insert(IntPair::value_type(clauseno, increment));
+	  foClauseFrequencies_->
+        insert(make_pair(clauseno, make_pair(increment, invertWt)));
 	else
-	  itr->second += increment;
+	  itr->second.first += increment;
   }
 
   /**
@@ -336,13 +320,9 @@ class GroundClause
     // if this is a hard clause, wt_ is set to HARD_GROUNDCLAUSE_WT
   double wt_; // 8 bytes
 
-    // Number of first-order clauses this clause corresponds to
-  IntPair* foClauseFrequencies_;
-
-    // pointers to weights of first-order clauses that, after being grounded 
-    // and having their ground predicates with known truth values removed, 
-    // are equal to ground clause
-  Array<const double*>* parentWtPtrs_;
+    // Number of first-order clauses this clause corresponds to. Also stores
+    // if the weight has been flipped from each parent clause
+  IntBoolPair* foClauseFrequencies_;
 
 };
 

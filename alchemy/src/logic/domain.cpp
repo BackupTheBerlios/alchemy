@@ -2,11 +2,11 @@
  * All of the documentation and software included in the
  * Alchemy Software is copyrighted by Stanley Kok, Parag
  * Singla, Matthew Richardson, Pedro Domingos, Marc
- * Sumner and Hoifung Poon.
+ * Sumner, Hoifung Poon, and Daniel Lowd.
  * 
  * Copyright [2004-07] Stanley Kok, Parag Singla, Matthew
- * Richardson, Pedro Domingos, Marc Sumner and Hoifung
- * Poon. All rights reserved.
+ * Richardson, Pedro Domingos, Marc Sumner, Hoifung
+ * Poon, and Daniel Lowd. All rights reserved.
  * 
  * Contact: Pedro Domingos, University of Washington
  * (pedrod@cs.washington.edu).
@@ -28,8 +28,8 @@
  * of this software must display the following
  * acknowledgment: "This product includes software
  * developed by Stanley Kok, Parag Singla, Matthew
- * Richardson, Pedro Domingos, Marc Sumner and Hoifung
- * Poon in the Department of Computer Science and
+ * Richardson, Pedro Domingos, Marc Sumner, Hoifung
+ * Poon, and Daniel Lowd in the Department of Computer Science and
  * Engineering at the University of Washington".
  * 
  * 4. Your publications acknowledge the use or
@@ -69,6 +69,8 @@
 #include "mln.h"
 #include "truefalsegroundingsstore.h"
 
+const char* Domain::PROPOSITIONAL_TYPE = "AlchemyPropositionalType";
+const char* Domain::PROPOSITIONAL_CONSTANT = "AlchemyPropositionalConstant";
 
 Domain::~Domain()
 {
@@ -156,6 +158,8 @@ Domain::~Domain()
   //if (externalConstant_) delete externalConstant_;
   
   if (numNonEvidAtomsPerPred_) delete numNonEvidAtomsPerPred_;
+  if (numTrueNonEvidGndingsPerClause_) delete numTrueNonEvidGndingsPerClause_;
+  if (numFalseNonEvidGndingsPerClause_) delete numFalseNonEvidGndingsPerClause_;
 }
 
 
@@ -320,6 +324,7 @@ void Domain::reorderConstants(MLN* const & mln)
 
   int prevNewConstId = -1;
   bool constChanged = false;
+  assert(constantsByType_->size() == externalConstantsByType_->size());
   for (int i = 0; i < constantsByType_->size(); i++)
   {
     newConstantsByType->append(new Array<int>);
@@ -335,14 +340,11 @@ void Domain::reorderConstants(MLN* const & mln)
       oldToNewConstIds[constId] = newConstId;
       if (constId != newConstId) constChanged = true;
     }
-  }
-  for (int i = 0; i < externalConstantsByType_->size(); i++)
-  {
     newExternalConstantsByType->append(new Array<int>);
-    Array<int>* constIds = (*externalConstantsByType_)[i];
-    for (int j = 0; j < constIds->size(); j++)
+    Array<int>* extConstIds = (*externalConstantsByType_)[i];
+    for (int j = 0; j < extConstIds->size(); j++)
     {
-      int constId = (*constIds)[j];
+      int constId = (*extConstIds)[j];
       const char* constName = getConstantName(constId);
       int newConstId = newConstDualMap->insert(constName, i);
       assert(prevNewConstId + 1 == newConstId);
@@ -386,7 +388,7 @@ void Domain::reorderConstants(MLN* const & mln)
   constDualMap_->compress();
 
     // update
-  updatePerOldToNewIds(mln,oldToNewConstIds);
+  updatePerOldToNewIds(mln, oldToNewConstIds);
 
     //clauses and hence their hash values have changed, and they need to be 
     //inserted into the MLN
@@ -397,6 +399,7 @@ void Domain::reorderConstants(MLN* const & mln)
   // Assumption is: map is a superset of this domain's ConstDualMap
 void Domain::reorderConstants(ConstDualMap* const & map,
                               Array<Array<int>*>* const & cbt,
+                              Array<Array<int>*>* const & ecbt,
                               MLN* const & mln)
 {
     // Generate oldtoNew
@@ -421,16 +424,36 @@ void Domain::reorderConstants(ConstDualMap* const & map,
     }
     else
     {
+      bool continueOuter = false;
         // Add as external constant
-      for (int i = 0; i < cbt->size(); i++)
+        // Constant is in reference domain
+      for (int j = 0; j < cbt->size(); j++)
       {
         bool breakOuter = false;
-        for (int j = 0; j < (*cbt)[i]->size(); j++)
+        for (int k = 0; k < (*cbt)[j]->size(); k++)
         {
-          if (map->getInt(name) == (*(*cbt)[i])[j])
+          if (map->getInt(name) == (*(*cbt)[j])[k])
           {
               // Add as external constant
-            (*externalConstantsByType_)[i]->append((*(*cbt)[i])[j]);
+            (*externalConstantsByType_)[j]->append((*(*cbt)[j])[k]);
+            breakOuter = true;
+            continueOuter = true;
+            break;
+          }
+        }
+        if (breakOuter) break;
+      }
+      if (continueOuter) continue;
+        // Constant is external in reference domain (comes from another domain)
+      for (int j = 0; j < ecbt->size(); j++)
+      {
+        bool breakOuter = false;
+        for (int k = 0; k < (*ecbt)[j]->size(); k++)
+        {
+          if (map->getInt(name) == (*(*ecbt)[j])[k])
+              // Add as external constant
+          {
+            (*externalConstantsByType_)[j]->append((*(*ecbt)[j])[k]);
             breakOuter = true;
             break;
           }
@@ -449,6 +472,7 @@ void Domain::reorderConstants(ConstDualMap* const & map,
       assert(oldToNewConstIds.find(oldId) != oldToNewConstIds.end());
       (*(*constantsByType_)[i])[j] = oldToNewConstIds[oldId];
     }
+    (*constantsByType_)[i]->quicksort();
   }
 
     // swap map/type

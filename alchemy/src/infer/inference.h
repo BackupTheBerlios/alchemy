@@ -2,11 +2,11 @@
  * All of the documentation and software included in the
  * Alchemy Software is copyrighted by Stanley Kok, Parag
  * Singla, Matthew Richardson, Pedro Domingos, Marc
- * Sumner and Hoifung Poon.
+ * Sumner, Hoifung Poon, and Daniel Lowd.
  * 
  * Copyright [2004-07] Stanley Kok, Parag Singla, Matthew
- * Richardson, Pedro Domingos, Marc Sumner and Hoifung
- * Poon. All rights reserved.
+ * Richardson, Pedro Domingos, Marc Sumner, Hoifung
+ * Poon, and Daniel Lowd. All rights reserved.
  * 
  * Contact: Pedro Domingos, University of Washington
  * (pedrod@cs.washington.edu).
@@ -28,8 +28,8 @@
  * of this software must display the following
  * acknowledgment: "This product includes software
  * developed by Stanley Kok, Parag Singla, Matthew
- * Richardson, Pedro Domingos, Marc Sumner and Hoifung
- * Poon in the Department of Computer Science and
+ * Richardson, Pedro Domingos, Marc Sumner, Hoifung
+ * Poon, and Daniel Lowd in the Department of Computer Science and
  * Engineering at the University of Washington".
  * 
  * 4. Your publications acknowledge the use or
@@ -99,19 +99,12 @@ class Inference
         allClauseTrueCnts_(NULL), oldClauseTrueCnts_(NULL),
         oldAllClauseTrueCnts_(NULL)
   {
-//    if (seed_ <= 0)
-//    {
-//      struct timeval tv;
-//      struct timezone tzp;
-//      gettimeofday(&tv, &tzp);
-//      seed_ = (long int)((( tv.tv_sec & 0177 ) * 1000000) + tv.tv_usec);
-//    }
       // If seed not specified, then init always to same random number
     if (seed_ == -1) seed_ = DEFAULT_SEED;
     srandom(seed_);
 
     trackClauseTrueCnts_ = trackClauseTrueCnts;
-    if (trackClauseTrueCnts_)
+    if (trackClauseTrueCnts_ && state_)
     {
       int numClauses = state_->getMLN()->getNumClauses();
 
@@ -138,22 +131,22 @@ class Inference
 
   void saveAllCounts(bool saveCounts=true)
   {
-      if (saveAllCounts_ == saveCounts)
-        return;
+    if (saveAllCounts_ == saveCounts)
+      return;
 
-      saveAllCounts_ = saveCounts;
-      if (saveCounts)
-      {
-        allClauseTrueCnts_ = new Array<Array<double> >;
-        oldAllClauseTrueCnts_ = new Array<Array<double> >;
-      }
-      else
-      {
-        delete allClauseTrueCnts_;
-        delete oldAllClauseTrueCnts_;
-        allClauseTrueCnts_ = NULL;
-        oldAllClauseTrueCnts_ = NULL;
-      }
+    saveAllCounts_ = saveCounts;
+    if (saveCounts)
+    {
+      allClauseTrueCnts_ = new Array<Array<double> >;
+      oldAllClauseTrueCnts_ = new Array<Array<double> >;
+    }
+    else
+    {
+      delete allClauseTrueCnts_;
+      delete oldAllClauseTrueCnts_;
+      allClauseTrueCnts_ = NULL;
+      oldAllClauseTrueCnts_ = NULL;
+    }
   }
 
 
@@ -199,6 +192,12 @@ class Inference
   
   VariableState* getState() { return state_; }
   void setState(VariableState* s) { state_ = s; }
+
+  /* Increase or decrease the number of MCMC samples by a multiplicative
+   * factor.  (For MaxWalkSAT, this could perhaps change the number
+   * of flips or something that trades off speed and accuracy.)
+   */
+  virtual void scaleSamples(double factor) { /* Override this... */ }
   
   const Array<double>* getClauseTrueCnts()   { return clauseTrueCnts_; }
   const Array<double>* getClauseTrueSqCnts() { return clauseTrueSqCnts_; }
@@ -260,7 +259,7 @@ class Inference
     {
       (*product)[clauseno] = 0.0;
       for (int i = 0; i < numClauses; i++)
-        (*product)[clauseno] += (*hessian)[clauseno][0] * v[i];
+        (*product)[clauseno] += (*hessian)[clauseno][i] * v[i];
     }
 
     delete hessian;
@@ -423,7 +422,8 @@ class Inference
   int numSamples_;
     // Indicates if true counts for each first-order clause are being kept
   bool trackClauseTrueCnts_;
-    // Where these counts are stored
+    // Where these counts are stored: (*allClauseTrueCnts_)[i][j] has the true
+    // counts for clause j in sample i
   Array<Array<double> >* allClauseTrueCnts_;
 
   Array<double>* oldClauseTrueCnts_;

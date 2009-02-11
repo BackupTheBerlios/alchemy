@@ -55,7 +55,9 @@ OBJS=$(OBJDIR)/arguments.o $(OBJDIR)/powerset.o \
 	$(OBJDIR)/predicatetemplate.o $(OBJDIR)/functiontemplate.o \
 	$(OBJDIR)/function.o $(OBJDIR)/predicate.o $(OBJDIR)/term.o \
 	$(OBJDIR)/domain.o $(OBJDIR)/clause.o $(OBJDIR)/clausesampler.o \
-	$(OBJDIR)/groundclause.o
+	$(OBJDIR)/groundclause.o $(OBJDIR)/superpred.o \
+	$(OBJDIR)/superclause.o \
+	$(OBJDIR)/bpnode.o $(OBJDIR)/bpfactor.o
 
 #add .cpp files (including executables') to CPPFILES.
 CPPFILES=$(UTIL)/arguments.cpp $(UTIL)/powerset.cpp \
@@ -64,7 +66,10 @@ CPPFILES=$(UTIL)/arguments.cpp $(UTIL)/powerset.cpp \
 	$(LOGIC)/function.cpp $(LOGIC)/predicate.cpp $(LOGIC)/term.cpp \
 	$(LOGIC)/domain.cpp  $(LOGIC)/clause.cpp $(LOGIC)/clausesampler.cpp\
 	$(INFER)/groundclause.cpp \
-	$(LEARNWTS)/learnwts.cpp $(INFER)/infer.cpp $(LEARNSTRUCT)/learnstruct.cpp 
+	$(LEARNWTS)/learnwts.cpp $(INFER)/infer.cpp \
+	$(LEARNSTRUCT)/learnstruct.cpp $(INFER)/superpred.cpp \
+	$(INFER)/superclause.cpp \
+	$(INFER)/bpnode.cpp $(INFER)/bpfactor.cpp
 
 ##############################################################################
 #EXECUTABLES: add executables rules here
@@ -146,7 +151,17 @@ $(OBJDIR)/clausesampler.o:
 $(OBJDIR)/groundclause.o:
 	$(GPP) $(CFLAGS) -o $(OBJDIR)/groundclause.o -c $(INFER)/groundclause.cpp
 
+$(OBJDIR)/superpred.o:
+	$(GPP) $(CFLAGS) -o $(OBJDIR)/superpred.o -c $(INFER)/superpred.cpp
 
+$(OBJDIR)/superclause.o:
+	$(GPP) $(CFLAGS) -o $(OBJDIR)/superclause.o -c $(INFER)/superclause.cpp
+
+$(OBJDIR)/bpnode.o:
+	$(GPP) $(CFLAGS) -o $(OBJDIR)/bpnode.o -c $(INFER)/bpnode.cpp
+
+$(OBJDIR)/bpfactor.o:
+	$(GPP) $(CFLAGS) -o $(OBJDIR)/bpfactor.o -c $(INFER)/bpfactor.cpp
 
 ###############################################################################
 
@@ -172,4 +187,5 @@ depend:
 	@mv $(MF).new $(MF)
 
 ############ Everything below here is subject to SUDDEN DEATH #####
+
 
