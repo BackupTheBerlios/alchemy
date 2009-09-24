@@ -2,11 +2,11 @@
  * All of the documentation and software included in the
  * Alchemy Software is copyrighted by Stanley Kok, Parag
  * Singla, Matthew Richardson, Pedro Domingos, Marc
- * Sumner, Hoifung Poon, and Daniel Lowd.
+ * Sumner, Hoifung Poon, Daniel Lowd, and Jue Wang.
  * 
- * Copyright [2004-07] Stanley Kok, Parag Singla, Matthew
+ * Copyright [2004-09] Stanley Kok, Parag Singla, Matthew
  * Richardson, Pedro Domingos, Marc Sumner, Hoifung
- * Poon, and Daniel Lowd. All rights reserved.
+ * Poon, Daniel Lowd, and Jue Wang. All rights reserved.
  * 
  * Contact: Pedro Domingos, University of Washington
  * (pedrod@cs.washington.edu).
@@ -29,8 +29,9 @@
  * acknowledgment: "This product includes software
  * developed by Stanley Kok, Parag Singla, Matthew
  * Richardson, Pedro Domingos, Marc Sumner, Hoifung
- * Poon, and Daniel Lowd in the Department of Computer Science and
- * Engineering at the University of Washington".
+ * Poon, Daniel Lowd, and Jue Wang in the Department of
+ * Computer Science and Engineering at the University of
+ * Washington".
  * 
  * 4. Your publications acknowledge the use or
  * contribution made by the Software to your research
@@ -40,7 +41,7 @@
  * Statistical Relational AI", Technical Report,
  * Department of Computer Science and Engineering,
  * University of Washington, Seattle, WA.
- * http://www.cs.washington.edu/ai/alchemy.
+ * http://alchemy.cs.washington.edu.
  * 
  * 5. Neither the name of the University of Washington nor
  * the names of its contributors may be used to endorse or
@@ -126,7 +127,7 @@ class unionClass
 
   argU* ptr;
   argType type;
-  static char* typeStr(unionClass::argType);
+  static const char* typeStr(unionClass::argType);
   friend ostream& operator << (ostream&, unionClass::argType&);
  
  public:
@@ -197,10 +198,10 @@ class ARGS
   static bool ignoreUnknownSwitch;
 
     // instance data members.
-  char* flag;        // name to match on command line, NULL when end.
+  const char* flag;        // name to match on command line, NULL when end.
   argKind arg_kind;  // optional, required, toggle
   unionClass uc;
-  char* description;
+  const char* description;
   argsAction* action;
 
   
@@ -210,9 +211,10 @@ class ARGS
   static ostream* pout; //used to print parameters
 
  public:
-  ARGS(char*,argKind, unionClass, char*d=NULL, argsAction&a=no_action);
-  ARGS(argKind, unionClass, char*d=NULL, argsAction&a=no_action);
-  ARGS(unionClass, char*d=NULL, argsAction&a=no_action);
+  ARGS(const char*,argKind, unionClass, const char*d=NULL,
+       argsAction&a=no_action);
+  ARGS(argKind, unionClass, const char*d=NULL, argsAction&a=no_action);
+  ARGS(unionClass, const char*d=NULL, argsAction&a=no_action);
   ARGS(const ARGS&);
   ARGS();
 
@@ -228,12 +230,12 @@ class ARGS
   static void regardUnknownFlag()   { ignoreUnknownSwitch = false; }
 
  private:
-  void init(char*, argKind, char*, argsAction&);
+  void init(const char*, argKind, const char*, argsAction&);
   static void Error(const char*, const char*s2=NULL, const char*s3=NULL,
                     const char*s4=NULL, const char*s5=NULL);
 
-  static bool noFlagP(char *);
-  static ArgsRetCode argsSwitch(ARGS*, char*, int&, bool&, char*);
+  static bool noFlagP(const char *);
+  static ArgsRetCode argsSwitch(ARGS*, char*, int&, bool&, const char*);
   static ARGS* findMatch(ARGS*, char*);
   static void makeFound();
   static bool checkMissing(bool printMessage=false);

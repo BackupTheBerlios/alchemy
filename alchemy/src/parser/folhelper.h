@@ -2,11 +2,11 @@
  * All of the documentation and software included in the
  * Alchemy Software is copyrighted by Stanley Kok, Parag
  * Singla, Matthew Richardson, Pedro Domingos, Marc
- * Sumner, Hoifung Poon, and Daniel Lowd.
+ * Sumner, Hoifung Poon, Daniel Lowd, and Jue Wang.
  * 
- * Copyright [2004-07] Stanley Kok, Parag Singla, Matthew
+ * Copyright [2004-09] Stanley Kok, Parag Singla, Matthew
  * Richardson, Pedro Domingos, Marc Sumner, Hoifung
- * Poon, and Daniel Lowd. All rights reserved.
+ * Poon, Daniel Lowd, and Jue Wang. All rights reserved.
  * 
  * Contact: Pedro Domingos, University of Washington
  * (pedrod@cs.washington.edu).
@@ -29,8 +29,9 @@
  * acknowledgment: "This product includes software
  * developed by Stanley Kok, Parag Singla, Matthew
  * Richardson, Pedro Domingos, Marc Sumner, Hoifung
- * Poon, and Daniel Lowd in the Department of Computer Science and
- * Engineering at the University of Washington".
+ * Poon, Daniel Lowd, and Jue Wang in the Department of
+ * Computer Science and Engineering at the University of
+ * Washington".
  * 
  * 4. Your publications acknowledge the use or
  * contribution made by the Software to your research
@@ -40,7 +41,7 @@
  * Statistical Relational AI", Technical Report,
  * Department of Computer Science and Engineering,
  * University of Washington, Seattle, WA.
- * http://www.cs.washington.edu/ai/alchemy.
+ * http://alchemy.cs.washington.edu.
  * 
  * 5. Neither the name of the University of Washington nor
  * the names of its contributors may be used to endorse or
@@ -99,7 +100,7 @@
   //a specific value, you can set HARD_WEIGHT below. 
   //If HARD_WEIGHT is DBL_MIN, HARD_WEIGHT_MULTIPLIER is used instead of 
   //HARD_WEIGHT; otherwise the latter is used.
-const double HARD_WEIGHT_MULTIPLIER = 2;
+const double HARD_WEIGHT_MULTIPLIER = 200000;
 const double HARD_WEIGHT = DBL_MIN;
 
   // If the variables are assigned some initial values, ensure they are are
@@ -159,10 +160,14 @@ Function* zzfunc;
 stack<Function*> zzfuncStack;
 stack<ListObj*> zzfuncConjStack;
 double* zzwt;
+double* zzrealValue;
 bool zzisNegated;
 bool zzisAsterisk;
 bool zzisPlus;
 bool zzhasFullStop;
+bool zzhasWeightFullStop;
+bool zzinIndivisible;
+bool zzisHybrid;
 int zznumAsterisk;
 char zztrueFalseUnknown;
 string zzformulaStr;
@@ -171,6 +176,8 @@ bool zzparseGroundPred;
 stack<ListObj*> zzformulaListObjs;  //used by formulas with connectives
 stack<ListObj*> zzpredFuncListObjs; // used by predicates and functions
 hash_map<int, PredicateHashArray*> zzpredIdToGndPredMap;
+ListObj* zzcontPred;
+double zzmean;
 
 // Used to check if there is a function definition
 int zzfdnumPreds;
@@ -338,13 +345,17 @@ struct ZZFormulaInfo
                 const StringToIntMap& pplusVarMap, const int& nnumAsterisk,
                 const bool& hhasFullStop, 
                 const bool& rreadHardClauseWts,
-                const bool& mmustHaveWtOrFullStop)
+                const bool& mmustHaveWtOrFullStop,
+                const bool& iisIndivisible, const bool& iisHybrid,
+                const ListObj* const & ccontPred, const double& mmean,
+                const bool& hhasWeightFullStop)
     : formula(fformula), formulaStr(fformulaStr), numPreds(nnumPreds), 
       defaultWt(ddefaultWt), domain(ddomain), mln(mmln), 
       numAsterisk(nnumAsterisk), hasFullStop(hhasFullStop), 
       readHardClauseWts(rreadHardClauseWts),
-      mustHaveWtOrFullStop(mmustHaveWtOrFullStop)
-
+      mustHaveWtOrFullStop(mmustHaveWtOrFullStop),
+      isIndivisible(iisIndivisible), isHybrid(iisHybrid),
+      contPred(ccontPred), mean(mmean), hasWeightFullStop(hhasWeightFullStop)
   {
     wt = (wwt) ? new double(*wwt) : NULL;
     
@@ -372,6 +383,11 @@ struct ZZFormulaInfo
   const bool hasFullStop;
   const bool readHardClauseWts;
   const bool mustHaveWtOrFullStop;
+  const bool isIndivisible;
+  const bool isHybrid;
+  const ListObj* contPred;
+  const double mean;
+  const bool hasWeightFullStop;
 };
 
 Array<ZZFormulaInfo*> zzformulaInfos;
@@ -546,11 +562,11 @@ int zzgetVarId(const char* const& varName, const int& varTypeId,
     return varIdType.id_;
   }
 
-  if (typeId != zzanyTypeId && typeId != varIdType.typeId_) 
-  {
-    expectedTypeId = varIdType.typeId_;
-    return 0;
-  }
+//  if (typeId != zzanyTypeId && typeId != varIdType.typeId_) 
+//  {
+//    expectedTypeId = varIdType.typeId_;
+//    return 0;
+//  }
   return varIdType.id_;  
 }
 
@@ -721,15 +737,15 @@ void zzsetEqPredTypeName(const int& typeId)
   predlo->replace(PredicateTemplate::EQUAL_NAME, eqPredName.c_str());
 }
 
-
 int zzgetTypeId(const Term* const & t, const char* const & varName)
 {
   int termType = t->getType();
   if (termType == Term::FUNCTION) 
     return t->getFunction()->getRetTypeId();
  
+    // Constants could potentially be of any type
   if (termType == Term::CONSTANT) 
-    return zzdomain->getConstantTypeId(t->getId());
+    return -1;
 
   if (termType == Term::VARIABLE) 
   {
@@ -1097,7 +1113,7 @@ void zzpredAppendConstant(Predicate* const& pred, const int& constId,
           pred->getName(), exp, unexp);
     return;
   }
-
+/*
     // if this is not '=' predicate with unknown types
   if (!(strcmp(pred->getName(),PredicateTemplate::EQUAL_NAME) == 0) &&
   	  !(strcmp(pred->getTermTypeAsStr(pred->getNumTerms()),
@@ -1115,7 +1131,7 @@ void zzpredAppendConstant(Predicate* const& pred, const int& constId,
       return;
     }
   }
-  
+*/  
     // at this point, we have the right num of terms and right constant types
   if (pred != NULL) pred->appendTerm(new Term(constId, (void*)pred, true));
 }
@@ -1280,7 +1296,7 @@ void zzfuncAppendConstant(Function* const& func, const int& constId,
           func->getName(), exp, unexp);
     return;
   }
-
+/*
   if (!(strcmp(func->getTermTypeAsStr(func->getNumTerms()),
                PredicateTemplate::ANY_TYPE_NAME)==0))
   {
@@ -1296,6 +1312,7 @@ void zzfuncAppendConstant(Function* const& func, const int& constId,
       return;
   	}
   }
+*/
     // at this point, we have the right num of term and right constant type
   if (func != NULL) func->appendTerm(new Term(constId, (void*)func, false));
 }
@@ -1401,7 +1418,7 @@ Function* zzcreateFunc(const ListObj* const & lo)
           // check the type of the term that is to be added
         int typeId = func->getTermTypeAsInt(func->getNumTerms());
         int expectedTypeId; 
-        int varId = zzgetVarId(name,typeId, expectedTypeId);
+        int varId = zzgetVarId(name, typeId, expectedTypeId);
 
         if (varId==0) 
           zzexit("zzcreateFunc(): failed to create term, variable %s has wrong "
@@ -1435,7 +1452,6 @@ Predicate* zzcreatePred(const ListObj* const & lo)
     if (termlo[i]->isStr())  // if is a constant or variable
     {
       const char* name = termlo[i]->getStr();
-      //if (isupper(name[0]))  // if is a constant
       if (zzisConstant(name))  // if is a constant
       {
         int constId = zzdomain->getConstantId(name);
@@ -1453,9 +1469,9 @@ Predicate* zzcreatePred(const ListObj* const & lo)
           // check the type of the term that is to be added
         int typeId = pred->getTermTypeAsInt(pred->getNumTerms());
         int expectedTypeId;
-        int varId = zzgetVarId(name,typeId,expectedTypeId);
+        int varId = zzgetVarId(name, typeId, expectedTypeId);
 
-        if (varId==0) 
+        if (varId == 0) 
           zzexit("zzcreatePred(): failed to create term, variable %s has wrong "
                  "type", name);
         pred->appendTerm(new Term(varId, (void*)pred, true));        
@@ -1647,11 +1663,14 @@ int zzcreateBlocks(const Domain* const & domain)
         // One pred has to be true
       if (!trueOne)
       {
-        cout << "Problem with predicate ";
-        newPred->print(cout, domain); 
-        cout << endl;
-        zzexit(": No true atom was found for mutually "
-               "exclusive and exhaustive variables");
+      	// This assumes that all groundings of predicate are either query or
+      	// evidence. It doesn't work when some groundings are query, some are
+      	// evidence.
+        //cout << "Problem with predicate ";
+        //newPred->print(cout, domain); 
+        //cout << endl;
+        //zzexit(": No true atom was found for mutually "
+        //       "exclusive and exhaustive variables");
       }
     }
     delete pred;
@@ -1795,14 +1814,14 @@ const char* getIntConstantTypeName(const int& i, const Domain* const & domain)
   return NULL;
 }
 
-void zzcreateAndCheckIntConstant(const char* const & intStr,
+void zzcreateAndCheckNumConstant(const char* const & intStr,
                                  const Function* const & func,
                                  const Predicate* const & pred,
                                  const Domain* const & domain,
                                  char* constName)
 {
   double d = atof(intStr); int i = int(d);
-  if (d!=i) zzerr("%s cannot be a term. Only integer terms are allowed",intStr);
+  //if (d!=i) zzerr("%s cannot be a term. Only integer terms are allowed",intStr);
   
   const char* typeName = NULL;
   if (func) typeName = func->getTermTypeAsStr(func->getNumTerms());
@@ -1839,7 +1858,12 @@ void zzaddGndPredsToDb(Database* const & db)
     {
       PredicateHashArray* predHashArray = (*it).second;
       for (int j = 0; j < predHashArray->size(); j++)
+      {
         db->addEvidenceGroundPredicate((*predHashArray)[j]);
+        double rv = (*predHashArray)[j]->getRealValue();
+        if (rv > numeric_limits<double>::min())
+          db->setRealValue((*predHashArray)[j], rv);
+      }
 
       predHashArray->deleteItemsAndClear();
     }
@@ -1947,8 +1971,8 @@ void zzaddConstantToDomain(const char* const & vs, const char* const & typeName)
   }
 
   zzassert(typeName != NULL, "expect typeName != NULL");
-  int id = zzdomain->addConstant(vs, typeName);
-  if (id < 0) zzerr("Failed to add constant %s", vs);
+  zzdomain->addConstant(vs, typeName);
+  //if (id < 0) zzerr("Failed to add constant %s", vs);
 }
 
 
@@ -1957,24 +1981,20 @@ void zzaddConstantToPredFunc(const char* const & constName)
     //commented out because a constant can be declared with its first appearance
   //int constId = zzcheckConstantAndGetId(constName);
  
-  int constId = zzdomain->getConstantId(constName);
-  if (constId < 0) 
+  const char* typeName = NULL;
+  if (zzfunc) typeName = zzfunc->getTermTypeAsStr(zzfunc->getNumTerms());
+  else
+  if (zzpred) typeName = zzpred->getTermTypeAsStr(zzpred->getNumTerms());
+
+    // May be continuing after a parse error
+  if (typeName == NULL) 
   {
-    const char* typeName = NULL;
-    if (zzfunc) typeName = zzfunc->getTermTypeAsStr(zzfunc->getNumTerms());
-    else
-    if (zzpred) typeName = zzpred->getTermTypeAsStr(zzpred->getNumTerms());
-
-      // May be continuing after a parse error
-    if (typeName == NULL) 
-    {
-      zzwarn("Wrong number of terms.");
-      typeName=PredicateTemplate::ANY_TYPE_NAME;
-    }
-
-    zzaddConstantToDomain(constName, typeName);
-    constId = zzdomain->getConstantId(constName);
+    zzwarn("Wrong number of terms.");
+    typeName = PredicateTemplate::ANY_TYPE_NAME;
   }
+
+  zzaddConstantToDomain(constName, typeName);
+  int constId = zzdomain->getConstantId(constName);
   if (zzfunc) zzfuncAppendConstant(zzfunc, constId, constName);
   else if (zzpred) zzpredAppendConstant(zzpred, constId, constName);
   else zzexit("No predicate or function is defined.");
@@ -2154,10 +2174,17 @@ void zztermIsVariable(const bool& folDbg)
       if (rightNumTerms && rightType)
       {
         zzpred->appendTerm(new Term(varId, (void*)zzpred, true));
-        if (zzpredFuncListObjs.size() != 1) 
-          zzerr("There may be a parse error. Have you declared all the "
-                "predicates and functions?");
-        zzpredFuncListObjs.top()->append(newVarName.c_str());
+        if (!zzisHybrid)
+        {
+          if (zzpredFuncListObjs.size() != 1) 
+            zzerr("There may be a parse error. Have you declared all the "
+                  "predicates and functions?");
+          zzpredFuncListObjs.top()->append(newVarName.c_str());
+        }
+        else
+        {
+          zzcontPred->append(varName);
+        }
         zzformulaStr.append(varName);
       }
     }
@@ -2389,13 +2416,18 @@ void zzreset()
   while (!zzfuncStack.empty()) zzfuncStack.pop();
   while (!zzfuncConjStack.empty()) zzfuncConjStack.pop();
   if (zzwt) { delete zzwt; zzwt = NULL; }
+  if (zzrealValue) { delete zzrealValue; zzrealValue = NULL; }
   zzisNegated = false;
   zzisAsterisk = false;
   zzisPlus = false;
   zzhasFullStop = false;
+  zzhasWeightFullStop = false;
+  zzinIndivisible = false;
+  zzisHybrid = false;
   zznumAsterisk = 0;
   zztrueFalseUnknown = 't';
   zzformulaStr.clear();
+  
   zzfuncConjStr.clear();
   zzparseGroundPred = false;
   while (!zzformulaListObjs.empty()) 
@@ -2565,7 +2597,8 @@ void zzappendUnitClausesToMLN(const Domain* const & domain, MLN* const & mln,
     int idx;
     ostringstream oss;
     clause->getPredicate(0)->getTemplate()->printWithStrVar(oss);
-    bool app = mln->appendClause(oss.str(), false, clause, defaultWt,false,idx);
+    bool app = mln->appendClause(oss.str(), false, clause, defaultWt, false,
+                                 idx, false, false);
     if (app)
     {
       mln->setFormulaNumPreds(oss.str(), 1);
@@ -2589,6 +2622,11 @@ void zzappendFormulaClausesToMLN(const ListObj* const & formula,
                                  const bool& hasFullStop,
                                  const bool& readHardClauseWts,
                                  const bool& mustHaveWtOrFullStop,
+                                 const bool& isIndivisible,
+                                 const bool& isHybrid,
+                                 const ListObj* const & contPred,
+                                 const double mean,
+                                 const bool& hasWeightFullStop,
                                  Array<int>& hardClauseIdxs,
                                  Array<string>& hardFormulas,
                                  Clause*& flippedClause,
@@ -2696,25 +2734,48 @@ void zzappendFormulaClausesToMLN(const ListObj* const & formula,
           clauseWt = -clauseWt;
 
         int prevIdx;
-        bool ok = mln->appendClause(formStr, hasExist, clauses[i], 
-                                    clauseWt, hasFullStop, prevIdx);
+        bool ok = false;
 
+        if (isHybrid)
+        {
+          Predicate* pred = zzcreatePred(contPred);
+          ok = mln->appendHybridClause(formStr, clauses[i], clauseWt, prevIdx,
+                                       pred, mean);
+        }
+        else
+        {
+          ok = mln->appendClause(formStr, hasExist, clauses[i], 
+                                 clauseWt, hasFullStop, prevIdx,
+                                 isIndivisible, hasWeightFullStop);
+        }
+        
         if (!ok)
         {
           cout << "\tsame clause (derived from another formula) has been added "
                << "to MLN:\n\t"; 
-          const Clause* cl = mln->getClause(prevIdx);          
-          cl->printWithoutWt(cout,domain); cout << endl;
+          const Clause* cl;
+          if (isHybrid)
+          {
+            cout << formStr << endl;
+          }
+          else
+          {
+            cl = mln->getClause(prevIdx);          
+            cl->printWithoutWt(cout,domain); cout << endl;
+          }
           //cout << " derived from current formula:\n\t" << formStr << endl;
         }
 
         if (setHardWtLater) hardClauseIdxs.append(prevIdx);
       }
 
-      mln->setFormulaNumPreds(formStr, numPreds);
-      mln->setFormulaPriorMean(formStr, formulaWt);
-      mln->setFormulaWt(formStr, formulaWt);
-      mln->setFormulaIsHard(formStr, hasFullStop);      
+      if (!isHybrid)
+      {
+        mln->setFormulaNumPreds(formStr, numPreds);
+        mln->setFormulaPriorMean(formStr, formulaWt);
+        mln->setFormulaWt(formStr, formulaWt);
+        mln->setFormulaIsHard(formStr, hasFullStop);
+      }
 
     } //for (int g = 0; g < formulas2.size(); g++)
   }//for (int f = 0; f < formulas.size(); f++)
@@ -2744,6 +2805,9 @@ void zzappendFormulasToMLN(Array<ZZFormulaInfo*>& formulaInfos,
                                 epfi->hasFullStop,
                                 epfi->readHardClauseWts,
                                 epfi->mustHaveWtOrFullStop,
+                                epfi->isIndivisible, epfi->isHybrid,
+                                epfi->contPred, epfi->mean,
+                                epfi->hasWeightFullStop,
                                 hardClauseIdxs, hardFormulas, 
                                 flippedClause, domain0);
     delete epfi;
@@ -2790,6 +2854,7 @@ void zzappendFormulasToMLN(Array<ZZFormulaInfo*>& formulaInfos,
     mln->setFormulaWt(hardFormulas[i], hardWt);
     mln->setFormulaPriorMean(hardFormulas[i], hardWt);
   }
+
 }
 
 

@@ -429,17 +429,16 @@ class Domain
   }
 
 	// Returns the index of the given constant of all constants of this type
-/*
-  int getConstantIndexInType(const int& constId) const
+
+  int getConstantIndexInType(const int& constId, const int& typeId) const
   {
-  	int typeId = getConstantTypeId(constId);
   	const Array<int>* constArray = getConstantsByType(typeId);
   	for (int i = 0; i < constArray->size(); i++)
   	  if (constId == (*constArray)[i])
         return i;
   	return -1;
   }
-*/  
+
   /**
    * Returns the number of constants of a certain type in this domain.
    * External constants are not included.
@@ -543,14 +542,14 @@ class Domain
     int constId = getConstantId(constName);
     if (constId >= 0)
     {
-      bool newType = false;
+      bool newType = true;
       Array<const char*>* prevTypes = getConstantTypeNames(constId);
       for (int i = 0; i < prevTypes->size(); i++)
       {
-        if (strcmp((*prevTypes)[i], typeName) != 0)
+        if (strcmp((*prevTypes)[i], typeName) == 0)
         {
             // New type
-          newType = true;
+          newType = false;
           break;
         }
       }

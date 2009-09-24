@@ -43,8 +43,8 @@ LIBLINC= -L. -L$(UTIL) -L$(LOGIC) -L$(PARSER) -L$(LEARNWTS) -L$(LEARNSTRUCT) \
 	-L$(INFER)
 LIBLINK= -ldl
 
-CFLAGS=$(CLFLAGS) -Wall $(LIBCINC)
-LFLAGS=$(CLFLAGS) -Wall $(LIBLINC)
+CFLAGS=$(CLFLAGS) -Wno-deprecated -Wall $(LIBCINC)
+LFLAGS=$(CLFLAGS) -Wno-deprecated -Wall $(LIBLINC)
 
 
 #############################################################################
@@ -201,3 +201,4 @@ depend:
 	@mv $(MF).new $(MF)
 
 ############ Everything below here is subject to SUDDEN DEATH #####
+

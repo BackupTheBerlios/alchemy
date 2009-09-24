@@ -317,7 +317,8 @@ void createDomainsAndMLNs(Array<Domain*>& domains, Array<MLN*>& mlns,
           string formulaString = mlns[i]->getParentFormula(j, 0);
           bool hasExist = mlns[i]->isExistClause(j);
           if (mlns[0]->appendExternalClause(formulaString, hasExist,
-                                            new Clause(*c), domains[0], false))
+                                            new Clause(*c), domains[0], false,
+                                            false))
           {
             (*externalClausesPerMLN)[0]->append(false);
           }
@@ -416,7 +417,7 @@ void assignWtsAndOutputMLN(ostream& out, Array<MLN*>& mlns,
   {
     MLN* mln = mlns[i];
     const ClauseHashArray* clauses = mln->getClauses();
-    for (int j = 0; j < clauses->size(); j++) 
+    for (int j = 0; j < clauses->size(); j++)
       (*clauses)[j]->setWt(wts[j+1]);
   }
 

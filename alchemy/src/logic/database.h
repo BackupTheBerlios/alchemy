@@ -1379,8 +1379,10 @@ class Database
       int constId = pred->getTerm(i)->getId();
       assert(constId >= 0);
         // idx += mutliplier * num of constants belonging to type d]);
+//      idx += (*multAndTypes)[i].first 
+//        * (constId - currfirstConstIdByType[(*multAndTypes)[i].second]);
       idx += (*multAndTypes)[i].first 
-        * (constId - currfirstConstIdByType[(*multAndTypes)[i].second]);
+        * domain_->getConstantIndexInType(constId, (*multAndTypes)[i].second);
     }
     return idx;
   }
@@ -1416,8 +1418,10 @@ class Database
       int constId = pred->getTermId(i);
       assert(constId >= 0);
         // idx += mutliplier * num of constants belonging to type d]);
+//      idx += (*multAndTypes)[i].first 
+//        * (constId - currfirstConstIdByType[(*multAndTypes)[i].second]);
       idx += (*multAndTypes)[i].first 
-        * (constId - currfirstConstIdByType[(*multAndTypes)[i].second]);
+        * domain_->getConstantIndexInType(constId, (*multAndTypes)[i].second);
     }
     return idx;
   }
@@ -1447,6 +1451,19 @@ class Database
       new Array<unsigned long long>(predTemplate->getNumTerms());
     auxIdx->growToSize(predTemplate->getNumTerms());
     Array<MultAndType>* multAndTypes = currtermMultByPred[p->getId()];
+//    for (int i = 0; i < predTemplate->getNumTerms(); i++)
+//    {
+//      unsigned long long aux = 0;
+//      for (int j = 0; j < i; j++)
+//      {
+//        aux += (*auxIdx)[j] * ((*multAndTypes)[j].first);
+//      }
+//      (*auxIdx)[i] = (idx - aux) / (*multAndTypes)[i].first;
+//      int constId =
+//        (int)(*auxIdx)[i] + currfirstConstIdByType[(*multAndTypes)[i].second];
+//      p->setTermToConstant(i, constId);
+//    }
+//    delete auxIdx;
     for (int i = 0; i < predTemplate->getNumTerms(); i++)
     {
       unsigned long long aux = 0;
@@ -1455,8 +1472,9 @@ class Database
         aux += (*auxIdx)[j] * ((*multAndTypes)[j].first);
       }
       (*auxIdx)[i] = (idx - aux) / (*multAndTypes)[i].first;
-      int constId =
-        (int)(*auxIdx)[i] + currfirstConstIdByType[(*multAndTypes)[i].second];
+      const Array<int>* cbt =
+        domain_->getConstantsByType((*multAndTypes)[i].second);
+      int constId = (*cbt)[(int)(*auxIdx)[i]];
       p->setTermToConstant(i, constId);
     }
     delete auxIdx;

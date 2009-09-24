@@ -2,11 +2,11 @@
  * All of the documentation and software included in the
  * Alchemy Software is copyrighted by Stanley Kok, Parag
  * Singla, Matthew Richardson, Pedro Domingos, Marc
- * Sumner and Hoifung Poon.
+ * Sumner, Hoifung Poon, Daniel Lowd, and Jue Wang.
  * 
- * Copyright [2004-06] Stanley Kok, Parag Singla, Matthew
- * Richardson, Pedro Domingos, Marc Sumner and Hoifung
- * Poon. All rights reserved.
+ * Copyright [2004-09] Stanley Kok, Parag Singla, Matthew
+ * Richardson, Pedro Domingos, Marc Sumner, Hoifung
+ * Poon, Daniel Lowd, and Jue Wang. All rights reserved.
  * 
  * Contact: Pedro Domingos, University of Washington
  * (pedrod@cs.washington.edu).
@@ -28,9 +28,10 @@
  * of this software must display the following
  * acknowledgment: "This product includes software
  * developed by Stanley Kok, Parag Singla, Matthew
- * Richardson, Pedro Domingos, Marc Sumner and Hoifung
- * Poon in the Department of Computer Science and
- * Engineering at the University of Washington".
+ * Richardson, Pedro Domingos, Marc Sumner, Hoifung
+ * Poon, Daniel Lowd, and Jue Wang in the Department of
+ * Computer Science and Engineering at the University of
+ * Washington".
  * 
  * 4. Your publications acknowledge the use or
  * contribution made by the Software to your research
@@ -40,7 +41,7 @@
  * Statistical Relational AI", Technical Report,
  * Department of Computer Science and Engineering,
  * University of Washington, Seattle, WA.
- * http://www.cs.washington.edu/ai/alchemy.
+ * http://alchemy.cs.washington.edu.
  * 
  * 5. Neither the name of the University of Washington nor
  * the names of its contributors may be used to endorse or
@@ -60,7 +61,7 @@
  * ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
- * IF ADVISED OF THE POSS IBILITY OF SUCH DAMAGE.
+ * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  * 
  */
 #ifndef LBFGSB_H_SEP_17_2005
@@ -4188,7 +4189,7 @@ void mainlb(const int& n, const int& m, double* const & x,
     //If further progress is not possible, let stp be the best
     //point obtained during the search.
 
-    if (brackt && (stp <= stmin || stp >= stmax)
+    if ((brackt && (stp <= stmin || stp >= stmax))
         || (brackt && stmax-stmin <= xtol*stmax)) stp = stx;
     
     //Obtain another function and derivative.

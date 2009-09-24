@@ -2,11 +2,11 @@
  * All of the documentation and software included in the
  * Alchemy Software is copyrighted by Stanley Kok, Parag
  * Singla, Matthew Richardson, Pedro Domingos, Marc
- * Sumner, Hoifung Poon, and Daniel Lowd.
+ * Sumner, Hoifung Poon, Daniel Lowd, and Jue Wang.
  * 
- * Copyright [2004-07] Stanley Kok, Parag Singla, Matthew
+ * Copyright [2004-09] Stanley Kok, Parag Singla, Matthew
  * Richardson, Pedro Domingos, Marc Sumner, Hoifung
- * Poon, and Daniel Lowd. All rights reserved.
+ * Poon, Daniel Lowd, and Jue Wang. All rights reserved.
  * 
  * Contact: Pedro Domingos, University of Washington
  * (pedrod@cs.washington.edu).
@@ -29,8 +29,9 @@
  * acknowledgment: "This product includes software
  * developed by Stanley Kok, Parag Singla, Matthew
  * Richardson, Pedro Domingos, Marc Sumner, Hoifung
- * Poon, and Daniel Lowd in the Department of Computer Science and
- * Engineering at the University of Washington".
+ * Poon, Daniel Lowd, and Jue Wang in the Department of
+ * Computer Science and Engineering at the University of
+ * Washington".
  * 
  * 4. Your publications acknowledge the use or
  * contribution made by the Software to your research
@@ -40,7 +41,7 @@
  * Statistical Relational AI", Technical Report,
  * Department of Computer Science and Engineering,
  * University of Washington, Seattle, WA.
- * http://www.cs.washington.edu/ai/alchemy.
+ * http://alchemy.cs.washington.edu.
  * 
  * 5. Neither the name of the University of Washington nor
  * the names of its contributors may be used to endorse or
@@ -104,7 +105,8 @@ ZZ_INCLUDE [#][i][n][c][l][u][d][e]
 
 ZZ_DIGIT [0-9] 
 /* double ' to avoid string syntax highlighting in xemacs */
-ZZ_ID [a-zA-z_\-][a-zA-Z0-9_\-'']*
+/* ZZ_ID [a-zA-z_\-][a-zA-Z0-9_\-'']* */
+ZZ_ID [a-zA-Z_\-][a-zA-Z0-9_\-'']*
 
 %%
 
@@ -271,7 +273,7 @@ ZZ_ID [a-zA-z_\-][a-zA-Z0-9_\-'']*
 }
 
 
-{ZZ_MINUS}?{ZZ_DIGIT}+"."{ZZ_DIGIT}* {
+{ZZ_MINUS}?{ZZ_DIGIT}+"."{ZZ_DIGIT}+ {
   if (follexDbg) printf("FLOAT: %s (%g)\n", yytext, atof(yytext));
   zzcolumn += strlen(yytext);
   zznumCharRead += strlen(yytext);
@@ -344,6 +346,25 @@ ZZ_ID [a-zA-z_\-][a-zA-Z0-9_\-'']*
   	return '@';
   }
   zztokenList.add(yytext);
+  return yytext[0];
+}
+
+"[" {
+  if (follexDbg) printf("LEFT BRACKET: %s\n", yytext);
+  zzcolumn += strlen(yytext);
+  zznumCharRead += strlen(yytext);
+  zztokenList.add(yytext);
+  //if (zzparseGroundPred) zzafterRtParen = false;
+  return yytext[0];
+}
+
+
+"]" {
+  if (follexDbg) printf("RIGHT BRACKET: %s\n", yytext);
+  zzcolumn += strlen(yytext);
+  zznumCharRead += strlen(yytext);
+  zztokenList.add(yytext);
+  //if (zzparseGroundPred) zzafterRtParen = true;
   return yytext[0];
 }
 
@@ -421,7 +442,7 @@ ZZ_ID [a-zA-z_\-][a-zA-Z0-9_\-'']*
   zzcolumn += strlen(yytext);
   zznumCharRead += strlen(yytext);
 
-  if (zzparseGroundPred && zzafterRtParen) { zztokenList.add("@"); return '@'; }
+  //if (zzparseGroundPred && zzafterRtParen) { zztokenList.add("@"); return '@'; }
 }
 
 

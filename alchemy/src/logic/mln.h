@@ -161,11 +161,13 @@ class MLN
    */
   bool appendExternalClause(const string& formulaString, const bool& hasExist,
                             Clause* const& c, const Domain* const & domain,
-                            const bool& tiedClauses)
+                            const bool& tiedClauses,
+                            const bool& hasWeightFullStop)
   {
     int idx;
     bool app = appendClause(formulaString, hasExist, c, c->getWt(),
-                            c->isHardClause(), idx, tiedClauses);
+                            c->isHardClause(), idx, tiedClauses,
+                            hasWeightFullStop);
     if (app)
     {
       setFormulaNumPreds(formulaString, c->getNumPredicates());
@@ -186,7 +188,7 @@ class MLN
   bool appendClause(const string& formulaString, const bool& hasExist, 
                     Clause* const& c, const double& wt,
                     const bool& isHardClause, int& retClauseIdx,
-                    const bool& tiedClauses)
+                    const bool& tiedClauses, const bool& hasWeightFullStop)
   {
     assert(c);
     c->canonicalize();
@@ -209,6 +211,7 @@ class MLN
     }
     clause->addWt(wt);
     if (isHardClause) clause->setIsHardClause(isHardClause);
+    if (hasWeightFullStop) clause->setStaticWt(hasWeightFullStop);
 
  
     FormulaAndClauses* fac = new FormulaAndClauses(formulaString, 

@@ -750,6 +750,15 @@ int main(int argc, char* argv[])
   //////////////////////  discriminative/generative learning /////////////////
   Array<double> wts;
 
+  for (int j = 0; j < mlns[0]->getNumClauses(); j++) 
+  {
+    Clause* c = (Clause*) mlns[0]->getClause(j);
+      // If the weight was set to non-zero in the source MLN,
+      // don't modify it while learning.
+    if (c->getWt() != 0 && c->isStaticWt())
+      c->lock();
+  }
+
     // Discriminative learning
   if (discLearn) 
   {
@@ -832,15 +841,9 @@ int main(int argc, char* argv[])
     Array<Predicate*> ppreds;
     
       // Need to set some dummy weight (only in mln0 as clauses are shared)
-//      for (int j = 0; j < mln->getNumClauses(); j++)
-//        ((Clause*) mln->getClause(j))->setWt(1);
     for (int j = 0; j < mlns[0]->getNumClauses(); j++) 
     {
       Clause* c = (Clause*) mlns[0]->getClause(j);
-        // If the weight was set to non-zero in the source MLN,
-        // don't modify it while learning.
-      if (c->getWt() != 0)
-        c->lock();
       c->setWt(1);
     }
 

@@ -2,11 +2,11 @@
  * All of the documentation and software included in the
  * Alchemy Software is copyrighted by Stanley Kok, Parag
  * Singla, Matthew Richardson, Pedro Domingos, Marc
- * Sumner, Hoifung Poon, and Daniel Lowd.
+ * Sumner, Hoifung Poon, Daniel Lowd, and Jue Wang.
  * 
- * Copyright [2004-07] Stanley Kok, Parag Singla, Matthew
+ * Copyright [2004-09] Stanley Kok, Parag Singla, Matthew
  * Richardson, Pedro Domingos, Marc Sumner, Hoifung
- * Poon, and Daniel Lowd. All rights reserved.
+ * Poon, Daniel Lowd, and Jue Wang. All rights reserved.
  * 
  * Contact: Pedro Domingos, University of Washington
  * (pedrod@cs.washington.edu).
@@ -29,8 +29,9 @@
  * acknowledgment: "This product includes software
  * developed by Stanley Kok, Parag Singla, Matthew
  * Richardson, Pedro Domingos, Marc Sumner, Hoifung
- * Poon, and Daniel Lowd in the Department of Computer Science and
- * Engineering at the University of Washington".
+ * Poon, Daniel Lowd, and Jue Wang in the Department of
+ * Computer Science and Engineering at the University of
+ * Washington".
  * 
  * 4. Your publications acknowledge the use or
  * contribution made by the Software to your research
@@ -40,7 +41,7 @@
  * Statistical Relational AI", Technical Report,
  * Department of Computer Science and Engineering,
  * University of Washington, Seattle, WA.
- * http://www.cs.washington.edu/ai/alchemy.
+ * http://alchemy.cs.washington.edu.
  * 
  * 5. Neither the name of the University of Washington nor
  * the names of its contributors may be used to endorse or
@@ -103,7 +104,7 @@ int folDbg = 0;
 %left '*' '/' '%'
 
 %glr-parser
-%expect 14
+%expect 16
 %error-verbose
 %% 
 
@@ -146,9 +147,10 @@ input:
     if (folDbg >= 2) printf("input: sentence\n");
       // the states should be reset because a parse error may have occurred
   }
-  sentence fullstop
+  sentence
+  continuous_part
+  fullstop
   {
-
     ListObj* formula;
     zzassert(zzoldNewVarList.size()==0,"expected zzoldNewVarList.size()==0");
     zzassert(zzformulaListObjs.size()==1,"expected zzformulaListObjs.size()=1");
@@ -183,7 +185,9 @@ input:
                             zzdefaultWt, zzdomain, zzmln, zzvarNameToIdMap, 
                             zzplusVarMap, zznumAsterisk,
                             zzhasFullStop, zzreadHardClauseWts, 
-                            zzmustHaveWtOrFullStop);
+                            zzmustHaveWtOrFullStop, zzinIndivisible,
+                            zzisHybrid, zzcontPred, zzmean,
+                            zzhasWeightFullStop);
       zzformulaInfos.append(epfi); 
     }
 
@@ -191,6 +195,25 @@ input:
   }
   newline
 ;
+
+
+continuous_part:
+  // empty 
+| 
+  '*'
+  {
+    // Indicator
+    if (folDbg >= 2) printf("sentence: indicator function\n");
+    zzconsumeToken(zztokenList,"*"); 
+    if (folDbg >= 1) printf("* ");
+    zzisHybrid = true;
+    zzformulaStr.append(" * ");
+  }
+  numeric_term
+  {
+  	// Real-valued
+    if (folDbg >= 2) printf("sentence: numeric term\n");
+  }
 
 
 at: 
@@ -356,16 +379,7 @@ constant_declarations:
   {
     const char* vsc = zztokenList.removeLast();
     if (folDbg >= 1) printf("cd_%s ", vsc);
-    int constId = zzdomain->getConstantId(vsc);
-    if (constId < 0)
-      zzaddConstantToDomain(vsc, zztypeName);
-    else
-    {
-      const char* prevType = zzdomain->getConstantTypeName(constId);
-      if (strcmp(prevType,zztypeName)!=0)
-        zzerr("constant %s previously declared to be of type %s is redeclared "
-              "to be of type %s", vsc, prevType, zztypeName);
-    }
+    zzaddConstantToDomain(vsc, zztypeName);
     delete [] vsc;
   }
 ;
@@ -421,19 +435,7 @@ ZZ_NUM
 
   char constStr[100];
   zzcreateIntConstant(constStr, zztypeName, zzinitialNumDeclaration);
-  int constId = zzdomain->getConstantId(constStr);
-  if (constId < 0) 
-    zzaddConstantToDomain(constStr, zztypeName);
-  else
-  {
-    const char* prevType = zzdomain->getConstantTypeName(constId);
-    if (strcmp(prevType,zztypeName)!=0)
-    {
-      char buf[30]; sprintf(buf, "%d", zzinitialNumDeclaration);
-      zzerr("constant %s previously declared to be of type %s is redeclared "
-            "to be of type %s", buf, prevType, zztypeName);        
-    }
-  }
+  zzaddConstantToDomain(constStr, zztypeName);
 
   delete [] numStr;
 }
@@ -467,19 +469,7 @@ ZZ_DOTDOTDOT ',' ZZ_NUM
   {
     char constStr[100];
     zzcreateIntConstant(constStr, zztypeName, i);
-    int constId = zzdomain->getConstantId(constStr);
-    if (constId < 0) 
-      zzaddConstantToDomain(constStr, zztypeName);
-    else
-    {
-      const char* prevType = zzdomain->getConstantTypeName(constId);
-      if (strcmp(prevType,zztypeName)!=0)
-      {
-        char buf[30]; sprintf(buf, "%d", i);
-        zzerr("constant %s previously declared to be of type %s is redeclared "
-              "to be of type %s", buf, prevType, zztypeName);        
-      }
-    }
+    zzaddConstantToDomain(constStr, zztypeName);
   }
 
   delete [] numStr2; delete [] zztypeName;
@@ -518,19 +508,7 @@ single_numeric_type: ZZ_NUM
 
   char constStr[100];
   zzcreateIntConstant(constStr, zztypeName, i);
-  int constId = zzdomain->getConstantId(constStr);
-  if (constId < 0) 
-    zzaddConstantToDomain(constStr, zztypeName);
-  else
-  {
-    const char* prevType = zzdomain->getConstantTypeName(constId);
-    if (strcmp(prevType,zztypeName) != 0)
-    {
-      char buf[30]; sprintf(buf, "%d", i);
-      zzerr("constant %s previously declared to be of type %s is redeclared "
-            "to be of type %s", buf, prevType, zztypeName);        
-    }
-  }
+  zzaddConstantToDomain(constStr, zztypeName);
 
   delete [] numStr;
 }
@@ -784,13 +762,16 @@ ZZ_PREDICATE
   delete [] predName;
 }
 nothing_or_constants
-{  
+{
   zzcheckPredNumTerm(zzpred);
   int predId = zzpred->getId();
   hash_map<int,PredicateHashArray*>::iterator it;
   if ((it=zzpredIdToGndPredMap.find(predId)) == zzpredIdToGndPredMap.end())
     zzpredIdToGndPredMap[predId] = new PredicateHashArray;
-  
+    
+  if (zzrealValue != NULL)
+    zzpred->setRealValue(*zzrealValue);
+    
   PredicateHashArray* pha = zzpredIdToGndPredMap[predId];
   if (pha->append(zzpred) < 0)
   {
@@ -814,6 +795,7 @@ nothing_or_constants
   }
   zzpred = NULL;
 }
+;
 
 nothing_or_constants:
   // Nothing (propositional case)
@@ -835,6 +817,21 @@ constants_in_groundings ')'
   zzconsumeToken(zztokenList,")"); 
   if (folDbg >= 1) printf(")\n"); 
 }
+real_value
+;
+
+real_value:
+  // whitespace between pred and number was eaten up
+ZZ_NUM
+{
+  const char* value = zztokenList.removeLast();
+  if (folDbg >= 1) printf("rv_%f ", atof(value));
+  if (zzrealValue) delete zzrealValue;
+  zzrealValue = new double(atof(value));
+  delete [] value;
+}
+|
+  //empty
 ;
 
 // function_return_constant '=' ZZ_FUNCTION '(' constants_in_groundings ')'
@@ -865,7 +862,7 @@ ZZ_FUNCTION
   char* constString;
   if (zztmpReturnNum)
   {
-  	zzcreateAndCheckIntConstant(zztmpReturnConstant, zzfunc, zzpred, zzdomain, constName);
+  	zzcreateAndCheckNumConstant(zztmpReturnConstant, zzfunc, zzpred, zzdomain, constName);
     if (constName == NULL)
     {
       constString = (char *)malloc((strlen(zztmpReturnConstant) + 1)*sizeof(char));
@@ -966,7 +963,7 @@ is_constant_string_num_variable:
   {
     const char* intStr = zztokenList.removeLast();
     char constName[100];
-    zzcreateAndCheckIntConstant(intStr, zzfunc, zzpred, zzdomain, constName);
+    zzcreateAndCheckNumConstant(intStr, zzfunc, zzpred, zzdomain, constName);
     if (constName == NULL) zztokenList.addLast(intStr);
     else                   zztokenList.addLast(constName);
     delete [] intStr;
@@ -1035,12 +1032,42 @@ weight:
     zzwt = new double(atof(wt));
     delete [] wt;
   }
+  weight_fullstop
 ;
+
+weight_fullstop:
+  // empty 
+| 
+  '.' 
+{ 
+  if (folDbg >= 1) printf(".\n"); zzconsumeToken(zztokenList,"."); 
+  zzassert(!zzhasWeightFullStop, "expecting no full stop");
+  zzhasWeightFullStop = true;
+  zzformulaStr.append(".");
+}
 
 
 // You must explicitly specify the connectives between the "sentence"s in order
 // for Bison to effect the left-associativity of the connectives
 sentence:
+  '['  
+  { 
+      // Square Brackets
+    zzconsumeToken(zztokenList,"["); 
+    if (folDbg >= 1) printf("[ "); 
+    if (folDbg >= 2) printf("sentence: '[' sentence\n");
+    zzformulaStr.append("[");
+    zzinIndivisible = true;
+  }
+  sentence 
+  ']'  
+  { 
+    zzconsumeToken(zztokenList,"]"); 
+    if (folDbg >= 1) printf("] "); 
+    zzformulaStr.append("]");
+    //zzinIndivisible = false;
+  }
+| 
   '('  
   { 
     zzconsumeToken(zztokenList,"("); 
@@ -1058,7 +1085,7 @@ sentence:
 | 
   { if (folDbg >= 2) printf("sentence: atomic_sentence\n"); }
   atomic_sentence
-|  
+|
   sentence ZZ_IMPLY
   {
     const char* imp = zztokenList.removeLast(); 
@@ -1427,11 +1454,14 @@ nothing_or_terms:
     zzcheckPredNumTerm(zzpred);
     delete zzpred;
     zzpred = NULL;
-    zzassert(zzpredFuncListObjs.size()==1,
-             "expecting zzpredFuncListObjs.size()==1");
-    ListObj* predlo = zzpredFuncListObjs.top();
-    zzpredFuncListObjs.pop();
-    zzformulaListObjs.push(predlo);
+    if (!zzisHybrid)
+    {
+      zzassert(zzpredFuncListObjs.size()==1,
+               "expecting zzpredFuncListObjs.size()==1");
+      ListObj* predlo = zzpredFuncListObjs.top();
+      zzpredFuncListObjs.pop();
+      zzformulaListObjs.push(predlo);
+    }
   }
 |
   '(' 
@@ -1440,6 +1470,7 @@ nothing_or_terms:
     if (folDbg >= 1) printf("( "); 
     if (folDbg >= 2) printf("atomic_sentence: terms\n"); 
     zzformulaStr.append("(");
+    //if (zzisHybrid) zzcontinuousStr.append("(");
   }
   terms 
   ')'
@@ -1553,21 +1584,28 @@ nothing_or_terms:
     zzcheckPredNumTerm(zzpred);
     delete zzpred;
     zzpred = NULL;
-    zzassert(zzpredFuncListObjs.size()==1,
-             "expecting zzpredFuncListObjs.size()==1");
-    ListObj* predlo = zzpredFuncListObjs.top();
-    zzpredFuncListObjs.pop();
-
-    if (zzisAsterisk)
+    
+    if (!zzisHybrid)
     {
-      zzisAsterisk = false;
-      ListObj* lo = new ListObj;
-      lo->append("*"); lo->append(predlo);
-      zzformulaListObjs.push(lo);
-    }
-    else
-      zzformulaListObjs.push(predlo);
+      zzassert(zzpredFuncListObjs.size()==1,
+               "expecting zzpredFuncListObjs.size()==1");
+      ListObj* predlo = zzpredFuncListObjs.top();
+      zzpredFuncListObjs.pop();
 
+      if (zzisAsterisk)
+      {
+        zzisAsterisk = false;
+        ListObj* lo = new ListObj;
+        lo->append("*"); lo->append(predlo);
+        zzformulaListObjs.push(lo);
+      }
+      else
+        zzformulaListObjs.push(predlo);
+	}
+	else
+	{
+	  
+	}
     zzformulaStr.append(")");
 
 	// If we have replaced a function inside the predicate
@@ -1776,7 +1814,7 @@ term:
     if (folDbg >= 1) printf("c3_%s ", intStr);
 
     char constName[100];
-    zzcreateAndCheckIntConstant(intStr, zzfunc, zzpred, zzdomain, constName);
+    zzcreateAndCheckNumConstant(intStr, zzfunc, zzpred, zzdomain, constName);
     if (constName == NULL) { break; delete [] intStr; }
 
     zztermIsConstant(constName, intStr, true);
@@ -2249,6 +2287,177 @@ internal_function_sign:
   }
 ;
 
+numeric_term:
+  '['
+  { 
+      // Square Brackets
+    zzconsumeToken(zztokenList,"["); 
+    if (folDbg >= 1) printf("[ "); 
+    if (folDbg >= 2) printf("numeric_term: '[' numeric_term\n");
+    zzformulaStr.append("[");
+  }
+  numeric_term
+  ']'  
+  { 
+    zzconsumeToken(zztokenList,"]"); 
+    if (folDbg >= 1) printf("] "); 
+    zzformulaStr.append("]");
+  }
+| 
+  '('  
+  { 
+    zzconsumeToken(zztokenList,"("); 
+    if (folDbg >= 1) printf("( "); 
+    if (folDbg >= 2) printf("numeric_term: '(' numeric_term\n");
+    zzformulaStr.append("(");
+  }
+  numeric_term
+  ')'
+  { 
+    zzconsumeToken(zztokenList,")"); 
+    if (folDbg >= 1) printf(") "); 
+    zzformulaStr.append(")");
+  }
+|
+  gaussian_shorthand
+|
+  polynomial
+;
+
+gaussian_shorthand:
+  ZZ_PREDICATE
+  {
+    const char* predName = zztokenList.removeLast();
+    if (folDbg >= 1) printf("p_%s ", predName); 
+
+    ListObj* predlo = new ListObj;
+
+	if (PredicateTemplate::isInternalPredicateTemplateName(predName))
+	{
+	  //zzinfixPredName is misused here to store internal pred. name
+	  zzinfixPredName = (char *)malloc((strlen(predName)
+    								  	+ 1)*sizeof(char));
+	  strcpy(zzinfixPredName, predName);
+	  const PredicateTemplate* t = zzdomain->getEmptyPredicateTemplate();
+      zzassert(zzpred == NULL,"expecting zzpred==NULL");
+      zzpred = new Predicate(t);
+      predlo->append(PredicateTemplate::EMPTY_NAME);
+	}
+	else
+	{
+      zzcreatePred(zzpred, predName);
+      predlo->append(predName);
+	}
+	
+    zzformulaStr.append(predName);
+    if(zzisNegated)  { zzpred->setSense(false); zzisNegated = false; }
+    zzcontPred = predlo;
+    delete [] predName;
+  }
+  nothing_or_terms
+  '='  
+   {
+    zzconsumeToken(zztokenList,"="); 
+    if (folDbg >= 1) printf("= "); 
+    zzformulaStr.append(" = ");
+    //if (zzisHybrid) zzcontinuousStr.append("=");
+  }
+  ZZ_NUM
+  {
+  	const char* tmp = zztokenList.removeLast();
+  	//zztmpReturnConstant = (char *)malloc((strlen(tmp) + 1)*sizeof(char));
+  	//strcpy(zztmpReturnConstant, tmp);
+  	//zztmpReturnNum = true;
+    zzformulaStr.append(tmp);
+    if (zzisHybrid) zzmean = atof(tmp);
+  	if (folDbg >= 1) printf("icnum_%s ", tmp);
+  	delete []tmp;
+  }
+|
+  '-'  
+  {
+    zzconsumeToken(zztokenList,"-");
+    if (folDbg >= 1) printf("-"); 
+    zzformulaStr.append("-");
+  }
+  '('  
+  {
+    zzconsumeToken(zztokenList,"("); 
+    if (folDbg >= 1) printf("("); 
+    zzformulaStr.append("(");
+  }
+  ZZ_PREDICATE
+  {
+    const char* predName = zztokenList.removeLast();
+    if (folDbg >= 1) printf("p_%s ", predName); 
+
+    ListObj* predlo = new ListObj;
+
+	if (PredicateTemplate::isInternalPredicateTemplateName(predName))
+	{
+	  //zzinfixPredName is misused here to store internal pred. name
+	  zzinfixPredName = (char *)malloc((strlen(predName)
+    								  	+ 1)*sizeof(char));
+	  strcpy(zzinfixPredName, predName);
+	  const PredicateTemplate* t = zzdomain->getEmptyPredicateTemplate();
+      zzassert(zzpred == NULL,"expecting zzpred==NULL");
+      zzpred = new Predicate(t);
+      predlo->append(PredicateTemplate::EMPTY_NAME);
+	}
+	else
+	{
+      zzcreatePred(zzpred, predName);
+      predlo->append(predName);
+	}
+	
+    zzformulaStr.append(predName);
+    if(zzisNegated)  { zzpred->setSense(false); zzisNegated = false; }
+    zzcontPred = predlo;
+    delete [] predName;
+  }
+  nothing_or_terms
+  '-'
+  { 
+    zzconsumeToken(zztokenList,"-"); 
+    if (folDbg >= 1) printf("- "); 
+    zzformulaStr.append(" - ");
+  }
+  ZZ_NUM
+  {
+  	const char* tmp = zztokenList.removeLast();
+  	//zztmpReturnConstant = (char *)malloc((strlen(tmp) + 1)*sizeof(char));
+  	//strcpy(zztmpReturnConstant, tmp);
+  	//zztmpReturnNum = true;
+    zzformulaStr.append(tmp);
+    if (zzisHybrid) zzmean = atof(tmp);
+  	if (folDbg >= 1) printf("icnum_%s ", tmp);
+  	delete []tmp;
+  }
+  ')'  
+  {
+    zzconsumeToken(zztokenList,")");
+    if (folDbg >= 1) printf(")"); 
+    zzformulaStr.append(")");
+  }
+  '^'  
+  {
+    zzconsumeToken(zztokenList,"^"); 
+    if (folDbg >= 1) printf("^"); 
+    zzformulaStr.append("^");
+  }
+  ZZ_NUM // must be the number 2
+  {
+    zzconsumeToken(zztokenList,"2"); 
+    if (folDbg >= 1) printf("2"); 
+    zzformulaStr.append("2");
+  }
+;
+
+polynomial:
+  'x^2 + x + 3'
+  {
+  }
+;
 
 %%
 

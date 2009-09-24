@@ -1124,7 +1124,7 @@ class StructLearn
       {
         Clause* c = (j == 0) ? unitClauses[i] : new Clause(*unitClauses[i]);
         (*mlns_)[j]->appendClause(oss.str(), false, c, priorMean_, false, idx,
-                                  false);
+                                  false, false);
         ((MLNClauseInfo*)(*mlns_)[j]->getMLNClauseInfo(idx))->priorMean 
           = priorMean_;
       }
@@ -1258,7 +1258,7 @@ class StructLearn
     c->printWithoutWtWithStrVar(oss, (*domains_)[domainIdx]);
     MLN* mln = (*mlns_)[domainIdx];
     bool ok = mln->appendClause(oss.str(), false, c, c->getWt(), false, idx,
-                                false);
+                                false, false);
     if (!ok) { cout << "ERROR: failed to insert " << oss.str() <<" into MLN"
                     << endl; exit(-1); }
     ((MLNClauseInfo*)mln->getMLNClauseInfo(idx))->priorMean = priorMean_;
@@ -1672,7 +1672,7 @@ class StructLearn
     for (i = 0; i < bestCandidates.size(); i++)
     {
       cout << "effecting best candidate " << i << " on MLN..." << endl << endl;
-      if (ok=effectBestCandidateOnMLNs(bestCandidates[i], score)) break;
+      if ((ok = effectBestCandidateOnMLNs(bestCandidates[i], score))) break;
       cout << "failed to effect candidate on MLN." << endl;
       delete bestCandidates[i];
     }
@@ -2370,7 +2370,7 @@ class StructLearn
           //if cnfClauses[i] is already in MLN, its weights will be correctly set
           //in updateWts() later
         mln->appendClause(ef->formula, true, new Clause(*cnfClauses[i]),
-                          wt, false, idx, false);
+                          wt, false, idx, false, false);
         mln->setFormulaPriorMean(ef->formula, priorMean_);
         ((MLNClauseInfo*)mln->getMLNClauseInfo(idx))->priorMean 
           += priorMean_/cnfClauses.size();
@@ -2432,14 +2432,14 @@ class StructLearn
     {
       if (a >= bestCandidates.size())
       {
-        if (ok=effectExistFormulaOnMLNs(highGainWtFormulas[b++],
-                                        existFormulas, score)) break;
+        if ((ok = effectExistFormulaOnMLNs(highGainWtFormulas[b++],
+                                           existFormulas, score))) break;
       }
       else
       if (b >= highGainWtFormulas.size())
       {
         cout << "effecting best candidate " << a << " on MLN..." << endl;
-        if (ok=effectBestCandidateOnMLNs(bestCandidates[a++], score)) break;
+        if ((ok = effectBestCandidateOnMLNs(bestCandidates[a++], score))) break;
         cout << "failed to effect candidate on MLN." << endl;
         delete bestCandidates[a-1];
       }
@@ -2447,13 +2447,13 @@ class StructLearn
       if (highGainWtFormulas[b]->gain > 
           bestCandidates[a]->getAuxClauseData()->gain)
       {
-        if (ok=effectExistFormulaOnMLNs(highGainWtFormulas[b++], 
-                                        existFormulas, score)) break;
+        if ((ok = effectExistFormulaOnMLNs(highGainWtFormulas[b++], 
+                                           existFormulas, score))) break;
       }
       else
       {
         cout << "effecting best candidate " << a << " on MLN..." << endl;
-        if (ok=effectBestCandidateOnMLNs(bestCandidates[a++], score)) break;
+        if ((ok = effectBestCandidateOnMLNs(bestCandidates[a++], score))) break;
         cout << "failed to effect candidate on MLN." << endl;
         delete bestCandidates[a-1];
       }

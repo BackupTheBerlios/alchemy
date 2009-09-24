@@ -122,12 +122,12 @@ class Clause
   Clause() 
     : wt_(0), predicates_(new Array<Predicate*>), intArrRep_(NULL),
       hashCode_(0), dirty_(true), isHardClause_(false), locked_(false),
-      varIdToVarsGroundedType_(NULL), auxClauseData_(NULL) {}
+      varIdToVarsGroundedType_(NULL), auxClauseData_(NULL), staticWt_(false) {}
 
   Clause(const double& wt) 
     : wt_(wt), predicates_(new Array<Predicate*>), intArrRep_(NULL),
       hashCode_(0), dirty_(true), isHardClause_(false), locked_(false),
-      varIdToVarsGroundedType_(NULL), auxClauseData_(NULL) {}
+      varIdToVarsGroundedType_(NULL), auxClauseData_(NULL), staticWt_(false) {}
 
 
   Clause(const Clause& c)
@@ -151,6 +151,8 @@ class Clause
     hashCode_ = c.hashCode_;
     
     isHardClause_ = c.isHardClause_;
+
+    staticWt_ = c.staticWt_;
 
     if (c.varIdToVarsGroundedType_)
     {
@@ -328,6 +330,9 @@ class Clause
 
   bool isHardClause() const { return isHardClause_; }
   void setIsHardClause(const bool& b) { isHardClause_ = b; }
+
+  bool isStaticWt() const { return staticWt_; }
+  void setStaticWt(const bool& b) { staticWt_ = b; }
 
   bool isLocked() const { return locked_; }
   void lock()   { locked_ = true; }
@@ -2922,6 +2927,7 @@ public:
   Array<VarsGroundedType*>* varIdToVarsGroundedType_ ;
 
   AuxClauseData* auxClauseData_;
+  bool staticWt_;
   static ClauseSampler* clauseSampler_;
   static double fixedSizeB_;
 };

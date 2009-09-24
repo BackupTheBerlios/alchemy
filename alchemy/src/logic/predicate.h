@@ -67,6 +67,7 @@
 #ifndef PREDICATE_H_JUN_26_2005
 #define PREDICATE_H_JUN_26_2005
 
+#include <limits>
 #include <ext/hash_set>
 using namespace __gnu_cxx;
 #include "predicatetemplate.h"
@@ -92,13 +93,13 @@ class Predicate
     : template_(pt), terms_(new Array<Term*>), sense_(true), 
       truthValue_(UNKNOWN), allTermsAreDiffVars_(false), isGrounded_(false), 
       intArrRep_(NULL), hashCode_(0), dirty_(true), parent_(NULL),
-      realValue_(numeric_limits<double>::min()) {}
+      realValue_(std::numeric_limits<double>::min()) {}
 
   Predicate(const PredicateTemplate* const & pt, Clause* const & parent)
     : template_(pt), terms_(new Array<Term*>), sense_(true), 
       truthValue_(UNKNOWN), allTermsAreDiffVars_(false), isGrounded_(false), 
       intArrRep_(NULL), hashCode_(0), dirty_(true), parent_(parent),
-      realValue_(numeric_limits<double>::min()) {}
+      realValue_(std::numeric_limits<double>::min()) {}
 
   Predicate(const Predicate& p)  { parent_ = NULL; copy(p); }
   Predicate(const Predicate& p,  Clause* const & par) { parent_= par; copy(p); }

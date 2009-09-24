@@ -367,8 +367,8 @@ static void yy_fatal_error (yyconst char msg[]  );
 	*yy_cp = '\0'; \
 	(yy_c_buf_p) = yy_cp;
 
-#define YY_NUM_RULES 32
-#define YY_END_OF_BUFFER 33
+#define YY_NUM_RULES 34
+#define YY_END_OF_BUFFER 35
 /* This struct is not used in this scanner,
    but its presence is necessary. */
 struct yy_trans_info
@@ -376,17 +376,17 @@ struct yy_trans_info
 	flex_int32_t yy_verify;
 	flex_int32_t yy_nxt;
 	};
-static yyconst flex_int16_t yy_accept[82] =
+static yyconst flex_int16_t yy_accept[84] =
     {   0,
-        0,    0,   33,   31,   30,   22,   22,   30,    6,   31,
-       31,   23,   24,   13,   14,   25,   15,   29,   31,   17,
-       31,   26,   16,   28,   21,   21,   21,    1,    2,   30,
-       30,    0,    0,    0,   20,    0,    0,   21,   17,    0,
-        0,    3,   18,   17,    0,    0,    9,   21,   21,    8,
-        7,    0,   17,   21,   27,    0,    0,    3,   18,    0,
-       19,   10,   21,   21,    0,   21,   19,    0,    0,    4,
-       21,   21,    0,    0,   11,   21,    0,   12,    0,    5,
-        0
+        0,    0,   35,   33,   32,   22,   22,   32,    6,   33,
+       33,   25,   26,   13,   14,   27,   15,   31,   33,   17,
+       33,   28,   16,   30,   21,   21,   21,   23,   24,    1,
+        2,   32,   32,    0,    0,    0,   20,    0,    0,   21,
+       17,    0,    0,    3,    0,   17,    0,    0,    9,   21,
+       21,    8,    7,    0,   17,   21,   29,    0,    0,    3,
+       18,    0,   19,   10,   21,   21,    0,   21,   19,    0,
+        0,    4,   21,   21,    0,    0,   11,   21,    0,   12,
+        0,    5,    0
     } ;
 
 static yyconst flex_int32_t yy_ec[256] =
@@ -400,11 +400,11 @@ static yyconst flex_int32_t yy_ec[256] =
        21,   22,   23,   24,   25,   26,   26,   26,   27,   28,
        26,   26,   29,   26,   26,   30,   26,   26,   31,   26,
        26,   32,   33,   34,   26,   26,   26,   35,   26,   26,
-       36,   37,   36,   38,   26,   36,   25,   39,   40,   41,
+       36,   37,   38,   39,   26,    1,   25,   40,   41,   42,
 
-       42,   28,   26,   26,   43,   26,   26,   44,   26,   45,
-       31,   26,   26,   46,   33,   47,   48,   49,   26,   35,
-       26,   26,   50,    1,   51,    1,    1,    1,    1,    1,
+       43,   28,   26,   26,   44,   26,   26,   45,   26,   46,
+       31,   26,   26,   47,   33,   48,   49,   50,   26,   35,
+       26,   26,   51,    1,   52,    1,    1,    1,    1,    1,
         1,    1,    1,    1,    1,    1,    1,    1,    1,    1,
         1,    1,    1,    1,    1,    1,    1,    1,    1,    1,
         1,    1,    1,    1,    1,    1,    1,    1,    1,    1,
@@ -421,96 +421,96 @@ static yyconst flex_int32_t yy_ec[256] =
         1,    1,    1,    1,    1
     } ;
 
-static yyconst flex_int32_t yy_meta[52] =
+static yyconst flex_int32_t yy_meta[53] =
     {   0,
         1,    1,    2,    1,    2,    1,    1,    1,    1,    3,
         1,    1,    1,    1,    1,    3,    1,    1,    3,    1,
         1,    1,    1,    1,    3,    3,    3,    3,    3,    3,
-        3,    3,    3,    3,    3,    1,    1,    1,    3,    3,
-        3,    3,    3,    3,    3,    3,    3,    3,    3,    1,
-        1
+        3,    3,    3,    3,    3,    1,    1,    1,    1,    3,
+        3,    3,    3,    3,    3,    3,    3,    3,    3,    3,
+        1,    1
     } ;
 
-static yyconst flex_int16_t yy_base[88] =
+static yyconst flex_int16_t yy_base[90] =
     {   0,
-        0,    0,  164,  165,   50,  165,  165,   51,  165,   46,
-      120,  165,  165,  165,  165,  165,  143,  144,   42,   42,
-      139,  137,  165,  165,    0,  123,  126,  165,  165,   56,
-       61,   63,   67,   56,  165,   67,  111,    0,   59,  138,
-      141,    0,   46,   62,   66,  131,  165,   62,   62,   92,
-      112,  112,   90,  105,  165,  131,   74,    0,   83,  119,
-      116,  165,  100,  106,   86,  110,  109,  114,   98,  165,
-       56,   90,   78,  110,    0,   92,   55,    0,   44,  165,
-      165,  136,   71,  139,  142,  145,  148
+        0,    0,  165,  166,   51,  166,  166,   52,  166,   47,
+      120,  166,  166,  166,  166,  166,  144,  145,   43,   43,
+      140,  138,  166,  166,    0,  124,  127,  166,  166,  166,
+      166,   57,   62,   64,   68,   57,  166,   68,  111,    0,
+       60,  139,  142,    0,   47,   63,   69,  132,  166,   52,
+       57,   92,  104,  112,   94,  103,  166,  132,   74,    0,
+       56,  120,  115,  166,  100,  106,   85,  110,  109,  114,
+       87,  166,   84,   90,   77,  112,    0,   91,   82,    0,
+       80,  166,  166,  137,   90,  140,  143,  146,  149
     } ;
 
-static yyconst flex_int16_t yy_def[88] =
+static yyconst flex_int16_t yy_def[90] =
     {   0,
-       81,    1,   81,   81,   81,   81,   81,   81,   81,   82,
-       81,   81,   81,   81,   81,   81,   83,   81,   81,   81,
-       81,   81,   81,   81,   83,   83,   83,   81,   81,   81,
-       81,   81,   81,   82,   81,   81,   81,   83,   83,   81,
-       84,   85,   81,   81,   81,   81,   81,   83,   83,   81,
-       81,   81,   83,   83,   81,   84,   86,   85,   81,   81,
-       81,   81,   83,   83,   81,   83,   83,   87,   86,   81,
-       83,   83,   81,   87,   83,   83,   81,   83,   81,   81,
-        0,   81,   81,   81,   81,   81,   81
+       83,    1,   83,   83,   83,   83,   83,   83,   83,   84,
+       83,   83,   83,   83,   83,   83,   85,   83,   83,   83,
+       83,   83,   83,   83,   85,   85,   85,   83,   83,   83,
+       83,   83,   83,   83,   83,   84,   83,   83,   83,   85,
+       85,   83,   86,   87,   83,   83,   83,   83,   83,   85,
+       85,   83,   83,   83,   85,   85,   83,   86,   88,   87,
+       83,   83,   83,   83,   85,   85,   83,   85,   85,   89,
+       88,   83,   85,   85,   83,   89,   85,   85,   83,   85,
+       83,   83,    0,   83,   83,   83,   83,   83,   83
     } ;
 
-static yyconst flex_int16_t yy_nxt[217] =
+static yyconst flex_int16_t yy_nxt[219] =
     {   0,
         4,    5,    6,    4,    7,    8,    9,   10,   11,    4,
        12,   13,   14,   15,   16,   17,   18,   19,   20,   21,
        22,    4,   23,   24,   25,   25,   26,   27,   25,   25,
-       25,   25,   25,   25,   25,   25,   25,   25,   25,   25,
-       25,   26,   25,   25,   25,   25,   25,   25,   25,   28,
-       29,   30,   30,   35,   41,   30,   31,   30,   43,   42,
-       44,   30,   30,   35,   59,   50,   31,   50,   50,   51,
-       34,   51,   51,   38,   34,   43,   34,   53,   43,   60,
-       44,   60,   36,   45,   61,   80,   69,   45,   32,   75,
-       63,   70,   36,   64,   50,   79,   50,   50,   32,   33,
+       25,   25,   25,   25,   25,   28,    4,   29,    4,   25,
+       25,   25,   26,   25,   25,   25,   25,   25,   25,   25,
+       30,   31,   32,   32,   37,   43,   32,   33,   32,   45,
+       44,   46,   32,   32,   37,   61,   52,   33,   52,   52,
+       53,   36,   53,   53,   61,   36,   45,   36,   55,   45,
+       65,   46,   62,   38,   62,   47,   71,   63,   66,   47,
+       34,   72,   40,   38,   52,   65,   52,   52,   47,   71,
 
-       54,   59,   75,   45,   63,   34,   43,   64,   53,   33,
-       69,   34,   34,   34,   51,   70,   51,   51,   60,   76,
-       66,   78,   69,   67,   45,   77,   69,   67,   67,   73,
-       72,   54,   71,   76,   61,   78,   34,   61,   34,   56,
-       56,   56,   58,   57,   58,   68,   68,   68,   74,   74,
-       74,   65,   62,   57,   55,   52,   49,   48,   47,   46,
-       40,   39,   37,   81,    3,   81,   81,   81,   81,   81,
-       81,   81,   81,   81,   81,   81,   81,   81,   81,   81,
-       81,   81,   81,   81,   81,   81,   81,   81,   81,   81,
-       81,   81,   81,   81,   81,   81,   81,   81,   81,   81,
+       34,   35,   56,   66,   72,   47,   53,   36,   53,   53,
+       45,   35,   55,   36,   36,   36,   62,   77,   68,   78,
+       80,   69,   82,   81,   71,   79,   71,   69,   69,   75,
+       74,   77,   73,   63,   78,   80,   56,   36,   63,   36,
+       58,   58,   58,   60,   59,   60,   70,   70,   70,   76,
+       76,   76,   67,   64,   59,   57,   54,   51,   50,   49,
+       48,   42,   41,   39,   83,    3,   83,   83,   83,   83,
+       83,   83,   83,   83,   83,   83,   83,   83,   83,   83,
+       83,   83,   83,   83,   83,   83,   83,   83,   83,   83,
+       83,   83,   83,   83,   83,   83,   83,   83,   83,   83,
 
-       81,   81,   81,   81,   81,   81,   81,   81,   81,   81,
-       81,   81,   81,   81,   81,   81
+       83,   83,   83,   83,   83,   83,   83,   83,   83,   83,
+       83,   83,   83,   83,   83,   83,   83,   83
     } ;
 
-static yyconst flex_int16_t yy_chk[217] =
+static yyconst flex_int16_t yy_chk[219] =
     {   0,
         1,    1,    1,    1,    1,    1,    1,    1,    1,    1,
         1,    1,    1,    1,    1,    1,    1,    1,    1,    1,
         1,    1,    1,    1,    1,    1,    1,    1,    1,    1,
         1,    1,    1,    1,    1,    1,    1,    1,    1,    1,
         1,    1,    1,    1,    1,    1,    1,    1,    1,    1,
-        1,    5,    8,   10,   19,    5,    8,   30,   20,   19,
-       20,   30,   31,   34,   43,   32,   31,   32,   32,   33,
-       36,   33,   33,   83,   36,   39,   36,   39,   44,   45,
-       44,   45,   10,   20,   45,   79,   57,   43,    8,   71,
-       48,   57,   34,   49,   50,   77,   50,   50,   31,    8,
+        1,    1,    5,    8,   10,   19,    5,    8,   32,   20,
+       19,   20,   32,   33,   36,   45,   34,   33,   34,   34,
+       35,   38,   35,   35,   61,   38,   41,   38,   41,   46,
+       50,   46,   47,   10,   47,   20,   59,   47,   51,   45,
+        8,   59,   85,   36,   52,   50,   52,   52,   61,   71,
 
-       39,   59,   71,   44,   48,   36,   53,   49,   53,   31,
-       69,   36,   36,   36,   51,   69,   51,   51,   54,   72,
-       54,   76,   74,   54,   59,   73,   68,   67,   66,   65,
-       64,   53,   63,   72,   61,   76,   82,   60,   82,   84,
-       84,   84,   85,   56,   85,   86,   86,   86,   87,   87,
-       87,   52,   46,   41,   40,   37,   27,   26,   22,   21,
-       18,   17,   11,    3,   81,   81,   81,   81,   81,   81,
-       81,   81,   81,   81,   81,   81,   81,   81,   81,   81,
-       81,   81,   81,   81,   81,   81,   81,   81,   81,   81,
-       81,   81,   81,   81,   81,   81,   81,   81,   81,   81,
+       33,    8,   41,   51,   71,   46,   53,   38,   53,   53,
+       55,   33,   55,   38,   38,   38,   56,   73,   56,   74,
+       78,   56,   81,   79,   76,   75,   70,   69,   68,   67,
+       66,   73,   65,   63,   74,   78,   55,   84,   62,   84,
+       86,   86,   86,   87,   58,   87,   88,   88,   88,   89,
+       89,   89,   54,   48,   43,   42,   39,   27,   26,   22,
+       21,   18,   17,   11,    3,   83,   83,   83,   83,   83,
+       83,   83,   83,   83,   83,   83,   83,   83,   83,   83,
+       83,   83,   83,   83,   83,   83,   83,   83,   83,   83,
+       83,   83,   83,   83,   83,   83,   83,   83,   83,   83,
 
-       81,   81,   81,   81,   81,   81,   81,   81,   81,   81,
-       81,   81,   81,   81,   81,   81
+       83,   83,   83,   83,   83,   83,   83,   83,   83,   83,
+       83,   83,   83,   83,   83,   83,   83,   83
     } ;
 
 static yy_state_type yy_last_accepting_state;
@@ -532,11 +532,11 @@ char *yytext;
  * All of the documentation and software included in the
  * Alchemy Software is copyrighted by Stanley Kok, Parag
  * Singla, Matthew Richardson, Pedro Domingos, Marc
- * Sumner, Hoifung Poon, and Daniel Lowd.
+ * Sumner, Hoifung Poon, Daniel Lowd, and Jue Wang.
  * 
- * Copyright [2004-07] Stanley Kok, Parag Singla, Matthew
+ * Copyright [2004-09] Stanley Kok, Parag Singla, Matthew
  * Richardson, Pedro Domingos, Marc Sumner, Hoifung
- * Poon, and Daniel Lowd. All rights reserved.
+ * Poon, Daniel Lowd, and Jue Wang. All rights reserved.
  * 
  * Contact: Pedro Domingos, University of Washington
  * (pedrod@cs.washington.edu).
@@ -559,8 +559,9 @@ char *yytext;
  * acknowledgment: "This product includes software
  * developed by Stanley Kok, Parag Singla, Matthew
  * Richardson, Pedro Domingos, Marc Sumner, Hoifung
- * Poon, and Daniel Lowd in the Department of Computer Science and
- * Engineering at the University of Washington".
+ * Poon, Daniel Lowd, and Jue Wang in the Department of
+ * Computer Science and Engineering at the University of
+ * Washington".
  * 
  * 4. Your publications acknowledge the use or
  * contribution made by the Software to your research
@@ -570,7 +571,7 @@ char *yytext;
  * Statistical Relational AI", Technical Report,
  * Department of Computer Science and Engineering,
  * University of Washington, Seattle, WA.
- * http://www.cs.washington.edu/ai/alchemy.
+ * http://alchemy.cs.washington.edu.
  * 
  * 5. Neither the name of the University of Washington nor
  * the names of its contributors may be used to endorse or
@@ -594,7 +595,7 @@ char *yytext;
  * 
  */
 /* scanner for first-order language */
-#line 69 "../src/parser/follex.y"
+#line 70 "../src/parser/follex.y"
 
 #include "folhelper.h"
 
@@ -605,7 +606,8 @@ bool follexDbg = false;
 /* double ' and " to avoid string syntax highlighting in xemacs */
 /*ZZ_STRING  [""]([^""\\n\r] | ([\][ntbr\f''""]))*[""]*/
 /* double ' to avoid string syntax highlighting in xemacs */
-#line 609 "../src/parser/follex.cpp"
+/* ZZ_ID [a-zA-z_\-][a-zA-Z0-9_\-'']* */
+#line 611 "../src/parser/follex.cpp"
 
 #define INITIAL 0
 
@@ -758,10 +760,10 @@ YY_DECL
 	register char *yy_cp, *yy_bp;
 	register int yy_act;
     
-#line 109 "../src/parser/follex.y"
+#line 111 "../src/parser/follex.y"
 
 
-#line 765 "../src/parser/follex.cpp"
+#line 767 "../src/parser/follex.cpp"
 
 	if ( !(yy_init) )
 		{
@@ -814,13 +816,13 @@ yy_match:
 			while ( yy_chk[yy_base[yy_current_state] + yy_c] != yy_current_state )
 				{
 				yy_current_state = (int) yy_def[yy_current_state];
-				if ( yy_current_state >= 82 )
+				if ( yy_current_state >= 84 )
 					yy_c = yy_meta[(unsigned int) yy_c];
 				}
 			yy_current_state = yy_nxt[yy_base[yy_current_state] + (unsigned int) yy_c];
 			++yy_cp;
 			}
-		while ( yy_base[yy_current_state] != 165 );
+		while ( yy_base[yy_current_state] != 166 );
 
 yy_find_action:
 		yy_act = yy_accept[yy_current_state];
@@ -846,7 +848,7 @@ do_action:	/* This label is used only to access EOF actions. */
 
 case 1:
 YY_RULE_SETUP
-#line 111 "../src/parser/follex.y"
+#line 113 "../src/parser/follex.y"
 {
   if (follexDbg) printf("LBRACE: %s\n", yytext);
   zzcolumn += strlen(yytext);
@@ -857,7 +859,7 @@ YY_RULE_SETUP
 	YY_BREAK
 case 2:
 YY_RULE_SETUP
-#line 120 "../src/parser/follex.y"
+#line 122 "../src/parser/follex.y"
 {
   if (follexDbg) printf("RBRACE: %s\n", yytext);
   zzcolumn += strlen(yytext);
@@ -868,7 +870,7 @@ YY_RULE_SETUP
 	YY_BREAK
 case 3:
 YY_RULE_SETUP
-#line 129 "../src/parser/follex.y"
+#line 131 "../src/parser/follex.y"
 { 
   if (follexDbg) printf("SINGLE_LINE_COMMENT: %s\n", yytext);
   if (yytext[strlen(yytext)-1] == '\n' || yytext[strlen(yytext)-1] == '\r') 
@@ -884,7 +886,7 @@ YY_RULE_SETUP
 case 4:
 /* rule 4 can match eol */
 YY_RULE_SETUP
-#line 141 "../src/parser/follex.y"
+#line 143 "../src/parser/follex.y"
 { 
   if (follexDbg) printf("MULTI_LINE_COMMENT: %s\n", yytext);
   int i=-1;
@@ -903,7 +905,7 @@ YY_RULE_SETUP
 	YY_BREAK
 case 5:
 YY_RULE_SETUP
-#line 158 "../src/parser/follex.y"
+#line 160 "../src/parser/follex.y"
 { 
   if (follexDbg) printf("INCLUDE: %s\n", yytext);
   zzcolumn += strlen(yytext);
@@ -914,7 +916,7 @@ YY_RULE_SETUP
 	YY_BREAK
 case 6:
 YY_RULE_SETUP
-#line 167 "../src/parser/follex.y"
+#line 169 "../src/parser/follex.y"
 {
   if (follexDbg) printf("NOT: %s\n", yytext);
   zzcolumn += strlen(yytext);
@@ -926,7 +928,7 @@ YY_RULE_SETUP
 case 7:
 /* rule 7 can match eol */
 YY_RULE_SETUP
-#line 176 "../src/parser/follex.y"
+#line 178 "../src/parser/follex.y"
 {
   if (follexDbg) printf("OR: %s\n", yytext);
   zzcolumn += strlen(yytext);
@@ -938,7 +940,7 @@ YY_RULE_SETUP
 case 8:
 /* rule 8 can match eol */
 YY_RULE_SETUP
-#line 185 "../src/parser/follex.y"
+#line 187 "../src/parser/follex.y"
 {
   if (follexDbg) printf("AND: %s\n", yytext);
   zzcolumn += strlen(yytext);
@@ -949,7 +951,7 @@ YY_RULE_SETUP
 	YY_BREAK
 case 9:
 YY_RULE_SETUP
-#line 194 "../src/parser/follex.y"
+#line 196 "../src/parser/follex.y"
 {
   if (follexDbg) printf("IMPLY: %s\n", yytext);
   zzcolumn += strlen(yytext);
@@ -960,7 +962,7 @@ YY_RULE_SETUP
 	YY_BREAK
 case 10:
 YY_RULE_SETUP
-#line 203 "../src/parser/follex.y"
+#line 205 "../src/parser/follex.y"
 {
   if (follexDbg) printf("EQUIV: %s\n", yytext);
   zzcolumn += strlen(yytext);
@@ -971,7 +973,7 @@ YY_RULE_SETUP
 	YY_BREAK
 case 11:
 YY_RULE_SETUP
-#line 212 "../src/parser/follex.y"
+#line 214 "../src/parser/follex.y"
 { 
   if (follexDbg) printf("EXIST: %s\n", yytext);
   zzcolumn += strlen(yytext);
@@ -982,7 +984,7 @@ YY_RULE_SETUP
 	YY_BREAK
 case 12:
 YY_RULE_SETUP
-#line 221 "../src/parser/follex.y"
+#line 223 "../src/parser/follex.y"
 { 
   if (follexDbg) printf("FORALL: %s\n", yytext);
   zzcolumn += strlen(yytext);
@@ -993,7 +995,7 @@ YY_RULE_SETUP
 	YY_BREAK
 case 13:
 YY_RULE_SETUP
-#line 230 "../src/parser/follex.y"
+#line 232 "../src/parser/follex.y"
 {
   if (follexDbg) printf("ASTERISK: %s\n", yytext);
   zzcolumn += strlen(yytext);
@@ -1004,7 +1006,7 @@ YY_RULE_SETUP
 	YY_BREAK
 case 14:
 YY_RULE_SETUP
-#line 239 "../src/parser/follex.y"
+#line 241 "../src/parser/follex.y"
 {
   if (follexDbg) printf("PLUS: %s\n", yytext);
   zzcolumn += strlen(yytext);
@@ -1015,7 +1017,7 @@ YY_RULE_SETUP
 	YY_BREAK
 case 15:
 YY_RULE_SETUP
-#line 248 "../src/parser/follex.y"
+#line 250 "../src/parser/follex.y"
 {
   if (follexDbg) printf("MINUS: %s\n", yytext);
   zzcolumn += strlen(yytext);
@@ -1026,7 +1028,7 @@ YY_RULE_SETUP
 	YY_BREAK
 case 16:
 YY_RULE_SETUP
-#line 256 "../src/parser/follex.y"
+#line 258 "../src/parser/follex.y"
 {
   if (follexDbg) printf("QS: %s\n", yytext);
   zzcolumn += strlen(yytext);
@@ -1037,7 +1039,7 @@ YY_RULE_SETUP
 	YY_BREAK
 case 17:
 YY_RULE_SETUP
-#line 265 "../src/parser/follex.y"
+#line 267 "../src/parser/follex.y"
 {
   if (follexDbg) printf("INTEGER: %s (%d)\n", yytext, atoi(yytext));
   zzcolumn += strlen(yytext);
@@ -1048,7 +1050,7 @@ YY_RULE_SETUP
 	YY_BREAK
 case 18:
 YY_RULE_SETUP
-#line 274 "../src/parser/follex.y"
+#line 276 "../src/parser/follex.y"
 {
   if (follexDbg) printf("FLOAT: %s (%g)\n", yytext, atof(yytext));
   zzcolumn += strlen(yytext);
@@ -1059,7 +1061,7 @@ YY_RULE_SETUP
 	YY_BREAK
 case 19:
 YY_RULE_SETUP
-#line 283 "../src/parser/follex.y"
+#line 285 "../src/parser/follex.y"
 {
   if (follexDbg) printf("EXP_FLOAT: %s (%e)\n", yytext, atof(yytext));
   zzcolumn += strlen(yytext);
@@ -1070,7 +1072,7 @@ YY_RULE_SETUP
 	YY_BREAK
 case 20:
 YY_RULE_SETUP
-#line 292 "../src/parser/follex.y"
+#line 294 "../src/parser/follex.y"
 {
   if (follexDbg) printf("STRING: %s \n", yytext);
   zzcolumn += strlen(yytext);
@@ -1082,7 +1084,7 @@ YY_RULE_SETUP
 	YY_BREAK
 case 21:
 YY_RULE_SETUP
-#line 302 "../src/parser/follex.y"
+#line 304 "../src/parser/follex.y"
 {
   //if (follexDbg) printf("IDENTIFIER: %s\n", yytext );
   zzcolumn += strlen(yytext);
@@ -1115,7 +1117,7 @@ YY_RULE_SETUP
 case 22:
 /* rule 22 can match eol */
 YY_RULE_SETUP
-#line 332 "../src/parser/follex.y"
+#line 334 "../src/parser/follex.y"
 {
   if (follexDbg) 
   {
@@ -1136,7 +1138,31 @@ YY_RULE_SETUP
 	YY_BREAK
 case 23:
 YY_RULE_SETUP
-#line 351 "../src/parser/follex.y"
+#line 352 "../src/parser/follex.y"
+{
+  if (follexDbg) printf("LEFT BRACKET: %s\n", yytext);
+  zzcolumn += strlen(yytext);
+  zznumCharRead += strlen(yytext);
+  zztokenList.add(yytext);
+  //if (zzparseGroundPred) zzafterRtParen = false;
+  return yytext[0];
+}
+	YY_BREAK
+case 24:
+YY_RULE_SETUP
+#line 362 "../src/parser/follex.y"
+{
+  if (follexDbg) printf("RIGHT BRACKET: %s\n", yytext);
+  zzcolumn += strlen(yytext);
+  zznumCharRead += strlen(yytext);
+  zztokenList.add(yytext);
+  //if (zzparseGroundPred) zzafterRtParen = true;
+  return yytext[0];
+}
+	YY_BREAK
+case 25:
+YY_RULE_SETUP
+#line 372 "../src/parser/follex.y"
 {
   if (follexDbg) printf("LEFT PAREN: %s\n", yytext);
   zzcolumn += strlen(yytext);
@@ -1146,9 +1172,9 @@ YY_RULE_SETUP
   return yytext[0];
 }
 	YY_BREAK
-case 24:
+case 26:
 YY_RULE_SETUP
-#line 361 "../src/parser/follex.y"
+#line 382 "../src/parser/follex.y"
 {
   if (follexDbg) printf("RIGHT PAREN: %s\n", yytext);
   zzcolumn += strlen(yytext);
@@ -1158,9 +1184,9 @@ YY_RULE_SETUP
   return yytext[0];
 }
 	YY_BREAK
-case 25:
+case 27:
 YY_RULE_SETUP
-#line 371 "../src/parser/follex.y"
+#line 392 "../src/parser/follex.y"
 {
   if (follexDbg) printf("COMMA: %s\n", yytext);
   zzcolumn += strlen(yytext);
@@ -1169,9 +1195,9 @@ YY_RULE_SETUP
   return yytext[0];
 }
 	YY_BREAK
-case 26:
+case 28:
 YY_RULE_SETUP
-#line 380 "../src/parser/follex.y"
+#line 401 "../src/parser/follex.y"
 {
   if (follexDbg) printf("EQUAL: %s\n", yytext);
   zzcolumn += strlen(yytext);
@@ -1180,9 +1206,9 @@ YY_RULE_SETUP
   return '=';
 }
 	YY_BREAK
-case 27:
+case 29:
 YY_RULE_SETUP
-#line 389 "../src/parser/follex.y"
+#line 410 "../src/parser/follex.y"
 {
   if (follexDbg) printf("DOTDOTDOT: %s\n", yytext);
   zzcolumn += strlen(yytext);
@@ -1191,9 +1217,9 @@ YY_RULE_SETUP
   return ZZ_DOTDOTDOT;
 }
 	YY_BREAK
-case 28:
+case 30:
 YY_RULE_SETUP
-#line 398 "../src/parser/follex.y"
+#line 419 "../src/parser/follex.y"
 {
   if (follexDbg) printf("AT: %s\n", yytext);
   zzcolumn += strlen(yytext);
@@ -1202,9 +1228,9 @@ YY_RULE_SETUP
   return yytext[0];
 }
 	YY_BREAK
-case 29:
+case 31:
 YY_RULE_SETUP
-#line 407 "../src/parser/follex.y"
+#line 428 "../src/parser/follex.y"
 {
   if (follexDbg) printf("FULLSTOP: %s\n", yytext);
   zzcolumn += strlen(yytext);
@@ -1213,9 +1239,9 @@ YY_RULE_SETUP
   return yytext[0];
 }
 	YY_BREAK
-case 30:
+case 32:
 YY_RULE_SETUP
-#line 416 "../src/parser/follex.y"
+#line 437 "../src/parser/follex.y"
 { /* eat up whitespace */
   if (follexDbg) 
   {
@@ -1224,12 +1250,12 @@ YY_RULE_SETUP
   zzcolumn += strlen(yytext);
   zznumCharRead += strlen(yytext);
 
-  if (zzparseGroundPred && zzafterRtParen) { zztokenList.add("@"); return '@'; }
+  //if (zzparseGroundPred && zzafterRtParen) { zztokenList.add("@"); return '@'; }
 }
 	YY_BREAK
-case 31:
+case 33:
 YY_RULE_SETUP
-#line 428 "../src/parser/follex.y"
+#line 449 "../src/parser/follex.y"
 {
     // commented out so as to allow fol.y to deal with the problem
   //printf("\nERROR: Unrecognized character. %s: ln %d, col %d: %s \n", 
@@ -1244,7 +1270,7 @@ YY_RULE_SETUP
 }
 	YY_BREAK
 case YY_STATE_EOF(INITIAL):
-#line 441 "../src/parser/follex.y"
+#line 462 "../src/parser/follex.y"
 {
 
   if (zzparseGroundPred) 
@@ -1299,12 +1325,12 @@ case YY_STATE_EOF(INITIAL):
   
 }
 	YY_BREAK
-case 32:
+case 34:
 YY_RULE_SETUP
-#line 494 "../src/parser/follex.y"
+#line 515 "../src/parser/follex.y"
 ECHO;
 	YY_BREAK
-#line 1308 "../src/parser/follex.cpp"
+#line 1334 "../src/parser/follex.cpp"
 
 	case YY_END_OF_BUFFER:
 		{
@@ -1586,7 +1612,7 @@ static int yy_get_next_buffer (void)
 		while ( yy_chk[yy_base[yy_current_state] + yy_c] != yy_current_state )
 			{
 			yy_current_state = (int) yy_def[yy_current_state];
-			if ( yy_current_state >= 82 )
+			if ( yy_current_state >= 84 )
 				yy_c = yy_meta[(unsigned int) yy_c];
 			}
 		yy_current_state = yy_nxt[yy_base[yy_current_state] + (unsigned int) yy_c];
@@ -1614,11 +1640,11 @@ static int yy_get_next_buffer (void)
 	while ( yy_chk[yy_base[yy_current_state] + yy_c] != yy_current_state )
 		{
 		yy_current_state = (int) yy_def[yy_current_state];
-		if ( yy_current_state >= 82 )
+		if ( yy_current_state >= 84 )
 			yy_c = yy_meta[(unsigned int) yy_c];
 		}
 	yy_current_state = yy_nxt[yy_base[yy_current_state] + (unsigned int) yy_c];
-	yy_is_jam = (yy_current_state == 81);
+	yy_is_jam = (yy_current_state == 83);
 
 	return yy_is_jam ? 0 : yy_current_state;
 }
@@ -2288,7 +2314,7 @@ void yyfree (void * ptr )
 
 #define YYTABLES_NAME "yytables"
 
-#line 494 "../src/parser/follex.y"
+#line 515 "../src/parser/follex.y"
 
 
 

@@ -2,11 +2,11 @@
  * All of the documentation and software included in the
  * Alchemy Software is copyrighted by Stanley Kok, Parag
  * Singla, Matthew Richardson, Pedro Domingos, Marc
- * Sumner, Hoifung Poon, and Daniel Lowd.
+ * Sumner, Hoifung Poon, Daniel Lowd, and Jue Wang.
  * 
- * Copyright [2004-07] Stanley Kok, Parag Singla, Matthew
+ * Copyright [2004-09] Stanley Kok, Parag Singla, Matthew
  * Richardson, Pedro Domingos, Marc Sumner, Hoifung
- * Poon, and Daniel Lowd. All rights reserved.
+ * Poon, Daniel Lowd, and Jue Wang. All rights reserved.
  * 
  * Contact: Pedro Domingos, University of Washington
  * (pedrod@cs.washington.edu).
@@ -29,8 +29,9 @@
  * acknowledgment: "This product includes software
  * developed by Stanley Kok, Parag Singla, Matthew
  * Richardson, Pedro Domingos, Marc Sumner, Hoifung
- * Poon, and Daniel Lowd in the Department of Computer Science and
- * Engineering at the University of Washington".
+ * Poon, Daniel Lowd, and Jue Wang in the Department of
+ * Computer Science and Engineering at the University of
+ * Washington".
  * 
  * 4. Your publications acknowledge the use or
  * contribution made by the Software to your research
@@ -40,7 +41,7 @@
  * Statistical Relational AI", Technical Report,
  * Department of Computer Science and Engineering,
  * University of Washington, Seattle, WA.
- * http://www.cs.washington.edu/ai/alchemy.
+ * http://alchemy.cs.washington.edu.
  * 
  * 5. Neither the name of the University of Washington nor
  * the names of its contributors may be used to endorse or
@@ -147,18 +148,18 @@ ostream* ARGS::pout = NULL; //used to print parameters
 bool ARGS::__args__dummy__;
 ARGS ARGS::END(NULL,ARGS::Opt,ARGS::__args__dummy__, "");
 
-char* const ARGS::NOFLAG       = "noflg";
-char* const ARGS::NOFL_FOUND   = "nofl_fnd";
+char* const ARGS::NOFLAG       = (char*)"noflg";
+char* const ARGS::NOFL_FOUND   = (char*)"nofl_fnd";
 bool        ARGS::usage_called = false;
 const char  ARGS::CommentChar  = '#';
 int         ARGS::numArgs      = 0;
 bool*       ARGS::found        = NULL;
-char*       ARGS::progName     = "";
+char*       ARGS::progName     = (char*)"";
 argsAction  ARGS::no_action;
 bool        ARGS::ignoreUnknownSwitch = false;
 
 
-void ARGS::init(char* m, argKind r, char* d, argsAction& a) 
+void ARGS::init(const char* m, argKind r, const char* d, argsAction& a) 
 {
   flag = m;
   arg_kind = r;
@@ -184,19 +185,20 @@ ARGS::ARGS() : uc(__args__dummy__)
 }
 
 
-ARGS::ARGS(char* m , argKind r, unionClass ucl, char* d, argsAction& a): uc(ucl) 
+ARGS::ARGS(const char* m , argKind r, unionClass ucl, const char* d,
+           argsAction& a): uc(ucl) 
 {
   init(m,r,d,a);
 }
 
 
-ARGS::ARGS(argKind r, unionClass ucl, char* d, argsAction& a) : uc(ucl) 
+ARGS::ARGS(argKind r, unionClass ucl, const char* d, argsAction& a) : uc(ucl) 
 {
   init(NOFLAG,r,d,a);
 }
 
 
-ARGS::ARGS(unionClass ucl,char* d,argsAction& a) : uc(ucl) 
+ARGS::ARGS(unionClass ucl, const char* d, argsAction& a) : uc(ucl) 
 {
   init(NOFLAG,Opt,d,a);
 }
@@ -483,7 +485,8 @@ ARGS* ARGS::findMatch(ARGS* ag,char *flag)
 
   // only returns ARGS::ARG_OK or ARG_ERR
 ARGS::ArgsRetCode 
-ARGS::argsSwitch(ARGS* args_iter, char* arg, int& index, bool& found,char* flag)
+ARGS::argsSwitch(ARGS* args_iter, char* arg, int& index, bool& found,
+                 const char* flag)
 {
   switch(args_iter->uc.type) 
   {
@@ -699,7 +702,7 @@ bool ARGS::boolable(char* string, bool& value)
 
 
   // return true if there is no flag.
-bool ARGS::noFlagP(char* flg) 
+bool ARGS::noFlagP(const char* flg) 
 {
     // cant test here equality with NOFLAG, so do the following instread.
   if (flg == NOFLAG || flg == NOFL_FOUND)
@@ -819,7 +822,7 @@ ostream& operator << (ostream& os, unionClass::argType& t)
 }
 
 
-char* unionClass::typeStr(unionClass::argType at) 
+const char* unionClass::typeStr(unionClass::argType at) 
 {
   switch (at) 
   {
