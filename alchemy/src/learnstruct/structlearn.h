@@ -2,11 +2,11 @@
  * All of the documentation and software included in the
  * Alchemy Software is copyrighted by Stanley Kok, Parag
  * Singla, Matthew Richardson, Pedro Domingos, Marc
- * Sumner, Hoifung Poon, and Daniel Lowd.
+ * Sumner, Hoifung Poon, Daniel Lowd, and Jue Wang.
  * 
- * Copyright [2004-07] Stanley Kok, Parag Singla, Matthew
+ * Copyright [2004-09] Stanley Kok, Parag Singla, Matthew
  * Richardson, Pedro Domingos, Marc Sumner, Hoifung
- * Poon, and Daniel Lowd. All rights reserved.
+ * Poon, Daniel Lowd, and Jue Wang. All rights reserved.
  * 
  * Contact: Pedro Domingos, University of Washington
  * (pedrod@cs.washington.edu).
@@ -29,8 +29,9 @@
  * acknowledgment: "This product includes software
  * developed by Stanley Kok, Parag Singla, Matthew
  * Richardson, Pedro Domingos, Marc Sumner, Hoifung
- * Poon, and Daniel Lowd in the Department of Computer Science and
- * Engineering at the University of Washington".
+ * Poon, Daniel Lowd, and Jue Wang in the Department of
+ * Computer Science and Engineering at the University of
+ * Washington".
  * 
  * 4. Your publications acknowledge the use or
  * contribution made by the Software to your research
@@ -40,7 +41,7 @@
  * Statistical Relational AI", Technical Report,
  * Department of Computer Science and Engineering,
  * University of Washington, Seattle, WA.
- * http://www.cs.washington.edu/ai/alchemy.
+ * http://alchemy.cs.washington.edu.
  * 
  * 5. Neither the name of the University of Washington nor
  * the names of its contributors may be used to endorse or
@@ -1122,7 +1123,8 @@ class StructLearn
       for (int j = 0; j < mlns_->size(); j++)
       {
         Clause* c = (j == 0) ? unitClauses[i] : new Clause(*unitClauses[i]);
-        (*mlns_)[j]->appendClause(oss.str(), false, c, priorMean_, false, idx);
+        (*mlns_)[j]->appendClause(oss.str(), false, c, priorMean_, false, idx,
+                                  false);
         ((MLNClauseInfo*)(*mlns_)[j]->getMLNClauseInfo(idx))->priorMean 
           = priorMean_;
       }
@@ -1255,7 +1257,8 @@ class StructLearn
     ostringstream oss; int idx;
     c->printWithoutWtWithStrVar(oss, (*domains_)[domainIdx]);
     MLN* mln = (*mlns_)[domainIdx];
-    bool ok = mln->appendClause(oss.str(), false, c, c->getWt(), false, idx);
+    bool ok = mln->appendClause(oss.str(), false, c, c->getWt(), false, idx,
+                                false);
     if (!ok) { cout << "ERROR: failed to insert " << oss.str() <<" into MLN"
                     << endl; exit(-1); }
     ((MLNClauseInfo*)mln->getMLNClauseInfo(idx))->priorMean = priorMean_;
@@ -2012,7 +2015,7 @@ class StructLearn
     for (int i = 0; i < existFormulas.size(); i++)
     {
       string formula = existFormulas[i]->formula;      
-      FormulaAndClauses tmp(formula, 0, false);
+      FormulaAndClauses tmp(formula, 0, false, false);
       const FormulaAndClausesArray* fnca
         = (*mlns_)[0]->getFormulaAndClausesArray();
       int a = fnca->find(&tmp);            
@@ -2367,7 +2370,7 @@ class StructLearn
           //if cnfClauses[i] is already in MLN, its weights will be correctly set
           //in updateWts() later
         mln->appendClause(ef->formula, true, new Clause(*cnfClauses[i]),
-                          wt, false, idx);
+                          wt, false, idx, false);
         mln->setFormulaPriorMean(ef->formula, priorMean_);
         ((MLNClauseInfo*)mln->getMLNClauseInfo(idx))->priorMean 
           += priorMean_/cnfClauses.size();

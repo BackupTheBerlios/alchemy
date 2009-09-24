@@ -2,11 +2,11 @@
  * All of the documentation and software included in the
  * Alchemy Software is copyrighted by Stanley Kok, Parag
  * Singla, Matthew Richardson, Pedro Domingos, Marc
- * Sumner, Hoifung Poon, and Daniel Lowd.
+ * Sumner, Hoifung Poon, Daniel Lowd, and Jue Wang.
  * 
- * Copyright [2004-07] Stanley Kok, Parag Singla, Matthew
+ * Copyright [2004-09] Stanley Kok, Parag Singla, Matthew
  * Richardson, Pedro Domingos, Marc Sumner, Hoifung
- * Poon, and Daniel Lowd. All rights reserved.
+ * Poon, Daniel Lowd, and Jue Wang. All rights reserved.
  * 
  * Contact: Pedro Domingos, University of Washington
  * (pedrod@cs.washington.edu).
@@ -29,8 +29,9 @@
  * acknowledgment: "This product includes software
  * developed by Stanley Kok, Parag Singla, Matthew
  * Richardson, Pedro Domingos, Marc Sumner, Hoifung
- * Poon, and Daniel Lowd in the Department of Computer Science and
- * Engineering at the University of Washington".
+ * Poon, Daniel Lowd, and Jue Wang in the Department of
+ * Computer Science and Engineering at the University of
+ * Washington".
  * 
  * 4. Your publications acknowledge the use or
  * contribution made by the Software to your research
@@ -40,7 +41,7 @@
  * Statistical Relational AI", Technical Report,
  * Department of Computer Science and Engineering,
  * University of Washington, Seattle, WA.
- * http://www.cs.washington.edu/ai/alchemy.
+ * http://alchemy.cs.washington.edu.
  * 
  * 5. Neither the name of the University of Washington nor
  * the names of its contributors may be used to endorse or
@@ -81,7 +82,10 @@ class MLN
   MLN() : clauses_(new ClauseHashArray),clauseInfos_(new Array<MLNClauseInfo*>),
           formAndClausesArray_(new FormulaAndClausesArray), 
           predIdToClausesMap_(new Array<Array<IndexClause*>*>),
-          externalClause_(new Array<bool>) {}
+          externalClause_(new Array<bool>), hybridClauses_(new Array<Clause*>),
+          hybridFormulaStrings_(new Array<string>),
+          numericPreds_(new Array<Predicate*>),
+          numericMeans_(new Array<double>){}
 
   ~MLN()
   {
@@ -115,9 +119,27 @@ class MLN
     }
 
     if (externalClause_) delete externalClause_;
+
+    if (hybridClauses_)
+    {
+      hybridClauses_->deleteItemsAndClear();
+      delete hybridClauses_;
+    }
+
+    if (hybridFormulaStrings_) delete hybridFormulaStrings_;
+
+    if (numericPreds_)
+    {
+      numericPreds_->deleteItemsAndClear();
+      delete numericPreds_;
+    }
+
+    if (numericMeans_) delete numericMeans_;
   }
 
   int getNumClauses() const { return clauses_->size(); }
+
+  int getNumHybridClauses() const { return hybridClauses_->size(); }
 
   int getNumHardClauses() const
   {
@@ -138,10 +160,12 @@ class MLN
    * the clause is in CNF.
    */
   bool appendExternalClause(const string& formulaString, const bool& hasExist,
-                            Clause* const& c, const Domain* const & domain)
+                            Clause* const& c, const Domain* const & domain,
+                            const bool& tiedClauses)
   {
     int idx;
-    bool app = appendClause(formulaString, hasExist, c, c->getWt(), c->isHardClause(), idx);
+    bool app = appendClause(formulaString, hasExist, c, c->getWt(),
+                            c->isHardClause(), idx, tiedClauses);
     if (app)
     {
       setFormulaNumPreds(formulaString, c->getNumPredicates());
@@ -161,7 +185,8 @@ class MLN
     //retIdx is the index of the clause in MLN's array of clauses
   bool appendClause(const string& formulaString, const bool& hasExist, 
                     Clause* const& c, const double& wt,
-                    const bool& isHardClause, int& retClauseIdx) 
+                    const bool& isHardClause, int& retClauseIdx,
+                    const bool& tiedClauses)
   {
     assert(c);
     c->canonicalize();
@@ -188,7 +213,7 @@ class MLN
  
     FormulaAndClauses* fac = new FormulaAndClauses(formulaString, 
                                                    formAndClausesArray_->size(),
-                                                   hasExist);
+                                                   hasExist, tiedClauses);
     int fidx;
       // if this is the first time we see the formulaString
     if ( (fidx = formAndClausesArray_->find(fac)) < 0 )
@@ -223,6 +248,45 @@ class MLN
     assert(clauses_->size() == clauseInfos_->size());
     return isAppended;
   } //appendClause()
+
+
+    //MLN owns clause c and is responsible for its deletion.
+    //Returns true of the clause is appended; otherwise returns false.
+    //retIdx is the index of the clause in MLN's array of hybrid clauses
+  bool appendHybridClause(const string& formulaString, Clause* const& c,
+                          const double& wt, int& retClauseIdx,
+                          Predicate* const& pred, const double& mean)
+  {
+    assert(c);
+    c->canonicalize();
+    bool isAppended;
+    Clause* clause;
+      // if hybridClauses_ contains c
+    if ((retClauseIdx = hybridClauses_->find(c)) >= 0 &&
+        strcmp(formulaString.c_str(),
+               (*hybridFormulaStrings_)[retClauseIdx].c_str()) == 0)
+    {
+      clause = (*hybridClauses_)[retClauseIdx];
+      delete c;
+      isAppended = false;
+    }
+    else
+    {
+        // hybrid clause does not exist in MLN, so add it
+      retClauseIdx = hybridClauses_->append(c);
+      hybridFormulaStrings_->append(formulaString);
+
+      //numericTerms_->append(continuousString);
+      numericPreds_->append(pred);
+      numericMeans_->append(mean);
+      clause = c;
+      isAppended = true;
+      clause->setWt(0); //start accumulating weight from 0
+    }
+    clause->addWt(wt);
+ 
+    return isAppended;
+  } //appendHybridClause()
 
 
     // idx is the index into the clauses_ array
@@ -394,6 +458,47 @@ class MLN
     return (*clauses_)[i];
   }
 
+    //returns clause at position of hybridClauses_ 
+    //or NULL if i is not a valid index of hybridClauses_     
+  const Clause* getHybridClause(const int& i) const
+  {
+    if (i < 0 || i >= hybridClauses_->size()) return NULL;
+    return (*hybridClauses_)[i];
+  }
+
+  const Predicate* getNumericPred(const int& i) const
+  {
+    if (i < 0 || i >= numericPreds_->size()) return NULL;
+    return (*numericPreds_)[i];
+  }
+
+  const double getNumericMean(const int& i) const
+  {
+    return (*numericMeans_)[i];
+  }
+
+  double getHybridClauseVariance(const int& i,
+                                 const Domain* const & domain) const
+  {
+    double sum = 0.0;
+    double mean = (*numericMeans_)[i];
+    
+    Predicate* pred = (*numericPreds_)[i];
+    Array<Predicate*> predArr;
+    pred->createAllGroundings(domain, predArr);
+
+    int numPreds = predArr.size();
+    for (int i = 0; i < numPreds; i++)
+    {
+      Predicate* newPred = predArr[i];
+      double rv = domain->getDB()->getRealValue(newPred);
+      sum += pow((rv - mean),2.0);
+      delete newPred;
+    }
+    double variance = (sum / ((double)numPreds));
+    return variance;
+  }
+
   bool isExternalClause(const int& i) const
   {
     assert(0 <= i && i < clauses_->size());
@@ -485,6 +590,22 @@ class MLN
     // The list and its contents should not be modified.
   const ClauseHashArray* getClauses() const { return clauses_; }
 
+    // The list and its contents should not be modified.
+  const Array<Clause*>* getHybridClauses() const { return hybridClauses_; }
+
+  int getSoftClauseSize()
+  {
+	int clauseNum = clauses_->size();
+	for (int i = 0; i < clauseNum; i++)
+    {
+      Clause* clause = (*clauses_)[i];
+      if (clause->isHardClause())
+      {
+        clauseNum --;   
+      }
+    }
+    return clauseNum;
+  }
 
   void getClauses(Array<Clause*>* const & clauses) const
   { for (int i = 0; i < clauses_->size();i++) clauses->append((*clauses_)[i]); }
@@ -617,7 +738,7 @@ class MLN
   const IndexClauseHashArray* 
   getClausesOfFormula(const string& formulaStr) const
   {
-    FormulaAndClauses tmp(formulaStr, 0, false);    
+    FormulaAndClauses tmp(formulaStr, 0, false, false);    
     int i = formAndClausesArray_->find(&tmp);
     if (i < 0) return NULL;
     FormulaAndClauses* fnc = (*formAndClausesArray_)[i];
@@ -629,7 +750,7 @@ class MLN
     //returns false.
   bool setFormulaNumPreds(const string& formulaStr, const int& numPreds)
   {
-    FormulaAndClauses tmp(formulaStr, 0, false);    
+    FormulaAndClauses tmp(formulaStr, 0, false, false);    
     int i = formAndClausesArray_->find(&tmp);
     if (i < 0) return false;
     FormulaAndClauses* fnc = (*formAndClausesArray_)[i];
@@ -642,7 +763,7 @@ class MLN
     //returns false.
   bool setFormulaIsHard(const string& formulaStr, const bool& isHard)
   {
-    FormulaAndClauses tmp(formulaStr, 0, false);    
+    FormulaAndClauses tmp(formulaStr, 0, false, false);    
     int i = formAndClausesArray_->find(&tmp);
     if (i < 0) return false;
     FormulaAndClauses* fnc = (*formAndClausesArray_)[i];
@@ -655,7 +776,7 @@ class MLN
     //returns false.
   bool setFormulaPriorMean(const string& formulaStr, const double& priorMean)
   {
-    FormulaAndClauses tmp(formulaStr, 0, false);    
+    FormulaAndClauses tmp(formulaStr, 0, false, false);    
     int i = formAndClausesArray_->find(&tmp);
     if (i < 0) return false;
     FormulaAndClauses* fnc = (*formAndClausesArray_)[i];
@@ -667,7 +788,7 @@ class MLN
     //returns false.
   bool setFormulaWt(const string& formulaStr, const double& wt)
   {
-    FormulaAndClauses tmp(formulaStr, 0, false);    
+    FormulaAndClauses tmp(formulaStr, 0, false, false);    
     int i = formAndClausesArray_->find(&tmp);
     if (i < 0) return false;
     FormulaAndClauses* fnc = (*formAndClausesArray_)[i];
@@ -681,7 +802,7 @@ class MLN
   bool setFormulaIsExistUnique(const string& formulaStr, 
                                const bool& isExistUnique)
   {
-    FormulaAndClauses tmp(formulaStr, 0, false);    
+    FormulaAndClauses tmp(formulaStr, 0, false, false);    
     int i = formAndClausesArray_->find(&tmp);
     if (i < 0) return false;
     FormulaAndClauses* fnc = (*formAndClausesArray_)[i];
@@ -693,7 +814,7 @@ class MLN
     //formulaStr must be in MLN
   double getFormulaWt(const string& formulaStr)
   {
-    FormulaAndClauses tmp(formulaStr, 0, false);    
+    FormulaAndClauses tmp(formulaStr, 0, false, false);    
     int i = formAndClausesArray_->find(&tmp);
     FormulaAndClauses* fnc = (*formAndClausesArray_)[i];
     return fnc->wt;
@@ -788,22 +909,70 @@ class MLN
       }
         // output the original formula and its weight
       out.width(0); out << "// "; out.width(outprec); 
-      out << totalWt << "  " << (*fncArr)[i]->formula << endl;
+      if ((*fncArr)[i]->isHard) 
+        out << (*fncArr)[i]->formula << endl;
+      else
+        out << totalWt << "  " << (*fncArr)[i]->formula << endl;
       
       if ((*fncArr)[i]->hasExist || (*fncArr)[i]->isExistUnique)
-        out << totalWt << "  " << (*fncArr)[i]->formula <<endl;
+      {
+        if ((*fncArr)[i]->isHard) 
+          out << (*fncArr)[i]->formula << "." << endl;
+        else
+          out << totalWt << "  " << (*fncArr)[i]->formula <<endl;
+      }
       else
       {
-          //output clauses derived from the original formula and their weights
-        for (int j = 0; j < indexClauses->size(); j++)
+        if ((*fncArr)[i]->tiedClauses)
         {
-          Clause* c = (*indexClauses)[j]->clause;    
           out.width(outprec); 
-          out << c->getWt()/getNumParentFormulas(c) << "  "; 
-          c->printWithoutWtWithStrVar(out, domain);
-          out << endl;
+          if ((*fncArr)[i]->isHard) 
+            out << (*fncArr)[i]->formula << "." << endl;
+          else
+            out << totalWt << "  " << (*fncArr)[i]->formula << endl;
+        }
+        else
+        {
+            // output clauses derived from the original formula and their
+            // weights
+          for (int j = 0; j < indexClauses->size(); j++)
+          {
+            Clause* c = (*indexClauses)[j]->clause;    
+            if ((*fncArr)[i]->isHard)
+            {
+              c->printWithoutWtWithStrVar(out, domain);
+              out << ".";
+            }
+            else
+            {
+              out.width(outprec); 
+              out << c->getWt()/getNumParentFormulas(c) << "  "; 
+              c->printWithoutWtWithStrVar(out, domain);
+            }
+            out << endl;
+          }
         }
       }
+      out << endl;
+    }
+    
+    for (int i = 0; i < hybridClauses_->size(); i++)
+    {
+      Clause* c = (*hybridClauses_)[i];
+
+        // output the original formula and its weight
+      out.width(0); out << "// "; out.width(outprec); 
+      if (!c->isHardClause()) out << c->getWt() << "  ";
+      out << (*hybridFormulaStrings_)[i];
+      out << endl;
+
+      out.width(outprec);
+      if (!c->isHardClause()) out << c->getWt() << "  ";
+      c->printWithoutWtWithStrVar(out, domain);
+      out << " * (";
+      (*numericPreds_)[i]->printWithStrVar(out, domain);
+      out << " = " << (*numericMeans_)[i] << ")";
+      if (c->isHardClause()) out << ".";
       out << endl;
     }
   }
@@ -834,18 +1003,38 @@ class MLN
       }
         // output the original formula and its weight
       out.width(0); out << "// "; out.width(outprec); 
-      out << totalWt << "  " << (*fncArr)[i]->formula << endl;
+      if (!(*fncArr)[i]->isHard) 
+        out << totalWt << "  ";
+      out << (*fncArr)[i]->formula;
+      out << endl;
       
 
-        //output the clauses derived from the original formula and their weights
-      for (int j = 0; j < indexClauses->size(); j++)
+      if ((*fncArr)[i]->tiedClauses)
       {
-        Clause* c = (*indexClauses)[j]->clause;    
         out.width(outprec); 
-        out << c->getWt()/getNumNonExistNonExistUniqueParentFormulas(c)
-            << "  "; 
-        c->printWithoutWtWithStrVar(out, domain);
-        out << endl;
+        if ((*fncArr)[i]->isHard)
+          out << (*fncArr)[i]->formula << "." << endl;
+        else
+          out << totalWt << "  " << (*fncArr)[i]->formula << endl;
+      }
+      else
+      {
+          // output the clauses derived from the original formula and their
+          // weights
+        for (int j = 0; j < indexClauses->size(); j++)
+        {
+          Clause* c = (*indexClauses)[j]->clause;    
+          out.width(outprec); 
+
+          if (!(*fncArr)[i]->isHard)
+          {
+            out << c->getWt()/getNumNonExistNonExistUniqueParentFormulas(c)
+                << "  ";
+          }
+          c->printWithoutWtWithStrVar(out, domain);
+          if ((*fncArr)[i]->isHard) out << ".";
+          out << endl;
+        }
       }
       out << endl;
     } 
@@ -1076,6 +1265,11 @@ class MLN
     // constants not present in this mln (can occur when per-constant rules are
     // used with multiple dbs).
   Array<bool>* externalClause_;
+  
+  Array<Clause*>* hybridClauses_;
+  Array<string>* hybridFormulaStrings_;
+  Array<Predicate*>* numericPreds_;
+  Array<double>* numericMeans_;
 };
 
 #endif

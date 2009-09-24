@@ -2,11 +2,11 @@
  * All of the documentation and software included in the
  * Alchemy Software is copyrighted by Stanley Kok, Parag
  * Singla, Matthew Richardson, Pedro Domingos, Marc
- * Sumner, Hoifung Poon, and Daniel Lowd.
+ * Sumner, Hoifung Poon, Daniel Lowd, and Jue Wang.
  * 
- * Copyright [2004-07] Stanley Kok, Parag Singla, Matthew
+ * Copyright [2004-09] Stanley Kok, Parag Singla, Matthew
  * Richardson, Pedro Domingos, Marc Sumner, Hoifung
- * Poon, and Daniel Lowd. All rights reserved.
+ * Poon, Daniel Lowd, and Jue Wang. All rights reserved.
  * 
  * Contact: Pedro Domingos, University of Washington
  * (pedrod@cs.washington.edu).
@@ -29,8 +29,9 @@
  * acknowledgment: "This product includes software
  * developed by Stanley Kok, Parag Singla, Matthew
  * Richardson, Pedro Domingos, Marc Sumner, Hoifung
- * Poon, and Daniel Lowd in the Department of Computer Science and
- * Engineering at the University of Washington".
+ * Poon, Daniel Lowd, and Jue Wang in the Department of
+ * Computer Science and Engineering at the University of
+ * Washington".
  * 
  * 4. Your publications acknowledge the use or
  * contribution made by the Software to your research
@@ -40,7 +41,7 @@
  * Statistical Relational AI", Technical Report,
  * Department of Computer Science and Engineering,
  * University of Washington, Seattle, WA.
- * http://www.cs.washington.edu/ai/alchemy.
+ * http://alchemy.cs.washington.edu.
  * 
  * 5. Neither the name of the University of Washington nor
  * the names of its contributors may be used to endorse or
@@ -198,6 +199,14 @@ void Domain::updatePerOldToNewIds(MLN* const & mln,
   for (int i = 0; i < clauses->size(); i++)
   {
     Clause* c = (*clauses)[i];
+    for (int i = 0; i < c->getNumPredicates(); i++)
+      changePredTermsToNewIds(c->getPredicate(i), oldToNewConstIds);
+  }
+
+  const Array<Clause*>* hclauses = mln->getHybridClauses();
+  for (int i = 0; i < hclauses->size(); i++)
+  {
+    Clause* c = (*hclauses)[i];
     for (int i = 0; i < c->getNumPredicates(); i++)
       changePredTermsToNewIds(c->getPredicate(i), oldToNewConstIds);
   }
@@ -424,6 +433,7 @@ void Domain::reorderConstants(ConstDualMap* const & map,
     }
     else
     {
+/*
       bool continueOuter = false;
         // Add as external constant
         // Constant is in reference domain
@@ -460,6 +470,11 @@ void Domain::reorderConstants(ConstDualMap* const & map,
         }
         if (breakOuter) break;
       }
+*/
+      int mi = map->getInt(name);
+      Array<int>* ints = map->getInt2(mi);
+      for (int i = 0; i < ints->size(); i++)
+        (*externalConstantsByType_)[(*ints)[i]]->append(mi);
     }
   }
   
@@ -578,15 +593,20 @@ Predicate* Domain::getNonEvidenceAtom(const int& index) const
 
     // Get the newIndex-th grounding of f.o. pred with id predId   
   Predicate* pred = createPredicate(predId, false);
-  for (int i = 0; i < pred->getNumTerms(); i++)
+    // Not all groundings of pred are non-evidence, so we need the while loop
+  bool foundNE = false;
+  while(!foundNE)
   {
-    int termType = pred->getTermTypeAsInt(i);
-    const Array<int>* constantsByType = getConstantsByType(termType);
-    int constIdx = random() % constantsByType->size();
-    pred->setTermToConstant(i, (*constantsByType)[constIdx]);
-    //delete constantsByType;
+    for (int i = 0; i < pred->getNumTerms(); i++)
+    {
+      int termType = pred->getTermTypeAsInt(i);
+      const Array<int>* constantsByType = getConstantsByType(termType);
+      int constIdx = random() % constantsByType->size();
+      pred->setTermToConstant(i, (*constantsByType)[constIdx]);
+    }
+    assert(pred->isGrounded());
+    if (!db_->getEvidenceStatus(pred)) foundNE = true;
   }
-  assert(pred->isGrounded());
   return pred;
 }
 

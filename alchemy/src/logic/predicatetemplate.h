@@ -68,6 +68,7 @@
 
 #include <ctype.h>
 #include "array.h"
+#include <cstring>
 
 class Domain;
 

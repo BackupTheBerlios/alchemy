@@ -2,11 +2,11 @@
  * All of the documentation and software included in the
  * Alchemy Software is copyrighted by Stanley Kok, Parag
  * Singla, Matthew Richardson, Pedro Domingos, Marc
- * Sumner, Hoifung Poon, and Daniel Lowd.
+ * Sumner, Hoifung Poon, Daniel Lowd, and Jue Wang.
  * 
- * Copyright [2004-07] Stanley Kok, Parag Singla, Matthew
+ * Copyright [2004-09] Stanley Kok, Parag Singla, Matthew
  * Richardson, Pedro Domingos, Marc Sumner, Hoifung
- * Poon, and Daniel Lowd. All rights reserved.
+ * Poon, Daniel Lowd, and Jue Wang. All rights reserved.
  * 
  * Contact: Pedro Domingos, University of Washington
  * (pedrod@cs.washington.edu).
@@ -29,8 +29,9 @@
  * acknowledgment: "This product includes software
  * developed by Stanley Kok, Parag Singla, Matthew
  * Richardson, Pedro Domingos, Marc Sumner, Hoifung
- * Poon, and Daniel Lowd in the Department of Computer Science and
- * Engineering at the University of Washington".
+ * Poon, Daniel Lowd, and Jue Wang in the Department of
+ * Computer Science and Engineering at the University of
+ * Washington".
  * 
  * 4. Your publications acknowledge the use or
  * contribution made by the Software to your research
@@ -40,7 +41,7 @@
  * Statistical Relational AI", Technical Report,
  * Department of Computer Science and Engineering,
  * University of Washington, Seattle, WA.
- * http://www.cs.washington.edu/ai/alchemy.
+ * http://alchemy.cs.washington.edu.
  * 
  * 5. Neither the name of the University of Washington nor
  * the names of its contributors may be used to endorse or
@@ -80,6 +81,10 @@
 #include "gibbssampler.h"
 #include "simulatedtempering.h"
 #include "bp.h"
+#include "variablestate.h"
+#include "hvariablestate.h"
+#include "hmcsat.h"
+#include "lbfgsp.h"
 
 // Variables for holding inference command line args are in inferenceargs.h
 
@@ -87,6 +92,27 @@ char* aevidenceFiles  = NULL;
 char* aresultsFile    = NULL;
 char* aqueryPredsStr  = NULL;
 char* aqueryFile      = NULL;
+
+char* atestcont = "tmp.cont";
+char* atestdis = "tmp.dis";
+char* aHMWSDis = NULL;
+char* aMWSrst = NULL;
+
+int anumerator = 50;
+int adenominator = 100;
+
+char* aMaxSeconds = NULL;
+bool aGenRandom = true;
+bool aStartPt = false;
+
+int aLineNum = -1;
+char* aLinePara = NULL;
+char* aLineName = NULL;
+
+int saInterval = 100;
+
+char* aGndPredIdxMapFile = NULL;
+bool aPrintSamplePerIteration = false;
 
 string queryPredsStr, queryFile;
 GroundPredicateHashArray queries;
@@ -128,217 +154,161 @@ bool createComLineQueryPreds(const string& queryPredsStr,
                              Array<int>* const & allPredGndingsAreQueries,
                              bool printToFile, ostream& out, bool amapPos,
                             const GroundPredicateHashArray* const & trueQueries,
-                             const Array<double>* const & trueProbs)
+                             const Array<double>* const & trueProbs,
+                             Array<Array<Predicate* >* >* queryConjs)
 {
   if (queryPredsStr.length() == 0) return true;
-  string preds = Util::trim(queryPredsStr);
+  string predConjs = Util::trim(queryPredsStr);
 
-    //replace the comma between query predicates with '\n'
+    //replace the comma or semi-colon between query predicates with '\n'
   int balparen = 0;
-  for (unsigned int i = 0; i < preds.length(); i++)
+  for (unsigned int i = 0; i < predConjs.length(); i++)
   {
-    if (preds.at(i)=='(')                     balparen++;
-    else if (preds.at(i)==')')                balparen--;
-    else if (preds.at(i)==',' && balparen==0) preds.at(i)='\n';
+    if (predConjs.at(i)=='(')                     balparen++;
+    else if (predConjs.at(i)==')')                balparen--;
+    else if ((predConjs.at(i)==';' || predConjs.at(i)==',') &&
+             balparen==0) predConjs.at(i) = '\n';
   }
-
-  bool onlyPredName;
+  
   bool ret = true;
-  unsigned int cur;
-  int termId, varIdCnt = 0;
-  hash_map<string, int, HashString, EqualString> varToId;
-  hash_map<string, int, HashString, EqualString>::iterator it;
-  Array<VarsTypeId*>* vtiArr;
-  string pred, predName, term;
-  const PredicateTemplate* ptemplate;
-  istringstream iss(preds);
+  string predConj;
+  istringstream iss(predConjs);
   char delimit[2]; delimit[1] = '\0';
 
-    // for each query pred on command line
-  while (getline(iss, pred))
+    // for each query formula
+  while (getline(iss, predConj))
   {
-    onlyPredName = false;
-    varToId.clear();
-    varIdCnt = 0;
-    cur = 0;
-
-      // get predicate name
-    if (!Util::substr(pred,cur,predName,"("))
+      // replace the ^ with '\n'
+    int balparen = 0;
+    for (unsigned int i = 0; i < predConj.length(); i++)
     {
-      predName = pred;
-      onlyPredName = true;
+      if (predConj.at(i)=='(')                     balparen++;
+      else if (predConj.at(i)==')')                balparen--;
+      else if (predConj.at(i)=='^' && balparen==0) predConj.at(i) = '\n';
     }
+    bool onlyPredName;
+    unsigned int cur;
+    int termId, varIdCnt = 0;
+    hash_map<string, int, HashString, EqualString> varToId;
+    hash_map<string, int, HashString, EqualString>::iterator it;
+    Array<VarsTypeId*>* vtiArr;
+    string pred, predName, term;
+    istringstream iss2(predConj);
+    const PredicateTemplate* ptemplate;
+    int predicate = 0;
+
+    Array<Predicate* >* predArray = new Array<Predicate*>;
+    if (queryConjs) queryConjs->append(predArray);
+      // for each query pred on command line
+    while (getline(iss2, pred))
+    {
+      pred = Util::trim(pred);
+      onlyPredName = false;
+      varToId.clear();
+      varIdCnt = 0;
+      cur = 0;
+      bool negated = false;
+
+        // find if pred is negated
+      if (pred.at(0) == '!')
+      {
+        negated = true;
+        pred.at(0) = ' ';
+        pred = Util::trim(pred);
+      }
+        // get predicate name
+      if (!Util::substr(pred, cur, predName, "("))
+      {
+        predName = pred;
+        onlyPredName = true;
+      }
     
-      // Predicate must be in the domain
-    ptemplate = domain->getPredicateTemplate(predName.c_str());
-    if (ptemplate == NULL)
-    {
-      cout << "ERROR: Cannot find command line query predicate" << predName 
-           << " in domain." << endl;
-      ret = false;
-      continue;
-    }
-    Predicate ppred(ptemplate);
+        // Predicate must be in the domain
+      ptemplate = domain->getPredicateTemplate(predName.c_str());
+      if (ptemplate == NULL)
+      {
+        cout << "ERROR: Cannot find command line query predicate" << predName 
+             << " in domain." << endl;
+        ret = false;
+        continue;
+      }
+      Predicate ppred(ptemplate);
 
-      // if the terms of the query predicate are also specified
-    if (!onlyPredName)
-    {
-        // get term name
-      for (int i = 0; i < 2; i++)
-      {       
-        if (i == 0) delimit[0] = ',';
-        else        delimit[0] = ')';
-        while(Util::substr(pred, cur, term, delimit))
+        // if the terms of the query predicate are also specified
+      if (!onlyPredName)
+      {
+          // get term name
+        for (int i = 0; i < 2; i++)
         {
-            // this is a constant
-          if (isupper(term.at(0)) || term.at(0) == '"')
+          if (i == 0) delimit[0] = ',';
+          else        delimit[0] = ')';
+          while (Util::substr(pred, cur, term, delimit))
           {
-            termId = domain->getConstantId(term.c_str());
-            if (termId < 0) 
+              // this is a constant
+            if (isupper(term.at(0)) || term.at(0) == '"' || isdigit(term.at(0)))
             {
-              cout <<"ERROR: Cannot find constant "<<term<<" in database"<<endl;
-              ret = false;
-            }        
-          }
-          else
-          {   // it is a variable        
-            if ((it=varToId.find(term)) == varToId.end()) 
-            {
-              termId = --varIdCnt;
-              varToId[term] = varIdCnt; 
+              termId = domain->getConstantId(term.c_str());
+              if (termId < 0) 
+              {
+                cout <<"ERROR: Cannot find constant "<<term<<" in database"<<endl;
+                ret = false;
+              }
             }
             else
-              termId = (*it).second;
+            {   // it is a variable        
+              if ((it=varToId.find(term)) == varToId.end()) 
+              {
+                termId = --varIdCnt;
+                varToId[term] = varIdCnt; 
+              }
+              else
+                termId = (*it).second;
+            }
+            ppred.appendTerm(new Term(termId, (void*)&ppred, true));
           }
-          ppred.appendTerm(new Term(termId, (void*)&ppred, true));
         }
-      }
-    }
-    else
-    {   // if only the predicate name is specified
-        // HACK DEBUG
-      //(*allPredGndingsAreQueries)[ptemplate->getId()] = true;
-      for (int i = 0; i < ptemplate->getNumTerms(); i++)
-        ppred.appendTerm(new Term(--varIdCnt, (void*)&ppred, true));
-    }  
-
-      // Check if number of terms is correct
-    if (ppred.getNumTerms() != ptemplate->getNumTerms())
-    {
-      cout << "ERROR: " << predName << " requires " << ptemplate->getNumTerms()
-           << " terms but given " << ppred.getNumTerms() << endl;
-      ret = false;
-    }
-    if (!ret) continue;
-
-    
-    ///////////////////// create all groundings of predicate ///////////////
-    vtiArr = NULL;
-    ppred.createVarsTypeIdArr(vtiArr);
-
-      // If a ground predicate was specified on command line
-    if (vtiArr->size() <= 1)
-    {
-      assert(ppred.isGrounded());
-      assert(!db->isClosedWorld(ppred.getId()));
-      TruthValue tv = db->getValue(&ppred);
-      GroundPredicate* gndPred = new GroundPredicate(&ppred);
-        // If just printing to file, then all values must be known
-      if (printToFile) assert(tv != UNKNOWN);
-      if (tv == UNKNOWN)
-      {
-        if (queries->append(gndPred) < 0) delete gndPred;
       }
       else
-      {
-          // If just printing to file
-        if (printToFile)
-        {
-            // If trueQueries is given as argument, then get prob. from there
-          if (trueQueries)
-          {
-            double prob = 0.0;
-            if (domain->getDB()->getEvidenceStatus(&ppred))
-            {
-                // Don't print out evidence atoms
-              continue;
-              //prob = (tv == TRUE) ? 1.0 : 0.0;
-            }
-            else
-            {
-              int found = trueQueries->find(gndPred);
-              if (found >= 0) prob = (*trueProbs)[found];
-              else
-                  // Uniform smoothing
-                prob = (prob*10000+1/2.0)/(10000+1.0);
-              
-            }
-            gndPred->print(out, domain); out << " " << prob << endl;
-          }
-          else
-          {
-            if (amapPos) //if show postive ground query predicates only
-            {
-      		  if (tv == TRUE)
-      		  {
-      	  	    ppred.printWithStrVar(out, domain);
-      	  	    out << endl;
-      		  }
-            }
-            else //print all ground query predicates
-            {
-              ppred.printWithStrVar(out, domain);
-              out << " " << tv << endl;
-            }
-          }
-          delete gndPred;
-        }
-        else // Building queries for HashArray
-        {
-          //if (tv == TRUE) gndPred->setProbTrue(1);
-          //else            gndPred->setProbTrue(0);
+      {   // if only the predicate name is specified
+          // HACK DEBUG
+        //(*allPredGndingsAreQueries)[ptemplate->getId()] = true;
+        for (int i = 0; i < ptemplate->getNumTerms(); i++)
+          ppred.appendTerm(new Term(--varIdCnt, (void*)&ppred, true));
+      }  
 
-          if (knownQueries->append(gndPred) < 0) delete gndPred;  
-        }
-      }      
-    }
-    else // Variables need to be grounded
-    {
-      ArraysAccessor<int> acc;
-      for (int i = 1; i < vtiArr->size(); i++)
+        // Check if number of terms is correct
+      if (ppred.getNumTerms() != ptemplate->getNumTerms())
       {
-        const Array<int>* cons =
-          domain->getConstantsByType((*vtiArr)[i]->typeId);
-        acc.appendArray(cons);
-      } 
+        cout << "ERROR: " << predName << " requires " << ptemplate->getNumTerms()
+             << " terms but given " << ppred.getNumTerms() << endl;
+        ret = false;
+      }
+      if (!ret) continue;
+    
+      ///////////////////// create all groundings of predicate ///////////////
+      vtiArr = NULL;
+      ppred.createVarsTypeIdArr(vtiArr);
 
-        // form all groundings of the predicate
-      Array<int> constIds;
-      while (acc.getNextCombination(constIds))
+        // If a ground predicate was specified on command line
+      if (vtiArr->size() <= 1)
       {
-        assert(constIds.size() == vtiArr->size()-1);
-        for (int j = 0; j < constIds.size(); j++)
-        {
-          Array<Term*>& terms = (*vtiArr)[j+1]->vars;
-          for (int k = 0; k < terms.size(); k++)
-            terms[k]->setId(constIds[j]);
-        }
-
-        // at this point the predicate is grounded
+        assert(ppred.isGrounded());
         assert(!db->isClosedWorld(ppred.getId()));
+        TruthValue tv = db->getValue(&ppred);
 
-        TruthValue tv = db->getValue(&ppred);        
+        if (negated) ppred.setSense(false);
+        predArray->append(new Predicate(ppred));
+        
         GroundPredicate* gndPred = new GroundPredicate(&ppred);
-
-    	  // If just printing to file, then all values must be known
-	    if (printToFile) assert(tv != UNKNOWN);
+          // If just printing to file, then all values must be known
+        if (printToFile) assert(tv != UNKNOWN);
         if (tv == UNKNOWN)
         {
           if (queries->append(gndPred) < 0) delete gndPred;
         }
         else
         {
-          	// If just printing to file
+            // If just printing to file
           if (printToFile)
           {
               // If trueQueries is given as argument, then get prob. from there
@@ -358,19 +328,18 @@ bool createComLineQueryPreds(const string& queryPredsStr,
                 else
                     // Uniform smoothing
                   prob = (prob*10000+1/2.0)/(10000+1.0);
+              
               }
-                // Uniform smoothing
-              //prob = (prob*10000+1/2.0)/(10000+1.0);
               gndPred->print(out, domain); out << " " << prob << endl;
             }
             else
             {
               if (amapPos) //if show postive ground query predicates only
               {
-                if (tv == TRUE)
+      		    if (tv == TRUE)
                 {
-                  ppred.printWithStrVar(out, domain);
-                  out << endl;
+      	  	      ppred.printWithStrVar(out, domain);
+      	  	      out << endl;
                 }
               }
               else //print all ground query predicates
@@ -379,20 +348,114 @@ bool createComLineQueryPreds(const string& queryPredsStr,
                 out << " " << tv << endl;
               }
             }
-            delete gndPred;          
+            delete gndPred;
           }
-          else // Building queries
+          else // Building queries for HashArray
           {
-          	//if (tv == TRUE) gndPred->setProbTrue(1);
-          	//else            gndPred->setProbTrue(0);
-          	if (knownQueries->append(gndPred) < 0) delete gndPred;  
+            //if (tv == TRUE) gndPred->setProbTrue(1);
+            //else            gndPred->setProbTrue(0);
+            if (knownQueries->append(gndPred) < 0) delete gndPred;  
           }
-        }        
+        }
       }
-    }
+      else // Variables need to be grounded
+      {
+        ArraysAccessor<int> acc;
+        for (int i = 1; i < vtiArr->size(); i++)
+        {
+          const Array<int>* cons =
+            domain->getConstantsByType((*vtiArr)[i]->typeId);
+          acc.appendArray(cons);
+        } 
+
+          // form all groundings of the predicate
+        Array<int> constIds;
+        while (acc.getNextCombination(constIds))
+        {
+          assert(constIds.size() == vtiArr->size()-1);
+          for (int j = 0; j < constIds.size(); j++)
+          {
+            Array<Term*>& terms = (*vtiArr)[j+1]->vars;
+            for (int k = 0; k < terms.size(); k++)
+              terms[k]->setId(constIds[j]);
+          }
+
+          // at this point the predicate is grounded
+          assert(!db->isClosedWorld(ppred.getId()));
+ 
+          TruthValue tv = db->getValue(&ppred);        
+          GroundPredicate* gndPred = new GroundPredicate(&ppred);
+
+            // If just printing to file, then all values must be known
+          if (printToFile) assert(tv != UNKNOWN);
+          if (tv == UNKNOWN)
+          {
+            if (queries->append(gndPred) < 0) delete gndPred;
+          }
+          else
+          {
+              // If just printing to file
+            if (printToFile)
+            {
+                // If trueQueries is given as argument, then get prob. from there
+              if (trueQueries)
+              {
+                double prob = 0.0;
+                if (domain->getDB()->getEvidenceStatus(&ppred))
+                {
+                    // Don't print out evidence atoms
+                  continue;
+                  //prob = (tv == TRUE) ? 1.0 : 0.0;
+                }
+                else
+                {
+                  int found = trueQueries->find(gndPred);
+                  if (found >= 0) prob = (*trueProbs)[found];
+                  else
+                      // Uniform smoothing
+                    prob = (prob*10000+1/2.0)/(10000+1.0);
+                }
+                  // Uniform smoothing
+                //prob = (prob*10000+1/2.0)/(10000+1.0);
+                gndPred->print(out, domain); out << " " << prob << endl;
+              }
+              else
+              {
+                if (amapPos) //if show postive ground query predicates only
+                {
+                  if (tv == TRUE)
+                  {
+                    ppred.printWithStrVar(out, domain);
+                    out << endl;
+                  }
+                }
+                else //print all ground query predicates
+                {
+                  ppred.printWithStrVar(out, domain);
+                  out << " " << tv << endl;
+                }
+              }
+              delete gndPred;          
+            }
+            else // Building queries
+            {
+                //if (tv == TRUE) gndPred->setProbTrue(1);
+          	    //else            gndPred->setProbTrue(0);
+              if (knownQueries->append(gndPred) < 0) delete gndPred;  
+            }
+          }
+        }
+      }
       
-    ppred.deleteVarsTypeIdArr(vtiArr);
-  } // for each query pred on command line
+      ppred.deleteVarsTypeIdArr(vtiArr);
+      predicate++;
+    } // for each query pred on command line
+    if (predArray->size() == 0)
+    {
+      if (queryConjs) queryConjs->removeLastItem();
+      delete predArray;
+    }    
+  } // for each query formula
 
   if (!printToFile)
   {
@@ -412,12 +475,13 @@ bool createComLineQueryPreds(const string& queryPredsStr,
                              Database* const & db,
                              GroundPredicateHashArray* const & queries,
                              GroundPredicateHashArray* const & knownQueries,
-                             Array<int>* const & allPredGndingsAreQueries)
+                             Array<int>* const & allPredGndingsAreQueries,
+                             Array<Array<Predicate* >* >* queryConjs)
 {
   return createComLineQueryPreds(queryPredsStr, domain, db,
                              	 queries, knownQueries,
                                  allPredGndingsAreQueries,
-                             	 false, cout, false, NULL, NULL);
+                             	 false, cout, false, NULL, NULL, queryConjs);
 }
 
 /**
@@ -443,13 +507,14 @@ bool extractPredNames(string preds, const string* queryFile,
   {
     preds.append(" "); //terminate preds with a whitespace
     
-      //replace the comma between query predicates with ' '
+      //replace the comma or semi-colon between query predicates with ' '
     int balparen = 0;
     for (unsigned int i = 0; i < preds.length(); i++)
     {
       if (preds.at(i) == '(')      balparen++;
       else if (preds.at(i) == ')') balparen--;
-      else if (preds.at(i) == ',' && balparen == 0) preds.at(i) = ' ';
+      else if ((preds.at(i) == ',' || preds.at(i) == ';') &&
+               balparen == 0) preds.at(i) = ' ';
     }
     
     while (preds.at(cur) == ' ') cur++;
@@ -459,7 +524,9 @@ bool extractPredNames(string preds, const string* queryFile,
       if (ws == string::npos) break;
       qpred = preds.substr(cur,ws-cur+1);
       cur = ws+1;
-      while (cur < preds.length() && preds.at(cur) == ' ') cur++;
+      while (cur < preds.length() &&
+             (preds.at(cur) == ' ' || preds.at(cur) == '^' ||
+              preds.at(cur) == '!')) cur++;
       ltparen = qpred.find("(",0);
       
       if (ltparen == string::npos) 
@@ -488,7 +555,9 @@ bool extractPredNames(string preds, const string* queryFile,
   while (getline(in, buffer))
   {
     cur = 0;
-    while (cur < buffer.length() && buffer.at(cur) == ' ') cur++;
+    while (cur < buffer.length() &&
+           (buffer.at(cur) == ' ' || buffer.at(cur) == '^' ||
+            buffer.at(cur) == '!')) cur++;
     ltparen = buffer.find("(", cur);
     if (ltparen == string::npos) continue;
     predName = buffer.substr(cur, ltparen-cur);
@@ -599,166 +668,305 @@ bool createQueryFilePreds(const string& queryFile,
                           GroundPredicateHashArray* const &knownQueries,
                           bool printToFile, ostream& out, bool amapPos,
                           const GroundPredicateHashArray* const &trueQueries,
-                          const Array<double>* const & trueProbs)
+                          const Array<double>* const & trueProbs,
+                          Array<Array<Predicate* >* >* queryConjs)
 {
   if (queryFile.length() == 0) return true;
 
   bool ret = true;
+  string predConj;
   ifstream in(queryFile.c_str());
-  unsigned int line = 0;
-  unsigned int cur;
-  int constId, predId;
-  bool ok;
-  string predStr, predName, constant;
-  Array<int> constIds;
-  const PredicateTemplate* ptemplate;
+  char delimit[2]; delimit[1] = '\0';
 
-  while (getline(in, predStr))
+    // for each query formula
+  while (getline(in, predConj))
   {
-    line++;
-    cur = 0;
-
-      // get predicate name
-    ok = Util::substr(predStr, cur, predName, "(");
-    if (!ok) continue;
-
-    predId = domain->getPredicateId(predName.c_str());
-    ptemplate = domain->getPredicateTemplate(predId);
-
-    if (predId < 0 || ptemplate == NULL)
+      // replace the ^ with '\n'
+    int balparen = 0;
+    for (unsigned int i = 0; i < predConj.length(); i++)
     {
-      cout << "ERROR: Cannot find " << predName << " in domain on line " 
-           << line << " of query file " << queryFile << endl;
-      ret = false;
-      continue;
+      if (predConj.at(i)=='(')                     balparen++;
+      else if (predConj.at(i)==')')                balparen--;
+      else if (predConj.at(i)=='^' && balparen==0) predConj.at(i) = '\n';
     }
 
-      // get constant name
-    constIds.clear();
-    while (Util::substr(predStr, cur, constant, ","))
+    bool onlyPredName;
+    unsigned int cur;
+    int termId, varIdCnt = 0;
+    hash_map<string, int, HashString, EqualString> varToId;
+    hash_map<string, int, HashString, EqualString>::iterator it;
+    Array<VarsTypeId*>* vtiArr;
+    string pred, predName, term;
+    istringstream iss2(predConj);
+    const PredicateTemplate* ptemplate;
+    int predicate = 0;
+
+    Array<Predicate* >* predArray = new Array<Predicate*>;
+    queryConjs->append(predArray);
+      // for each query pred on command line
+    while (getline(iss2, pred))
     {
-      constId = domain->getConstantId(constant.c_str());
-      constIds.append(constId);
-      if (constId < 0)
+      pred = Util::trim(pred);
+      onlyPredName = false;
+      varToId.clear();
+      varIdCnt = 0;
+      cur = 0;
+      bool negated = false;
+
+        // find if pred is negated
+      if (pred.at(0) == '!')
       {
-        cout << "ERROR: Cannot find " << constant << " in database on line " 
-             << line << " of query file " << queryFile << endl;
-        ret = false;
+        negated = true;
+        pred.at(0) = ' ';
+        pred = Util::trim(pred);
       }
-    }
-
-      // get constant name
-    ok = Util::substr(predStr, cur, constant, ")"); 
-    if (!ok)
-    {
-      cout << "ERROR: Failed to parse ground predicate on line " << line
-           << " of query file " << queryFile << endl;
-      ret = false;
-      continue;
-    }
-
-    constId = domain->getConstantId(constant.c_str());
-    constIds.append(constId);
-    if (constId < 0)
-    {
-      cout << "ERROR: Cannot find " << constant << " in database on line " 
-           << line << " of query file " << queryFile << endl;
-      ret = false;
-    }
-
-    if (!ret) continue;
-    ///////////////////////// done parsing ///////////////////////////////
-    
-      // create Predicate and set its truth value to UNKNOWN
-    if (constIds.size() != ptemplate->getNumTerms())
-    {
-      cout << "ERROR: incorrect number of terms for " << predName 
-           << ". Expected " << ptemplate->getNumTerms() << ", given " 
-           << constIds.size() << endl;
-      ret = false;
-      continue;
-    }
-    
-    Predicate pred(ptemplate);
-    for (int i = 0; i < constIds.size(); i++)
-    {
-      if (pred.getTermTypeAsInt(i) != domain->getConstantTypeId(constIds[i]))
+        // get predicate name
+      if (!Util::substr(pred, cur, predName, "("))
       {
-        cout << "ERROR: wrong type for term " 
-             << domain->getConstantName(constIds[i]) << " for predicate " 
-             << predName  << " on line " << line << " of query file " 
-             << queryFile << endl;
+        predName = pred;
+        onlyPredName = true;
+      }
+    
+        // Predicate must be in the domain
+      ptemplate = domain->getPredicateTemplate(predName.c_str());
+      if (ptemplate == NULL)
+      {
+        cout << "ERROR: Cannot find command line query predicate" << predName 
+             << " in domain." << endl;
         ret = false;
         continue;
       }
-      pred.appendTerm(new Term(constIds[i], (void*)&pred, true));
-    }
-    if (!ret) continue;
+      Predicate ppred(ptemplate);
 
-    assert(!db->isClosedWorld(predId));
-
-    TruthValue tv = db->getValue(&pred);
-    GroundPredicate* gndPred = new GroundPredicate(&pred);
-    
-    // If just printing to file, then all values must be known
-    if (printToFile) assert(tv != UNKNOWN);
-    if (tv == UNKNOWN)
-    {
-      if (queries->append(gndPred) < 0) delete gndPred;
-    }
-    else
-    {
-    	// If just printing to file
-      if (printToFile)
+        // if the terms of the query predicate are also specified
+      if (!onlyPredName)
       {
-
-          // If trueQueries is given as argument, then get prob. from there
-        if (trueQueries)
+          // get term name
+        for (int i = 0; i < 2; i++)
         {
-          double prob = 0.0;
-          if (domain->getDB()->getEvidenceStatus(&pred))
+          if (i == 0) delimit[0] = ',';
+          else        delimit[0] = ')';
+          while (Util::substr(pred, cur, term, delimit))
           {
-              // Don't print out evidence atoms
-            continue;
-            //prob = (tv == TRUE) ? 1.0 : 0.0;
-          }
-          else
-          {
-            int found = trueQueries->find(gndPred);
-            if (found >= 0) prob = (*trueProbs)[found];
+              // this is a constant
+            if (isupper(term.at(0)) || term.at(0) == '"' || isdigit(term.at(0)))
+            {
+              termId = domain->getConstantId(term.c_str());
+              if (termId < 0) 
+              {
+                cout <<"ERROR: Cannot find constant "<<term<<" in database"<<endl;
+                ret = false;
+              }
+            }
             else
-                // Uniform smoothing
-              prob = (prob*10000+1/2.0)/(10000+1.0);            
+            {   // it is a variable        
+              if ((it=varToId.find(term)) == varToId.end()) 
+              {
+                termId = --varIdCnt;
+                varToId[term] = varIdCnt; 
+              }
+              else
+                termId = (*it).second;
+            }
+            ppred.appendTerm(new Term(termId, (void*)&ppred, true));
           }
-          gndPred->print(out, domain); out << " " << prob << endl;
+        }
+      }
+      else
+      {   // if only the predicate name is specified
+          // HACK DEBUG
+        //(*allPredGndingsAreQueries)[ptemplate->getId()] = true;
+        for (int i = 0; i < ptemplate->getNumTerms(); i++)
+          ppred.appendTerm(new Term(--varIdCnt, (void*)&ppred, true));
+      }  
+
+        // Check if number of terms is correct
+      if (ppred.getNumTerms() != ptemplate->getNumTerms())
+      {
+        cout << "ERROR: " << predName << " requires " << ptemplate->getNumTerms()
+             << " terms but given " << ppred.getNumTerms() << endl;
+        ret = false;
+      }
+      if (!ret) continue;
+    
+      ///////////////////// create all groundings of predicate ///////////////
+      vtiArr = NULL;
+      ppred.createVarsTypeIdArr(vtiArr);
+
+        // If a ground predicate was specified on command line
+      if (vtiArr->size() <= 1)
+      {
+        assert(ppred.isGrounded());
+        assert(!db->isClosedWorld(ppred.getId()));
+        TruthValue tv = db->getValue(&ppred);
+
+        if (negated) ppred.setSense(false);
+        predArray->append(new Predicate(ppred));
+        
+        GroundPredicate* gndPred = new GroundPredicate(&ppred);
+          // If just printing to file, then all values must be known
+        if (printToFile) assert(tv != UNKNOWN);
+        if (tv == UNKNOWN)
+        {
+          if (queries->append(gndPred) < 0) delete gndPred;
         }
         else
         {
-          if (amapPos) //if show postive ground query predicates only
+            // If just printing to file
+          if (printToFile)
           {
-            if (tv == TRUE)
+              // If trueQueries is given as argument, then get prob. from there
+            if (trueQueries)
             {
-              pred.printWithStrVar(out, domain);
-              out << endl;
+              double prob = 0.0;
+              if (domain->getDB()->getEvidenceStatus(&ppred))
+              {
+                  // Don't print out evidence atoms
+                continue;
+                //prob = (tv == TRUE) ? 1.0 : 0.0;
+              }
+              else
+              {
+                int found = trueQueries->find(gndPred);
+                if (found >= 0) prob = (*trueProbs)[found];
+                else
+                    // Uniform smoothing
+                  prob = (prob*10000+1/2.0)/(10000+1.0);
+              
+              }
+              gndPred->print(out, domain); out << " " << prob << endl;
+            }
+            else
+            {
+              if (amapPos) //if show postive ground query predicates only
+              {
+                if (tv == TRUE)
+                {
+                  ppred.printWithStrVar(out, domain);
+                  out << endl;
+                }
+              }
+              else //print all ground query predicates
+              {
+                ppred.printWithStrVar(out, domain);
+                out << " " << tv << endl;
+              }
+            }
+            delete gndPred;
+          }
+          else // Building queries for HashArray
+          {
+            //if (tv == TRUE) gndPred->setProbTrue(1);
+            //else            gndPred->setProbTrue(0);
+            if (knownQueries->append(gndPred) < 0) delete gndPred;  
+          }
+        }      
+      }
+      else // Variables need to be grounded
+      {
+        ArraysAccessor<int> acc;
+        for (int i = 1; i < vtiArr->size(); i++)
+        {
+          const Array<int>* cons =
+            domain->getConstantsByType((*vtiArr)[i]->typeId);
+          acc.appendArray(cons);
+        } 
+
+          // form all groundings of the predicate
+        Array<int> constIds;
+        while (acc.getNextCombination(constIds))
+        {
+          assert(constIds.size() == vtiArr->size()-1);
+          for (int j = 0; j < constIds.size(); j++)
+          {
+            Array<Term*>& terms = (*vtiArr)[j+1]->vars;
+            for (int k = 0; k < terms.size(); k++)
+              terms[k]->setId(constIds[j]);
+          }
+
+          // at this point the predicate is grounded
+          assert(!db->isClosedWorld(ppred.getId()));
+ 
+          TruthValue tv = db->getValue(&ppred);        
+          GroundPredicate* gndPred = new GroundPredicate(&ppred);
+
+            // If just printing to file, then all values must be known
+          if (printToFile) assert(tv != UNKNOWN);
+          if (tv == UNKNOWN)
+          {
+            if (queries->append(gndPred) < 0) delete gndPred;
+          }
+          else
+          {
+              // If just printing to file
+            if (printToFile)
+            {
+                // If trueQueries is given as argument, then get prob. from there
+              if (trueQueries)
+              {
+                double prob = 0.0;
+                if (domain->getDB()->getEvidenceStatus(&ppred))
+                {
+                    // Don't print out evidence atoms
+                  continue;
+                  //prob = (tv == TRUE) ? 1.0 : 0.0;
+                }
+                else
+                {
+                  int found = trueQueries->find(gndPred);
+                  if (found >= 0) prob = (*trueProbs)[found];
+                  else
+                      // Uniform smoothing
+                    prob = (prob*10000+1/2.0)/(10000+1.0);
+                }
+                  // Uniform smoothing
+                //prob = (prob*10000+1/2.0)/(10000+1.0);
+                gndPred->print(out, domain); out << " " << prob << endl;
+              }
+              else
+              {
+                if (amapPos) //if show postive ground query predicates only
+                {
+                  if (tv == TRUE)
+                  {
+                    ppred.printWithStrVar(out, domain);
+                    out << endl;
+                  }
+                }
+                else //print all ground query predicates
+                {
+                  ppred.printWithStrVar(out, domain);
+                  out << " " << tv << endl;
+                }
+              }
+              delete gndPred;          
+            }
+            else // Building queries
+            {
+                //if (tv == TRUE) gndPred->setProbTrue(1);
+                //else            gndPred->setProbTrue(0);
+              if (knownQueries->append(gndPred) < 0) delete gndPred;  
             }
           }
-          else //print all ground query predicates
-          {
-            pred.printWithStrVar(out, domain);
-            out << " " << tv << endl;
-          }
         }
-        delete gndPred;
       }
-      else // Building queries
-      {
-        //if (tv == TRUE) gndPred->setProbTrue(1);
-      	//else            gndPred->setProbTrue(0);
-      	if (knownQueries->append(gndPred) < 0) delete gndPred;
-      }
-    }
-  } // while (getline(in, predStr))
+      
+      ppred.deleteVarsTypeIdArr(vtiArr);
+      predicate++;
+    } // for each query pred on command line
+    if (predArray->size() == 0)
+    {
+      if (queryConjs) queryConjs->removeLastItem();
+      delete predArray;
+    }    
+  } // fore each query formula
 
+  if (!printToFile)
+  {
+    queries->compress();
+    knownQueries->compress();
+  }
+  
   in.close();
   return ret;
 }
@@ -770,10 +978,11 @@ bool createQueryFilePreds(const string& queryFile,
 bool createQueryFilePreds(const string& queryFile, const Domain* const & domain,
                           Database* const & db,
                           GroundPredicateHashArray* const &queries,
-                          GroundPredicateHashArray* const &knownQueries)
+                          GroundPredicateHashArray* const &knownQueries,
+                          Array<Array<Predicate* >* >* queryConjs)
 {
   return createQueryFilePreds(queryFile, domain, db, queries, knownQueries,
-                              false, cout, false, NULL, NULL);
+                              false, cout, false, NULL, NULL, queryConjs);
 }
 
 
@@ -822,7 +1031,7 @@ int buildInference(Inference*& inference, Domain*& domain,
   }
 
   if (!asimtpInfer && !amapPos && !amapAll && !agibbsInfer && !amcsatInfer &&
-      !abpInfer)
+      !aHybrid && !aSA && !abpInfer && !aoutputNetwork)
   {
       // If nothing specified, use MC-SAT
     amcsatInfer = true;
@@ -938,6 +1147,7 @@ int buildInference(Inference*& inference, Domain*& domain,
   bpparams->convergenceThresh      = abpConvergenceThresh;
   bpparams->convergeRequiredItrCnt = abpConvergeRequiredItrCnt;
   bpparams->implicitRep            = !aexplicitRep;
+  bpparams->outputNetwork          = aoutputNetwork;
 
   //////////////////// read in clauses & evidence predicates //////////////////
 
@@ -981,6 +1191,7 @@ int buildInference(Inference*& inference, Domain*& domain,
 
     ///////////////////////// read & create query predicates ///////////////////
   Array<int> allPredGndingsAreQueries;
+  Array<Array<Predicate* >* >* queryFormulas =  new Array<Array<Predicate*> *>;
 
     // Eager inference: Build the queries for the mrf
     // Lazy version evaluates the query string / file when printing out
@@ -991,7 +1202,7 @@ int buildInference(Inference*& inference, Domain*& domain,
       cout << "Reading query predicates that are specified in query file..."
            << endl;
       bool ok = createQueryFilePreds(queryFile, domain, domain->getDB(),
-                                     &queries, &knownQueries);
+                                     &queries, &knownQueries, queryFormulas);
       if (!ok) { cout<<"Failed to create query predicates."<<endl; exit(-1); }
     }
 
@@ -1004,7 +1215,7 @@ int buildInference(Inference*& inference, Domain*& domain,
       GroundPredicateHashArray knePreds;
       bool ok = createComLineQueryPreds(queryPredsStr, domain, 
                                   domain->getDB(), &unePreds, &knePreds,
-                                  &allPredGndingsAreQueries);
+                                  &allPredGndingsAreQueries, queryFormulas);
       if (!ok) { cout<<"Failed to create query predicates."<<endl; exit(-1); }
 
       if (aisQueryEvidence)
@@ -1041,37 +1252,141 @@ int buildInference(Inference*& inference, Domain*& domain,
 
   bool trackClauseTrueCnts = false;
   VariableState* state = NULL;
-  if (abpInfer)
+  HVariableState* hstate = NULL;
+  FactorGraph* factorGraph = NULL;
+  
+  if (abpInfer || aoutputNetwork)
   {
-    inference = new BP(state, aSeed, trackClauseTrueCnts, bpparams, mln, domain);
+    factorGraph = new FactorGraph(bpparams->lifted, mln, domain, queryFormulas);
+    inference = new BP(factorGraph, bpparams, queryFormulas);
   }
   else
   {
       // Create inference algorithm and state based on queries and mln / domain
     bool markHardGndClauses = true;
     bool trackParentClauseWts = false;
-      // Lazy version: queries and allPredGndingsAreQueries are empty,
-      // markHardGndClause and trackParentClauseWts are not used
-    state = new VariableState(&queries, NULL, NULL,
-                              &allPredGndingsAreQueries,
-                              markHardGndClauses,
-                              trackParentClauseWts,
-                              mln, domain, aLazy);
-      // MAP inference, MC-SAT, Gibbs or Sim. Temp.
-    if (amapPos || amapAll || amcsatInfer || agibbsInfer || asimtpInfer)
+    if (aHybrid)
     {
-      if (amapPos || amapAll)
+        // Create inference algorithm and state based on queries and mln / domain
+      bool markHardGndClauses = true;
+      bool trackParentClauseWts = false;
+	  hstate = new HVariableState(&queries, NULL, NULL,
+		                          &allPredGndingsAreQueries,
+		                          markHardGndClauses,
+	                              trackParentClauseWts,
+		                          mln, domain, aLazy);
+
+	  //hstate->LoadContGroundedMLN(aContPartFile);
+        // Ground out cont. formulas
+      hstate->LoadContMLN();
+
+	  //hstate->WriteGndPredIdxMap(aGndPredIdxMapFile);
+	  hstate->bMaxOnly_ = amapPos;
+    }
+    else
+    {
+        // Lazy version: queries and allPredGndingsAreQueries are empty,
+        // markHardGndClause and trackParentClauseWts are not used
+      state = new VariableState(&queries, NULL, NULL,
+                                &allPredGndingsAreQueries,
+                                markHardGndClauses,
+                                trackParentClauseWts,
+                                mln, domain, aLazy);
+    }
+    
+    if (aGenRandom && aHybrid)
+    {
+	  hstate->setProposalStdev(aProposalStdev);
+	  hstate->initRandom();
+	  //hstate->printContAtoms()
+	  hstate->saveLowStateAll();
+	  ofstream oscont(atestcont), osdis(atestdis);
+	  hstate->printLowStateCont(oscont);
+	  hstate->printLowState(osdis);
+	  //return 0;
+    }
+
+    if (aStartPt && aHybrid)
+    {
+	  hstate->LoadDisEviValuesFromRst(atestdis);
+	  hstate->LoadContEviValues(atestcont);
+    }
+    if (aStartPt && !aHybrid)
+    {
+	  state->LoadDisEviValuesFromRst(atestdis);
+    }
+    
+      // MAP inference, MC-SAT, Gibbs or Sim. Temp.
+    if (amapPos || amapAll || amcsatInfer || agibbsInfer || asimtpInfer ||
+        aHybrid || aSA)
+    {
+      if ((amapPos || amapAll) && !aHybrid)
       { // MaxWalkSat
           // When standalone MWS, numSolutions is always 1
           // (maybe there is a better way to do this?)
         mwsparams->numSolutions = 1;
         inference = new MaxWalkSat(state, aSeed, trackClauseTrueCnts, mwsparams);
       }
-      else if (amcsatInfer)
+      else if (amapPos && aHybrid && !amcsatInfer && !aSA)
+	  {
+	    hstate->setProposalStdev(aProposalStdev);
+		  // maximizing all the numeric terms individually by l-bfgs, 
+		  // and cache the optimal solution for each term
+		hstate->optimizeIndividualNumTerm();
+		mwsparams->numSolutions = 1;
+		mwsparams->heuristic = HMWS;
+		inference = new HMaxWalkSat(hstate, aSeed, trackClauseTrueCnts,
+                                    mwsparams);		
+		HMaxWalkSat* p = (HMaxWalkSat*)inference;
+		p->SetNoisePra(anumerator, adenominator);
+		if (aMaxSeconds)
+		{
+		  p->SetMaxSeconds(atof(aMaxSeconds));
+		}
+		
+		if (aStartPt)
+		{
+		  hstate->setInitFromEvi(true);
+		}	
+	  }
+	  else if (amapPos && aHybrid && !amcsatInfer && aSA)
+	  {
+		hstate->setProposalStdev(aProposalStdev);
+		mwsparams->numSolutions = 1;
+		mwsparams->heuristic = HSA;
+		inference = new HMaxWalkSat(hstate, aSeed, trackClauseTrueCnts,
+                                    mwsparams);
+
+		HMaxWalkSat* p = (HMaxWalkSat*)inference;
+		//p->SetNoisePra(anumerator, adenominator);
+		p->setHeuristic(HSA);
+		p->setSATempDownRatio(aSATempDownRatio);
+		p->SetMaxSeconds(atof(aMaxSeconds));
+		p->SetSAInterval(saInterval);
+		if (aStartPt)
+		{
+          hstate->setInitFromEvi(true);
+		}
+	  }
+	  else if (aHybrid && amcsatInfer)
+	  {
+		cout << "Creating HMCSAT instance." << endl;
+		hstate->setProposalStdev(aProposalStdev);
+		if (aContSamples == NULL)
+		{
+			//cout << "Numeric sample file is error." <<endl;
+		}
+		inference = new HMCSAT(hstate, aSeed, trackClauseTrueCnts, msparams);
+		HMCSAT* p = (HMCSAT*) inference;
+		p->SetContSampleFile(aContSamples);
+        p->SetPrintVarsPerSample(aPrintSamplePerIteration);
+	  }
+      else if (amcsatInfer && !aHybrid)
       { // MC-SAT
-        inference = new MCSAT(state, aSeed, trackClauseTrueCnts, msparams);
+        inference = new MCSAT(state, aSeed, trackClauseTrueCnts, msparams,
+                              queryFormulas);
       }
-      else if (asimtpInfer)
+      else if (asimtpInfer && !aHybrid)
       { // Simulated Tempering
           // When MWS is used in Sim. Temp., numSolutions is always 1
           // (maybe there is a better way to do this?)
@@ -1079,7 +1394,7 @@ int buildInference(Inference*& inference, Domain*& domain,
         inference = new SimulatedTempering(state, aSeed, trackClauseTrueCnts,
                                            stparams);
       }
-      else if (agibbsInfer)
+      else if (agibbsInfer && !aHybrid)
       { // Gibbs sampling
           // When MWS is used in Gibbs, numSolutions is always 1
           // (maybe there is a better way to do this?)

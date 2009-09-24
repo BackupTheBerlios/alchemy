@@ -2,11 +2,11 @@
  * All of the documentation and software included in the
  * Alchemy Software is copyrighted by Stanley Kok, Parag
  * Singla, Matthew Richardson, Pedro Domingos, Marc
- * Sumner, Hoifung Poon, and Daniel Lowd.
+ * Sumner, Hoifung Poon, Daniel Lowd, and Jue Wang.
  * 
- * Copyright [2004-07] Stanley Kok, Parag Singla, Matthew
+ * Copyright [2004-09] Stanley Kok, Parag Singla, Matthew
  * Richardson, Pedro Domingos, Marc Sumner, Hoifung
- * Poon, and Daniel Lowd. All rights reserved.
+ * Poon, Daniel Lowd, and Jue Wang. All rights reserved.
  * 
  * Contact: Pedro Domingos, University of Washington
  * (pedrod@cs.washington.edu).
@@ -29,8 +29,9 @@
  * acknowledgment: "This product includes software
  * developed by Stanley Kok, Parag Singla, Matthew
  * Richardson, Pedro Domingos, Marc Sumner, Hoifung
- * Poon, and Daniel Lowd in the Department of Computer Science and
- * Engineering at the University of Washington".
+ * Poon, Daniel Lowd, and Jue Wang in the Department of
+ * Computer Science and Engineering at the University of
+ * Washington".
  * 
  * 4. Your publications acknowledge the use or
  * contribution made by the Software to your research
@@ -40,7 +41,7 @@
  * Statistical Relational AI", Technical Report,
  * Department of Computer Science and Engineering,
  * University of Washington, Seattle, WA.
- * http://www.cs.washington.edu/ai/alchemy.
+ * http://alchemy.cs.washington.edu.
  * 
  * 5. Neither the name of the University of Washington nor
  * the names of its contributors may be used to endorse or
@@ -617,6 +618,8 @@ double Clause::getConstantTuples(const Domain* const & domain,
             assert(varIds.size() == v);
           }
 
+          removeRedundantPredicates();
+
           if (clausedebug)
           {
             cout << "Clause is now: ";
@@ -762,6 +765,8 @@ inline void Clause::addConstantTuple(const Domain* const & domain,
     delete clause;
     return;
   }
+    // MS: weight stored in clause
+  //clause->setWt(wt_);
 
   itr = clauseToSuperClause->find(clause);
   if (itr == clauseToSuperClause->end())
@@ -770,13 +775,14 @@ inline void Clause::addConstantTuple(const Domain* const & domain,
       //at this point
     keyClause = new Clause(*clause);
     keyClause->setWt(1);
+    //keyClause->setWt(this->getWt());
 
     int varCnt = constants->size();
     varIdToCanonicalVarId = new Array<int>(varCnt, -1);
     keyClause->canonicalize(varIdToCanonicalVarId);
     canonicalEqVars = getCanonicalArray(eqVars, varIdToCanonicalVarId);
     superClause = new SuperClause(keyClause, canonicalEqVars,
-                                  varIdToCanonicalVarId, useImplicit);
+                                  varIdToCanonicalVarId, useImplicit, wt_);
     (*clauseToSuperClause)[clause] = superClause;
     delete canonicalEqVars;
     delete varIdToCanonicalVarId;
@@ -784,7 +790,9 @@ inline void Clause::addConstantTuple(const Domain* const & domain,
   else
   {
     superClause = itr->second;
-
+      // MS: weight added to clause
+    //superClause->getClause()->addWt(clause->getWt());
+    //superClause->addOutputWt(clause->getWt());
       //sort of a hack, but it works: 
       //may need to increase the size of varIdToCanonicalVarId map
     int varCnt = constants->size();
@@ -799,7 +807,9 @@ inline void Clause::addConstantTuple(const Domain* const & domain,
   varIdToCanonicalVarId = superClause->getVarIdToCanonicalVarId();
   canonicalConstants = getCanonicalArray(constants, varIdToCanonicalVarId);
   superClause->addNewConstantsAndIncrementCount(canonicalConstants,
+// MS: Changed to increment by 1, not the weight
                                                 this->getWt());
+//                                                1.0);
     //clean up
   delete canonicalConstants;
 }

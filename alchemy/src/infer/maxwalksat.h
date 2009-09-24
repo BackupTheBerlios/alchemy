@@ -79,7 +79,6 @@
 #include "sat.h"
 #include "maxwalksatparams.h"
 
-enum heuristics {RANDOM = 0, BEST = 1, TABU = 2, SS = 3};
 const bool mwsdebug = false;
 
 /**

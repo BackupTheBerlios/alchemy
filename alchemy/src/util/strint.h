@@ -2,11 +2,11 @@
  * All of the documentation and software included in the
  * Alchemy Software is copyrighted by Stanley Kok, Parag
  * Singla, Matthew Richardson, Pedro Domingos, Marc
- * Sumner, Hoifung Poon, and Daniel Lowd.
+ * Sumner, Hoifung Poon, Daniel Lowd, and Jue Wang.
  * 
- * Copyright [2004-07] Stanley Kok, Parag Singla, Matthew
+ * Copyright [2004-09] Stanley Kok, Parag Singla, Matthew
  * Richardson, Pedro Domingos, Marc Sumner, Hoifung
- * Poon, and Daniel Lowd. All rights reserved.
+ * Poon, Daniel Lowd, and Jue Wang. All rights reserved.
  * 
  * Contact: Pedro Domingos, University of Washington
  * (pedrod@cs.washington.edu).
@@ -29,8 +29,9 @@
  * acknowledgment: "This product includes software
  * developed by Stanley Kok, Parag Singla, Matthew
  * Richardson, Pedro Domingos, Marc Sumner, Hoifung
- * Poon, and Daniel Lowd in the Department of Computer Science and
- * Engineering at the University of Washington".
+ * Poon, Daniel Lowd, and Jue Wang in the Department of
+ * Computer Science and Engineering at the University of
+ * Washington".
  * 
  * 4. Your publications acknowledge the use or
  * contribution made by the Software to your research
@@ -40,7 +41,7 @@
  * Statistical Relational AI", Technical Report,
  * Department of Computer Science and Engineering,
  * University of Washington, Seattle, WA.
- * http://www.cs.washington.edu/ai/alchemy.
+ * http://alchemy.cs.washington.edu.
  * 
  * 5. Neither the name of the University of Washington nor
  * the names of its contributors may be used to endorse or
@@ -74,26 +75,32 @@ using namespace __gnu_cxx;
 struct StrInt
 {
  public:
-  StrInt() : str_(NULL), int_(-1) {}
+  StrInt() : str_(NULL), ints_(NULL) {}
 
   StrInt(const char* const & s, const int& i) 
   {
     str_ = new char[strlen(s)+1];
     strcpy(str_,s);
-    int_ = i;
+    ints_ = new Array<int>;
+    ints_->append(i);
   }
 
   StrInt(const char* const & s) 
   {
     str_ = new char[strlen(s)+1];
     strcpy(str_,s);
-    int_ = -1;
+    ints_ = NULL;
   }
 
-  ~StrInt() { delete [] str_; }
+  ~StrInt() { delete [] str_; delete ints_; }
+
+  void addInt(const int& i)
+  {
+    ints_->append(i);
+  }
 
   char* str_;
-  int int_;
+  Array<int>* ints_;
 };
 
 

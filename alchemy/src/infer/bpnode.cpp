@@ -2,11 +2,11 @@
  * All of the documentation and software included in the
  * Alchemy Software is copyrighted by Stanley Kok, Parag
  * Singla, Matthew Richardson, Pedro Domingos, Marc
- * Sumner, Hoifung Poon, and Daniel Lowd.
+ * Sumner, Hoifung Poon, Daniel Lowd, and Jue Wang.
  * 
- * Copyright [2004-08] Stanley Kok, Parag Singla, Matthew
+ * Copyright [2004-09] Stanley Kok, Parag Singla, Matthew
  * Richardson, Pedro Domingos, Marc Sumner, Hoifung
- * Poon, and Daniel Lowd. All rights reserved.
+ * Poon, Daniel Lowd, and Jue Wang. All rights reserved.
  * 
  * Contact: Pedro Domingos, University of Washington
  * (pedrod@cs.washington.edu).
@@ -29,8 +29,9 @@
  * acknowledgment: "This product includes software
  * developed by Stanley Kok, Parag Singla, Matthew
  * Richardson, Pedro Domingos, Marc Sumner, Hoifung
- * Poon, and Daniel Lowd in the Department of Computer Science and
- * Engineering at the University of Washington".
+ * Poon, Daniel Lowd, and Jue Wang in the Department of
+ * Computer Science and Engineering at the University of
+ * Washington".
  * 
  * 4. Your publications acknowledge the use or
  * contribution made by the Software to your research
@@ -40,7 +41,7 @@
  * Statistical Relational AI", Technical Report,
  * Department of Computer Science and Engineering,
  * University of Washington, Seattle, WA.
- * http://www.cs.washington.edu/ai/alchemy.
+ * http://alchemy.cs.washington.edu.
  * 
  * 5. Neither the name of the University of Washington nor
  * the names of its contributors may be used to endorse or
@@ -158,6 +159,32 @@ void BPNode::sendMessage()
   delete [] outMsgs;
 }
 
+  //send the messages to all the auxiliary factor nodes connected to this node
+void BPNode::sendAuxMessage()
+{
+  BPLink *link;
+  BPFactor *factor;
+  double cnt;
+  //double *msgs;
+  double *outMsgs = new double[2];
+
+  for (int lindex = 0; lindex < auxLinks_->size(); lindex++)
+  {
+    link = (*auxLinks_)[lindex];
+    factor = link->getFactor();
+    cnt = link->getCount();
+    for (int i = 0; i < 2; i++)
+    {
+      outMsgs[i] = msgProds_[i];
+    }
+
+      //Assumes pass by value copy of the messages
+    factor->receiveMessage(outMsgs, link);
+  }
+  delete [] outMsgs;
+}
+
+
   //update the stored msgs and update the msgProduct
 void BPNode::moveToNextStep()
 {
@@ -178,7 +205,12 @@ void BPNode::moveToNextStep()
     msgs = (*msgsArr_)[lindex];
     nextMsgs = (*nextMsgsArr_)[lindex];
 
-    cnt = (*links_)[lindex]->getCount();
+      // MS: Weight of clause, but should be count of nodes belonging to supernode
+    if (superPred_)
+      cnt = superPred_->getNumTuples();
+    else
+      cnt = 1;
+    //cnt = (*links_)[lindex]->getCount();
     for (int i = 0; i < 2; i++)
     {
       msgs[i] = nextMsgs[i];

@@ -2,11 +2,11 @@
  * All of the documentation and software included in the
  * Alchemy Software is copyrighted by Stanley Kok, Parag
  * Singla, Matthew Richardson, Pedro Domingos, Marc
- * Sumner, Hoifung Poon, and Daniel Lowd.
+ * Sumner, Hoifung Poon, Daniel Lowd, and Jue Wang.
  * 
- * Copyright [2004-07] Stanley Kok, Parag Singla, Matthew
+ * Copyright [2004-09] Stanley Kok, Parag Singla, Matthew
  * Richardson, Pedro Domingos, Marc Sumner, Hoifung
- * Poon, and Daniel Lowd. All rights reserved.
+ * Poon, Daniel Lowd, and Jue Wang. All rights reserved.
  * 
  * Contact: Pedro Domingos, University of Washington
  * (pedrod@cs.washington.edu).
@@ -29,8 +29,9 @@
  * acknowledgment: "This product includes software
  * developed by Stanley Kok, Parag Singla, Matthew
  * Richardson, Pedro Domingos, Marc Sumner, Hoifung
- * Poon, and Daniel Lowd in the Department of Computer Science and
- * Engineering at the University of Washington".
+ * Poon, Daniel Lowd, and Jue Wang in the Department of
+ * Computer Science and Engineering at the University of
+ * Washington".
  * 
  * 4. Your publications acknowledge the use or
  * contribution made by the Software to your research
@@ -40,7 +41,7 @@
  * Statistical Relational AI", Technical Report,
  * Department of Computer Science and Engineering,
  * University of Washington, Seattle, WA.
- * http://www.cs.washington.edu/ai/alchemy.
+ * http://alchemy.cs.washington.edu.
  * 
  * 5. Neither the name of the University of Washington nor
  * the names of its contributors may be used to endorse or
@@ -63,7 +64,6 @@
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  * 
  */
-
 #include <unistd.h>
 #include <fstream>
 #include <climits>
@@ -122,6 +122,10 @@ ARGS ARGS::Args[] =
        "Run inference using simulated tempering and return probabilities "
        "for all query atoms"),
 
+  ARGS("outputNetwork", ARGS::Tog, aoutputNetwork,
+       "Build the network and output to results file, instead of "
+       "running inference"),
+
   ARGS("counts", ARGS::Tog, aclauseCounts,
        "Write clause counts, not atom values or probabilities"),
 
@@ -139,6 +143,57 @@ ARGS ARGS::Args[] =
   ARGS("memLimit", ARGS::Opt, aMemLimit, 
        "[-1] Maximum limit in kbytes which should be used for inference. "
        "-1 means main memory available on system is used."),
+
+  ARGS("GndPredIdxMapFile", ARGS::Opt, aGndPredIdxMapFile,
+       "File containing the mapping from ground predicates (dis & num) to their idx"),
+  
+  ARGS("PrintSamplePerIteration", ARGS::Opt, aPrintSamplePerIteration,
+       "Whether to print out variable values at each HMCS sample round."),
+	
+  ARGS("SAInterval", ARGS::Opt, saInterval, "SA interval"),
+
+  ARGS("MaxSeconds", ARGS::Opt, aMaxSeconds, "Max seconds for HMWS and SA."),
+
+  ARGS("StartPt", ARGS::Opt, aStartPt,
+       "Starting from a fixed point, load from testcont and testdis."),    
+
+  ARGS("GenRandom", ARGS::Opt, aGenRandom,
+       "Generate random assignment as starting point, saving in testcont and testdis."),
+
+  ARGS("SATempDownRation", ARGS::Opt, aSATempDownRatio, "simulated annealing temperature degrade ratio."),
+
+  ARGS("SA", ARGS::Opt, aSA, "simulated annealing inference."),
+
+  ARGS("MWSRST", ARGS::Opt, aMWSrst, "Result file for MaxwalkSAT inference."),
+
+  ARGS("noisynum", ARGS::Opt, anumerator, 
+       "numerator value for noisy pick in HMWS."),    
+
+  ARGS("noisyden", ARGS::Opt, adenominator, 
+       "denominator value for noisy pick in HMWS."),    
+
+  ARGS("hmwsDis", ARGS::Opt, aHMWSDis, 
+       "dis inference result file for hybrid maxwalksat."),    
+
+  ARGS("testcont", ARGS::Opt, atestcont, 
+       "file path containing assignment to cont variables."),    
+
+  ARGS("testdis", ARGS::Opt, atestdis, 
+       "file path containing assignment to dis variables."),    
+
+  ARGS("mwsMax", ARGS::Opt, aMaxOrNot, 
+       "[false] (MaxWalkSat) If false,MC-SAT uses WalkSAT, if true, MC-SAT "
+       "uses max-WalkSAT. "),  
+
+  ARGS("hybrid", ARGS::Opt, aHybrid, 
+	   "Flag for HMLN inference."),
+
+  ARGS("propstdev", ARGS::Opt, aProposalStdev, 
+	   "[1.0]Proposal stdev for SA step in HybridSAT."),
+
+  ARGS("contSamples", ARGS::Opt, aContSamples, 
+	   "output file for continuous variable samples."),
+
     // END: Common inference arguments
 
     // BEGIN: MaxWalkSat args
@@ -281,6 +336,82 @@ ARGS ARGS::Args[] =
 };
 
 
+void printResults(const string& queryFile, const string& queryPredsStr,
+				  Domain *domain, ostream& out, 
+				  GroundPredicateHashArray* const &queries,
+				  Inference* const &inference, HVariableState* const &state)
+{
+    // Lazy version: Have to generate the queries from the file or query string.
+    // This involves calling createQueryFilePreds / createComLineQueryPreds
+  if (aLazy)
+  {
+    const GroundPredicateHashArray* gndPredHashArray = NULL;
+    Array<double>* gndPredProbs = NULL;
+      // Inference algorithms with probs: have to retrieve this info from state.
+      // These are the ground preds which have been brought into memory. All
+      // others have always been false throughout sampling.
+    if (!(amapPos || amapAll))
+    {
+      gndPredHashArray = state->getGndPredHashArrayPtr();
+      gndPredProbs = new Array<double>;
+      gndPredProbs->growToSize(gndPredHashArray->size());
+      for (int i = 0; i < gndPredProbs->size(); i++)
+        (*gndPredProbs)[i] = inference->getProbabilityH((*gndPredHashArray)[i]);
+    }
+
+    if (queryFile.length() > 0)
+    {
+      cout << "Writing query predicates that are specified in query file..."
+           << endl;
+      bool ok = createQueryFilePreds(queryFile, domain, domain->getDB(),
+                                     NULL, NULL, true, out, amapPos,
+                                     gndPredHashArray, gndPredProbs, NULL);
+      if (!ok)
+      {
+        cout <<"Failed to create query predicates."<< endl;
+        exit(-1);
+      }
+    }
+
+    Array<int> allPredGndingsAreQueries;
+    allPredGndingsAreQueries.growToSize(domain->getNumPredicates(), false);
+    if (queryPredsStr.length() > 0)
+    {
+      cout << "Writing query predicates that are specified on command line..." 
+           << endl;
+      bool ok = createComLineQueryPreds(queryPredsStr, domain,
+                                        domain->getDB(), NULL, NULL,
+                                        &allPredGndingsAreQueries, true,
+                                        out, amapPos, gndPredHashArray,
+                                        gndPredProbs, NULL);
+      if (!ok)
+      {
+        cout <<"Failed to create query predicates."<< endl; exit(-1);
+      }
+    }
+
+    if (!(amapPos || amapAll))
+      delete gndPredProbs;
+  }
+    // Eager version: Queries have already been generated and we can get the
+    // information directly from the state
+  else
+  {
+    if (amapPos)
+      inference->printTruePredsH(out);
+    else
+    {
+      for (int i = 0; i < queries->size(); i++)
+      {
+          // Prob is smoothed in inference->getProbability
+        double prob = inference->getProbabilityH((*queries)[i]);
+        (*queries)[i]->print(out, domain); out << " " << prob << endl;
+      }
+    }
+  }
+}
+
+
 /**
  * Prints the results of inference to a stream.
  * 
@@ -412,7 +543,7 @@ void printResults(const string& queryFile, const string& queryPredsStr,
            << endl;
       bool ok = createQueryFilePreds(queryFile, domain, domain->getDB(), NULL,
                                      NULL, true, out, amapPos,
-                                     gndPredHashArray, gndPredProbs);
+                                     gndPredHashArray, gndPredProbs, NULL);
       if (!ok) { cout <<"Failed to create query predicates."<< endl; exit(-1); }
     }
 
@@ -425,7 +556,7 @@ void printResults(const string& queryFile, const string& queryPredsStr,
       bool ok = createComLineQueryPreds(queryPredsStr, domain, domain->getDB(), 
                                         NULL, NULL, &allPredGndingsAreQueries,
                                         true, out, amapPos, gndPredHashArray,
-                                        gndPredProbs);
+                                        gndPredProbs, NULL);
       if (!ok) { cout <<"Failed to create query predicates."<< endl; exit(-1); }
     }
 
@@ -440,18 +571,12 @@ void printResults(const string& queryFile, const string& queryPredsStr,
       inference->printTruePreds(out);
     else
     {
-      if (abpInfer)
+      inference->printQFProbs(out, domain);
+      for (int i = 0; i < queries->size(); i++)
       {
-        inference->printProbabilities(out);
-      }
-      else
-      {
-        for (int i = 0; i < queries->size(); i++)
-        {
-            // Prob is smoothed in inference->getProbability
-          double prob = inference->getProbability((*queries)[i]);
-          (*queries)[i]->print(out, domain); out << " " << prob << endl;
-        }
+          // Prob is smoothed in inference->getProbability
+        double prob = inference->getProbability((*queries)[i]);
+        (*queries)[i]->print(out, domain); out << " " << prob << endl;
       }
     }
   }
@@ -486,9 +611,27 @@ int main(int argc, char* argv[])
                      queryPredValues) > -1)
   {
     inference->init();
-    inference->infer();
-	printResults(queryFile, queryPredsStr, domain, resultsOut, &queries,
-                 inference, inference->getState());
+      // No inference, just output network
+    if (aoutputNetwork)
+    {
+      cout << "Writing network to file ..." << endl;
+      inference->printNetwork(resultsOut);
+    }
+      // Perform inference
+    else
+    {
+      inference->infer();
+      if (aHybrid && !amapPos)
+	  { 
+	    printResults(queryFile, queryPredsStr, domain, resultsOut, &queries,
+                     inference, inference->getHState());	
+	  }
+      else
+      {
+	    printResults(queryFile, queryPredsStr, domain, resultsOut, &queries,
+                     inference, inference->getState());
+      }
+    }
   }
 
   resultsOut.close();

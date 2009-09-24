@@ -2,11 +2,11 @@
  * All of the documentation and software included in the
  * Alchemy Software is copyrighted by Stanley Kok, Parag
  * Singla, Matthew Richardson, Pedro Domingos, Marc
- * Sumner, Hoifung Poon, and Daniel Lowd.
+ * Sumner, Hoifung Poon, Daniel Lowd, and Jue Wang.
  * 
- * Copyright [2004-07] Stanley Kok, Parag Singla, Matthew
+ * Copyright [2004-09] Stanley Kok, Parag Singla, Matthew
  * Richardson, Pedro Domingos, Marc Sumner, Hoifung
- * Poon, and Daniel Lowd. All rights reserved.
+ * Poon, Daniel Lowd, and Jue Wang. All rights reserved.
  * 
  * Contact: Pedro Domingos, University of Washington
  * (pedrod@cs.washington.edu).
@@ -29,8 +29,9 @@
  * acknowledgment: "This product includes software
  * developed by Stanley Kok, Parag Singla, Matthew
  * Richardson, Pedro Domingos, Marc Sumner, Hoifung
- * Poon, and Daniel Lowd in the Department of Computer Science and
- * Engineering at the University of Washington".
+ * Poon, Daniel Lowd, and Jue Wang in the Department of
+ * Computer Science and Engineering at the University of
+ * Washington".
  * 
  * 4. Your publications acknowledge the use or
  * contribution made by the Software to your research
@@ -40,7 +41,7 @@
  * Statistical Relational AI", Technical Report,
  * Department of Computer Science and Engineering,
  * University of Washington, Seattle, WA.
- * http://www.cs.washington.edu/ai/alchemy.
+ * http://alchemy.cs.washington.edu.
  * 
  * 5. Neither the name of the University of Washington nor
  * the names of its contributors may be used to endorse or
@@ -123,6 +124,7 @@ double cg_lambda = 100;
 double cg_max_lambda = DBL_MAX;
 bool   cg_noprecond = false;
 int amwsMaxSubsequentSteps = -1;
+char* ainDBListFile = NULL;
 
 
   // Inference arguments needed for disc. learning defined in inferenceargs.h
@@ -335,11 +337,15 @@ ARGS ARGS::Args[] =
   ARGS("o", ARGS::Req, outMLNFile, 
        "Output .mln file containing formulas with learned weights."),
 
-  ARGS("t", ARGS::Req, dbFiles, 
+  ARGS("t", ARGS::Opt, dbFiles, 
        "Comma-separated .db files containing the training database "
        "(of true/false ground atoms), including function definitions, "
        "e.g. ai.db,graphics.db,languages.db."),
-
+  
+  ARGS("l", ARGS::Opt, ainDBListFile, 
+       "list of database files used in learning"
+       ", each line contains a pointer to a database file."),
+    
   ARGS("ne", ARGS::Opt, nonEvidPredsStr, 
        "First-order non-evidence predicates (comma-separated with no space),  "
        "e.g., cancer,smokes,friends. For discriminative learning, at least "
@@ -452,6 +458,17 @@ ARGS ARGS::Args[] =
 };
 
 //bool extractPredNames(...) defined in infer.h
+
+void loadArray(const char* file, Array<string>& array)
+{
+  ifstream is(file);
+  array.clear();
+  string line;
+  while (getline(is, line))
+  {
+    array.append(line);
+  }
+}
 
 int main(int argc, char* argv[])
 {
@@ -592,12 +609,20 @@ int main(int argc, char* argv[])
 
     //extract .mln and .db, file names
   Array<string> constFilesArr;
-  Array<string> dbFilesArr;
   extractFileNames(ainMLNFiles, constFilesArr);
   assert(constFilesArr.size() >= 1);
   string inMLNFile = constFilesArr[0];
   constFilesArr.removeItem(0);
-  extractFileNames(dbFiles, dbFilesArr);
+
+  Array<string> dbFilesArr;
+  if (NULL != dbFiles)
+  {
+    extractFileNames(dbFiles, dbFilesArr);
+  }
+  else
+  {
+    loadArray(ainDBListFile, dbFilesArr);
+  }
 
   if (dbFilesArr.size() <= 0)
   {cout<<"ERROR: must specify training data with -t option."<<endl; return -1;}
@@ -714,10 +739,12 @@ int main(int argc, char* argv[])
       }
     }
   }
-  // HACK -- not sure if this is right... but the old version was broke!
-  // This may fail when there's an indexTrans.  [Daniel]
-  //int numClausesFormulas = priorMeans.size();
-  int numClausesFormulas = mlns[0]->getClauses()->size();
+
+  int numClausesFormulas;
+  if (indexTrans)
+      numClausesFormulas = indexTrans->getNumClausesAndExistFormulas();
+  else
+      numClausesFormulas = mlns[0]->getClauses()->size();
 
 
   //////////////////////  discriminative/generative learning /////////////////
@@ -804,6 +831,19 @@ int main(int argc, char* argv[])
     Array<int> allPredGndingsAreNonEvid;
     Array<Predicate*> ppreds;
     
+      // Need to set some dummy weight (only in mln0 as clauses are shared)
+//      for (int j = 0; j < mln->getNumClauses(); j++)
+//        ((Clause*) mln->getClause(j))->setWt(1);
+    for (int j = 0; j < mlns[0]->getNumClauses(); j++) 
+    {
+      Clause* c = (Clause*) mlns[0]->getClause(j);
+        // If the weight was set to non-zero in the source MLN,
+        // don't modify it while learning.
+      if (c->getWt() != 0)
+        c->lock();
+      c->setWt(1);
+    }
+
     for (int i = 0; i < domains.size(); i++)
     {
       Domain* domain = domains[i];
@@ -841,10 +881,6 @@ int main(int argc, char* argv[])
       GroundPredicateHashArray* knePreds = NULL;
       Array<TruthValue>* knePredValues = NULL;
 
-        // Need to set some dummy weight
-      for (int j = 0; j < mln->getNumClauses(); j++)
-        ((Clause*) mln->getClause(j))->setWt(1);
-
 		// Make open-world evidence preds into non-evidence
       if (!allPredsExceptQueriesAreCW)
       {
@@ -870,7 +906,7 @@ int main(int argc, char* argv[])
           //defined in infer.h
         createComLineQueryPreds(nePredsStr, domain, domain->getDB(), 
                                 unePreds, knePreds, 
-                                &allPredGndingsAreNonEvid);
+                                &allPredGndingsAreNonEvid, NULL);
 
           // Pred values not set to unknown in DB: unePreds contains
           // unknown, knePreds contains known non-evidence

@@ -239,15 +239,16 @@ class DiscriminativeLearner
       int clauseCnt = clauseCntPerDomain_[0];
       for (int i = 0; i < domainCnt_; i++)
       {
-        Array<bool>& relevantClauses = relevantClausesPerDomain_[i];
         assert(clauseCntPerDomain_[i] == clauseCnt);
         const MLN* mln = inferences_[i]->getState()->getMLN();
         
+        // Clauses are typically shared among MLNs for different
+        // domains, so many of these calls to setWt() are redundant.
+        // However, it doesn't hurt to set the same weight twice.
         for (int j = 0; j < clauseCnt; j++) 
         {
           Clause* c = (Clause*) mln->getClause(j);
-          if (relevantClauses[j]) c->setWt(weights[j]);
-          else                    c->setWt(0);
+          c->setWt(weights[j]);
         }
       }
     }
@@ -1450,8 +1451,9 @@ class DiscriminativeLearner
     }
     if (!lazyInference_) trainCnts = trainTrueCnts_[domainIdx];
 
-      // DEBUG
-    cout << "numSamples = " << numSamples << endl;
+    if (dldebug)
+      cout << "numSamples = " << numSamples << endl;
+
       //loop over all the training examples
     //cout << "\t\ttrain count\t\t\t\tinferred count" << endl << endl;
     for (int clauseno = 0; clauseno < clauseCnt; clauseno++) 
@@ -1554,7 +1556,7 @@ class DiscriminativeLearner
     {
 	  for (int i = 0; i < numWts; i++) 
       {
-        if (!relevantClausesFormulas_[i]) continue;
+        //if (!relevantClausesFormulas_[i]) continue;
         double sd = priorStdDevs_[i];
         double priorDerivative = (weights[i]-priorMeans_[i])/(sd*sd);
         //cout << i << " : " << "gradient : " << gradient[i]

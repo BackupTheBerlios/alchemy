@@ -55,21 +55,26 @@ OBJS=$(OBJDIR)/arguments.o $(OBJDIR)/powerset.o \
 	$(OBJDIR)/predicatetemplate.o $(OBJDIR)/functiontemplate.o \
 	$(OBJDIR)/function.o $(OBJDIR)/predicate.o $(OBJDIR)/term.o \
 	$(OBJDIR)/domain.o $(OBJDIR)/clause.o $(OBJDIR)/clausesampler.o \
+	$(OBJDIR)/Polynomial.o $(OBJDIR)/random.o \
+	$(OBJDIR)/logichelper.o \
 	$(OBJDIR)/groundclause.o $(OBJDIR)/superpred.o \
 	$(OBJDIR)/superclause.o \
-	$(OBJDIR)/bpnode.o $(OBJDIR)/bpfactor.o
+	$(OBJDIR)/node.o $(OBJDIR)/factor.o
 
 #add .cpp files (including executables') to CPPFILES.
-CPPFILES=$(UTIL)/arguments.cpp $(UTIL)/powerset.cpp \
+CPPFILES=$(UTIL)/arguments.cpp $(UTIL)/powerset.cpp $(UTIL)/random.cpp\
 	$(PARSER)/fol.cpp $(PARSER)/listobj.cpp \
 	$(LOGIC)/predicatetemplate.cpp $(LOGIC)/functiontemplate.cpp \
 	$(LOGIC)/function.cpp $(LOGIC)/predicate.cpp $(LOGIC)/term.cpp \
 	$(LOGIC)/domain.cpp  $(LOGIC)/clause.cpp $(LOGIC)/clausesampler.cpp\
 	$(INFER)/groundclause.cpp \
 	$(LEARNWTS)/learnwts.cpp $(INFER)/infer.cpp \
-	$(LEARNSTRUCT)/learnstruct.cpp $(INFER)/superpred.cpp \
+	$(LEARNSTRUCT)/learnstruct.cpp \
+	$(LOGIC)/Polynomial.cpp\
+	$(LOGIC)/logichelper.cpp\
+	$(INFER)/superpred.cpp \
 	$(INFER)/superclause.cpp \
-	$(INFER)/bpnode.cpp $(INFER)/bpfactor.cpp
+	$(INFER)/node.cpp $(INFER)/factor.cpp
 
 ##############################################################################
 #EXECUTABLES: add executables rules here
@@ -121,6 +126,9 @@ $(OBJDIR)/arguments.o:
 $(OBJDIR)/powerset.o:
 	$(GPP) $(CFLAGS) -o $(OBJDIR)/powerset.o -c $(UTIL)/powerset.cpp
 
+$(OBJDIR)/random.o:
+	$(GPP) $(CFLAGS) -o $(OBJDIR)/random.o -c $(UTIL)/random.cpp
+
 $(OBJDIR)/listobj.o:
 	$(GPP) $(CFLAGS) -o $(OBJDIR)/listobj.o -c $(PARSER)/listobj.cpp 
 
@@ -151,17 +159,23 @@ $(OBJDIR)/clausesampler.o:
 $(OBJDIR)/groundclause.o:
 	$(GPP) $(CFLAGS) -o $(OBJDIR)/groundclause.o -c $(INFER)/groundclause.cpp
 
+$(OBJDIR)/Polynomial.o:
+	$(GPP) $(CFLAGS) -o $(OBJDIR)/Polynomial.o -c $(LOGIC)/Polynomial.cpp
+	
+$(OBJDIR)/logichelper.o:
+	$(GPP) $(CFLAGS) -o $(OBJDIR)/logichelper.o -c $(LOGIC)/logichelper.cpp
+
 $(OBJDIR)/superpred.o:
 	$(GPP) $(CFLAGS) -o $(OBJDIR)/superpred.o -c $(INFER)/superpred.cpp
 
 $(OBJDIR)/superclause.o:
 	$(GPP) $(CFLAGS) -o $(OBJDIR)/superclause.o -c $(INFER)/superclause.cpp
 
-$(OBJDIR)/bpnode.o:
-	$(GPP) $(CFLAGS) -o $(OBJDIR)/bpnode.o -c $(INFER)/bpnode.cpp
+$(OBJDIR)/node.o:
+	$(GPP) $(CFLAGS) -o $(OBJDIR)/node.o -c $(INFER)/node.cpp
 
-$(OBJDIR)/bpfactor.o:
-	$(GPP) $(CFLAGS) -o $(OBJDIR)/bpfactor.o -c $(INFER)/bpfactor.cpp
+$(OBJDIR)/factor.o:
+	$(GPP) $(CFLAGS) -o $(OBJDIR)/factor.o -c $(INFER)/factor.cpp
 
 ###############################################################################
 
@@ -187,5 +201,3 @@ depend:
 	@mv $(MF).new $(MF)
 
 ############ Everything below here is subject to SUDDEN DEATH #####
-
-

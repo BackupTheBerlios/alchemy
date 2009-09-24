@@ -2,11 +2,11 @@
  * All of the documentation and software included in the
  * Alchemy Software is copyrighted by Stanley Kok, Parag
  * Singla, Matthew Richardson, Pedro Domingos, Marc
- * Sumner, Hoifung Poon, and Daniel Lowd.
+ * Sumner, Hoifung Poon, Daniel Lowd, and Jue Wang.
  * 
- * Copyright [2004-08] Stanley Kok, Parag Singla, Matthew
+ * Copyright [2004-09] Stanley Kok, Parag Singla, Matthew
  * Richardson, Pedro Domingos, Marc Sumner, Hoifung
- * Poon, and Daniel Lowd. All rights reserved.
+ * Poon, Daniel Lowd, and Jue Wang. All rights reserved.
  * 
  * Contact: Pedro Domingos, University of Washington
  * (pedrod@cs.washington.edu).
@@ -29,8 +29,9 @@
  * acknowledgment: "This product includes software
  * developed by Stanley Kok, Parag Singla, Matthew
  * Richardson, Pedro Domingos, Marc Sumner, Hoifung
- * Poon, and Daniel Lowd in the Department of Computer Science and
- * Engineering at the University of Washington".
+ * Poon, Daniel Lowd, and Jue Wang in the Department of
+ * Computer Science and Engineering at the University of
+ * Washington".
  * 
  * 4. Your publications acknowledge the use or
  * contribution made by the Software to your research
@@ -40,7 +41,7 @@
  * Statistical Relational AI", Technical Report,
  * Department of Computer Science and Engineering,
  * University of Washington, Seattle, WA.
- * http://www.cs.washington.edu/ai/alchemy.
+ * http://alchemy.cs.washington.edu.
  * 
  * 5. Neither the name of the University of Washington nor
  * the names of its contributors may be used to endorse or
@@ -90,9 +91,11 @@ void BPFactor::initFactorMesssages()
         break;
       }
     }
-                   
-    if(isSatisfied)
+
+    if (isSatisfied)
     {
+        // Always 1
+        // MS: should be weight of clause in ground network (super or ground)
       factorMsgs_[state] = clause_->getWt();
     }
     else
@@ -140,15 +143,20 @@ double* BPFactor::multiplyMessagesAndSumOut(int inpPredIndex)
       //averages (weighted) out the messages from various 
       //supernodes (at this predIndex position).
     assert(gndNodeCnts[predIndex] != 0);
-    double wt = node->getGroundNodeCount()/gndNodeCnts[predIndex];
+      //MS: Ground: should be 1, super: should be # of ground clauses in super clause
+    //double cnt = node->getGroundNodeCount()/gndNodeCnts[predIndex];
+    double cnt = 1;
+    if (superClause_)
+      cnt = superClause_->getNumTuplesIncludingImplicit();
 
     for (int state = 0; state < stateCnt; state++)
     {
       bool predBit = state & (1<<predIndex);
       if (predBit)
-        prodMsgs[state] += (*msgsArr_)[lno][1]*wt;
+        prodMsgs[state] += (*msgsArr_)[lno][1]*cnt;
       else
-        prodMsgs[state] += (*msgsArr_)[lno][0]*wt;
+        prodMsgs[state] += (*msgsArr_)[lno][0]*cnt;
+//cout << state << " state " << predBit << " " << prodMsgs[state] << endl;
     }
   }
 
@@ -232,5 +240,44 @@ void BPFactor::moveToNextStep()
       nextMsgs[i] = 0;
     }
   }
+}
+
+/**
+ * Prints the factor as its variables separated by "/".
+ */
+ostream& BPFactor::print(ostream& out)
+{
+  /*
+  if (superClause_ != NULL)
+  {
+    printArray(*(superClause_->getConstantTuple(0)), 1, out);
+  }
+  else
+  {
+    printArray(*constants_,1,out);
+  }
+  out << "// ";
+  */
+    
+  for (int i = 0; i < links_->size(); i++)
+  {
+    (*links_)[i]->getNode()->print(out);
+    if (i != links_->size() - 1) out << "/ ";
+  }
+  
+  return out;
+}
+
+/**
+ * Prints the weighted features for all states of the variables.
+ */
+ostream& BPFactor::printWts(ostream& out)
+{
+  for (int i = 0; i < (int)pow(2.0, clause_->getNumPredicates()); i++)
+  {
+    out << factorMsgs_[i] * outputWt_ << " ";
+  }
+  
+  return out;
 }
 

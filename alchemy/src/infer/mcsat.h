@@ -2,11 +2,11 @@
  * All of the documentation and software included in the
  * Alchemy Software is copyrighted by Stanley Kok, Parag
  * Singla, Matthew Richardson, Pedro Domingos, Marc
- * Sumner, Hoifung Poon, and Daniel Lowd.
+ * Sumner, Hoifung Poon, Daniel Lowd, and Jue Wang.
  * 
- * Copyright [2004-07] Stanley Kok, Parag Singla, Matthew
+ * Copyright [2004-09] Stanley Kok, Parag Singla, Matthew
  * Richardson, Pedro Domingos, Marc Sumner, Hoifung
- * Poon, and Daniel Lowd. All rights reserved.
+ * Poon, Daniel Lowd, and Jue Wang. All rights reserved.
  * 
  * Contact: Pedro Domingos, University of Washington
  * (pedrod@cs.washington.edu).
@@ -29,8 +29,9 @@
  * acknowledgment: "This product includes software
  * developed by Stanley Kok, Parag Singla, Matthew
  * Richardson, Pedro Domingos, Marc Sumner, Hoifung
- * Poon, and Daniel Lowd in the Department of Computer Science and
- * Engineering at the University of Washington".
+ * Poon, Daniel Lowd, and Jue Wang in the Department of
+ * Computer Science and Engineering at the University of
+ * Washington".
  * 
  * 4. Your publications acknowledge the use or
  * contribution made by the Software to your research
@@ -40,7 +41,7 @@
  * Statistical Relational AI", Technical Report,
  * Department of Computer Science and Engineering,
  * University of Washington, Seattle, WA.
- * http://www.cs.washington.edu/ai/alchemy.
+ * http://alchemy.cs.washington.edu.
  * 
  * 5. Neither the name of the University of Washington nor
  * the names of its contributors may be used to endorse or
@@ -87,8 +88,9 @@ class MCSAT : public MCMC
    * Constructor: Constructs unit propagation and SampleSat.
    */  
   MCSAT(VariableState* state, long int seed, const bool& trackClauseTrueCnts,
-        MCSatParams* mcsatParams)
-    : MCMC(state, seed, trackClauseTrueCnts, mcsatParams)
+        MCSatParams* mcsatParams,
+        Array<Array<Predicate* >* >* queryFormulas = NULL)
+    : MCMC(state, seed, trackClauseTrueCnts, mcsatParams, queryFormulas)
   {
 	Timer timer1;
 
@@ -179,11 +181,6 @@ class MCSAT : public MCMC
     double currentTimeSec;
     int samplesPerOutput = 100;
 
-      /* If keeping track of true clause groundings, then init to zero
-    if (trackClauseTrueCnts_)
-      resetCnts();
-      */
-
       // Holds the ground preds which have currently been affected
     GroundPredicateHashArray affectedGndPreds;
     Array<int> affectedGndPredIndices;
@@ -214,7 +211,6 @@ class MCSAT : public MCMC
     while (!done)
     {
       ++sample;
-      //bool mcSatStep = (sample % numStepsEveryMCSat_ == 0);
       if (sample % samplesPerOutput == 0)
       { 
         currentTimeSec = timer.time();
@@ -227,12 +223,7 @@ class MCSAT : public MCMC
       }
 
         // For each node, generate the node's new truth value
-      //if (mcSatStep) performMCSatStep(burningIn);
       performMCSatStep(burningIn);
-        // Defined in MCMC. Chain is set to 0, but single chain is considered
-        // in performGibbsStep
-      //else performGibbsStep(0, burningIn, affectedGndPreds,
-      //                      affectedGndPredIndices);
         
       if (!burningIn) numSamplesPerPred++;
 
@@ -276,6 +267,13 @@ class MCSAT : public MCMC
     {
       setProbTrue(i, numTrue_[i] / numSamplesPerPred);
     }
+    
+      // Update query formula probs
+    if (qfProbs_)
+    {
+      for (int j = 0; j < qfProbs_->size(); j++)
+        (*qfProbs_)[j] = (*qfProbs_)[j] / numSamplesPerPred;
+    }    
   }
 
  private:
@@ -352,6 +350,27 @@ class MCSAT : public MCMC
       // If keeping track of true clause groundings
     if (!burningIn && trackClauseTrueCnts_)
       tallyCntsFromState();
+      
+      // If there are query formulas
+    if (!burningIn && qfProbs_)
+    {
+      for (int i = 0; i < queryFormulas_->size(); i++)
+      {
+        Array<Predicate* >* formula = (*queryFormulas_)[i];
+        bool satisfied = true;
+        for (int j = 0; j < formula->size(); j++)
+        {
+          bool sense = (*formula)[j]->getSense();
+          GroundPredicate* pred = new GroundPredicate((*formula)[j]);
+          TruthValue tv = state_->getDomain()->getDB()->getValue(pred);
+          if ((tv == TRUE && !sense) || (tv == FALSE && sense))
+            satisfied = false;
+          delete pred;
+          if (!satisfied) break;
+        }
+        if (satisfied) (*qfProbs_)[i]++;
+      }
+    }
     
     if (msdebug) cout << "Leaving MC-SAT step" << endl;
   }

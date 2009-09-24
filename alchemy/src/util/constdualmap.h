@@ -2,11 +2,11 @@
  * All of the documentation and software included in the
  * Alchemy Software is copyrighted by Stanley Kok, Parag
  * Singla, Matthew Richardson, Pedro Domingos, Marc
- * Sumner, Hoifung Poon, and Daniel Lowd.
+ * Sumner, Hoifung Poon, Daniel Lowd, and Jue Wang.
  * 
- * Copyright [2004-07] Stanley Kok, Parag Singla, Matthew
+ * Copyright [2004-09] Stanley Kok, Parag Singla, Matthew
  * Richardson, Pedro Domingos, Marc Sumner, Hoifung
- * Poon, and Daniel Lowd. All rights reserved.
+ * Poon, Daniel Lowd, and Jue Wang. All rights reserved.
  * 
  * Contact: Pedro Domingos, University of Washington
  * (pedrod@cs.washington.edu).
@@ -29,8 +29,9 @@
  * acknowledgment: "This product includes software
  * developed by Stanley Kok, Parag Singla, Matthew
  * Richardson, Pedro Domingos, Marc Sumner, Hoifung
- * Poon, and Daniel Lowd in the Department of Computer Science and
- * Engineering at the University of Washington".
+ * Poon, Daniel Lowd, and Jue Wang in the Department of
+ * Computer Science and Engineering at the University of
+ * Washington".
  * 
  * 4. Your publications acknowledge the use or
  * contribution made by the Software to your research
@@ -40,7 +41,7 @@
  * Statistical Relational AI", Technical Report,
  * Department of Computer Science and Engineering,
  * University of Washington, Seattle, WA.
- * http://www.cs.washington.edu/ai/alchemy.
+ * http://alchemy.cs.washington.edu.
  * 
  * 5. Neither the name of the University of Washington nor
  * the names of its contributors may be used to endorse or
@@ -108,21 +109,21 @@ class ConstDualMap
   }
 
 
-    // Returns the int_ of StrInt corresponding to i; returns -1 if there is no
-    // such StrInt.
-  int getInt2(const int& i)
+    // Returns the ints_ of StrInt corresponding to i; returns NULL if there is
+    // no such StrInt. Should not be deleted by caller.
+  Array<int>* getInt2(const int& i)
   { 
     if (0 <= i && i < intToStrIntArr_->size())
-      return (*intToStrIntArr_)[i]->int_;
-    return -1;
+      return (*intToStrIntArr_)[i]->ints_;
+    return NULL;
   }
 
-    // Returns the int_ of StrInt corresponding to i; returns -1 if there is no
-    // such StrInt. Caller should delete s if required.
-  int getInt2(const char* const & s)
+    // Returns the ints_ of StrInt corresponding to i; returns NULL if there is
+    // no such StrInt. Caller should delete s if required, but not returned Array.
+  Array<int>* getInt2(const char* const & s)
   { 
     int i = getInt(s);
-    if (i < 0) return -1;
+    if (i < 0) return NULL;
     return getInt2(i);
   }
 
@@ -145,6 +146,18 @@ class ConstDualMap
     // Caller should delete s if required.
   int insert(const char* const & s, const int& ii)
   {
+      // See if string already present
+    Array<int>* oldInts = getInt2(s);
+    if (oldInts != NULL)
+    {
+      if (!oldInts->contains(ii))
+        oldInts->append(ii);
+      StrInt str(s);
+      StrIntToIntMap::iterator it;
+      it = strIntToIntMap_->find(&str);
+      return (*it).second;
+    }
+
     StrInt* strInt = new StrInt(s,ii);
 
     StrIntToIntMap::iterator it;
@@ -191,6 +204,7 @@ class ConstDualMap
 
 
     // Caller should delete the returned Array<int>*.
+/*
   const Array<int>* getIntToInt2Arr() const  
   { 
     Array<int>* a = new Array<int>;
@@ -198,7 +212,7 @@ class ConstDualMap
       a->append((*intToStrIntArr_)[i]->int_);
     return a; 
   }
-  
+*/  
   void compress() { intToStrIntArr_->compress(); }
  
  private:

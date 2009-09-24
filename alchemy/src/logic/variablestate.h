@@ -69,7 +69,10 @@
 #include "mrf.h"
 #include "timer.h"
 
-const int NOVALUE = -1;
+const int NOVALUE = 100000000;
+const int DISANDCONT = 200000000;
+const int MULTIDIS = 300000000;
+const double NOSOL = 1234567890;
 const bool vsdebug = false;
 
 /**
@@ -659,6 +662,12 @@ class VariableState
         // Not present, add it to the state
       else
       {
+        if (vsdebug)
+        {
+          cout << "Adding randomly ";
+          gndPred->print(cout, domain_);
+          cout << " to the state" << endl; 
+        }
         gndPredHashArray_.append(gndPred);
         bool initial = false;
         addNewClauses(initial);
@@ -2151,9 +2160,13 @@ class VariableState
     {
       GroundClause* gndClause = (*gndClauses_)[i];
       gndClause->setWtToSumOfParentWts(mln_);
+      if (gndClause->isHardClause())
+        clauseCost_[i] = hardWt_;
+      else
+        clauseCost_[i] = gndClause->getWt();
+      
       if (vsdebug) cout << "Setting cost of clause " << i << " to "
-                        << gndClause->getWt() << endl;
-      clauseCost_[i] = gndClause->getWt();
+                        << clauseCost_[i] << endl;
 
         // Set thresholds for clause selection
       if (gndClause->isHardClause()) threshold_[i] = RAND_MAX;
@@ -2634,7 +2647,52 @@ class VariableState
 
 	if (atLeastOneDead) initMakeBreakCostWatch();
   }
+  
+  void LoadDisEviValuesFromRst(const char* szDisEvi)
+  {
+	  for(int i = 1; i < atomEvi_.size(); i++)
+	  {
+		  atomEvi_[i] = false;
+	  }
+	  map<string, int> gndPredCont;
+	  for(int i = 0; i < gndPreds_->size(); i++)
+	  {
+		  string str = (*gndPreds_)[i]->getPredicateStr(domain_);
+		  gndPredCont.insert(map<string, int>::value_type(str, i+1));
+	  }
+	  ifstream is(szDisEvi);
+	  string strLine;
+	  while (getline(is, strLine))
+	  {
+		  stringstream ss(strLine);
+		  string strtmp;
+		  getline(ss,strtmp, ' ');
+		  //strLine = "Hastype(Wall,L0_1)";
  
+		  map<string, int>::const_iterator citer;
+		  citer = gndPredCont.find(strtmp);
+		  if (citer == gndPredCont.end())
+		  {
+			  cout << "dis evi file error, non-existent query gndings" << endl;
+			  cout  << strLine << endl;
+			  exit(1);
+		  }
+		  int atomIdx = citer->second;
+		  //atomEvi_[atomIdx] = true;
+
+		  getline(ss, strtmp);
+		  int b = atoi(strtmp.c_str());
+		  if (b==1)
+		  {
+			  atomEvi_[atomIdx] = true;
+		  }
+		  else
+		  {
+			  atomEvi_[atomIdx] = false;
+		  }
+	  }
+  }
+  
   /**
    * Marks clauses as dead which were not good in the previous iteration of
    * inference or are not picked according to a weighted coin flip. 
@@ -3324,6 +3382,7 @@ class VariableState
 
     // Current assigment of atoms
   Array<bool> atom_;
+  Array<bool> atomEvi_;
     // Cost of clauses which would become satisfied by flipping each atom
   Array<long double> makeCost_;
     // Cost of clauses which would become unsatisfied by flipping each atom

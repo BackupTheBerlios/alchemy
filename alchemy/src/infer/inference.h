@@ -2,11 +2,11 @@
  * All of the documentation and software included in the
  * Alchemy Software is copyrighted by Stanley Kok, Parag
  * Singla, Matthew Richardson, Pedro Domingos, Marc
- * Sumner, Hoifung Poon, and Daniel Lowd.
+ * Sumner, Hoifung Poon, Daniel Lowd, and Jue Wang.
  * 
- * Copyright [2004-07] Stanley Kok, Parag Singla, Matthew
+ * Copyright [2004-09] Stanley Kok, Parag Singla, Matthew
  * Richardson, Pedro Domingos, Marc Sumner, Hoifung
- * Poon, and Daniel Lowd. All rights reserved.
+ * Poon, Daniel Lowd, and Jue Wang. All rights reserved.
  * 
  * Contact: Pedro Domingos, University of Washington
  * (pedrod@cs.washington.edu).
@@ -29,8 +29,9 @@
  * acknowledgment: "This product includes software
  * developed by Stanley Kok, Parag Singla, Matthew
  * Richardson, Pedro Domingos, Marc Sumner, Hoifung
- * Poon, and Daniel Lowd in the Department of Computer Science and
- * Engineering at the University of Washington".
+ * Poon, Daniel Lowd, and Jue Wang in the Department of
+ * Computer Science and Engineering at the University of
+ * Washington".
  * 
  * 4. Your publications acknowledge the use or
  * contribution made by the Software to your research
@@ -40,7 +41,7 @@
  * Statistical Relational AI", Technical Report,
  * Department of Computer Science and Engineering,
  * University of Washington, Seattle, WA.
- * http://www.cs.washington.edu/ai/alchemy.
+ * http://alchemy.cs.washington.edu.
  * 
  * 5. Neither the name of the University of Washington nor
  * the names of its contributors may be used to endorse or
@@ -67,6 +68,7 @@
 #define INFERENCE_H_
 
 #include "variablestate.h"
+#include "hvariablestate.h"
 
   // Default seed when none specified (some random number)
 const long int DEFAULT_SEED = 2350877;
@@ -92,12 +94,13 @@ class Inference
    * clause are being kept
    */
   Inference(VariableState* state, long int seed,
-            const bool& trackClauseTrueCnts)
+            const bool& trackClauseTrueCnts,
+            Array<Array<Predicate* >* >* queryFormulas = NULL)
       : seed_(seed), state_(state), saveAllCounts_(false),
         clauseTrueCnts_(NULL), clauseTrueSqCnts_(NULL),
         numSamples_(0),
         allClauseTrueCnts_(NULL), oldClauseTrueCnts_(NULL),
-        oldAllClauseTrueCnts_(NULL)
+        oldAllClauseTrueCnts_(NULL), queryFormulas_(queryFormulas)
   {
       // If seed not specified, then init always to same random number
     if (seed_ == -1) seed_ = DEFAULT_SEED;
@@ -113,6 +116,35 @@ class Inference
       clauseTrueCnts_ = new Array<double>(numClauses, 0);
       clauseTrueSqCnts_ = new Array<double>(numClauses, 0);
     }
+    
+    if (queryFormulas_)
+      qfProbs_ = new Array<double>(queryFormulas_->size(), 0);
+    else
+      qfProbs_ = NULL;
+  }
+  
+  Inference(HVariableState* state, long int seed,
+            const bool& trackClauseTrueCnts)
+      : seed_(seed), hstate_(state), saveAllCounts_(false),
+        clauseTrueCnts_(NULL), clauseTrueCntsCont_(NULL), 
+        clauseTrueSqCnts_(NULL), numSamples_(0),
+        allClauseTrueCnts_(NULL), oldClauseTrueCnts_(NULL),
+        oldAllClauseTrueCnts_(NULL)
+  {
+        // If seed not specified, then init always to same random number
+      if (seed_ == -1) seed_ = DEFAULT_SEED;
+      srandom(seed_);
+	  
+	  trackClauseTrueCnts_ = trackClauseTrueCnts;
+	  if (trackClauseTrueCnts_ && hstate_)
+	  {
+		  // clauseTrueCnts_ will hold the true counts for each first-order
+          // clause
+		  clauseTrueCnts_ = new Array<double>;
+		  clauseTrueCnts_->growToSize(hstate_->getMLN()->getNumClauses(), 0);
+		  clauseTrueCntsCont_ = new Array<double>;
+		  clauseTrueCntsCont_->growToSize(hstate_->getNumContFormulas(), 0);
+	  }
   }
   
   /**
@@ -126,6 +158,8 @@ class Inference
 
     delete oldAllClauseTrueCnts_;
     delete oldClauseTrueCnts_;
+    
+    if (qfProbs_) delete qfProbs_;
   }
 
 
@@ -161,6 +195,11 @@ class Inference
   virtual void infer() = 0;
 
   /**
+   * Prints out the network. Currently only available in BP (uses factor graph).
+   */
+  virtual void printNetwork(ostream& out) = 0; 
+
+  /**
    * Prints the probabilities of each predicate to a stream.
    */
   virtual void printProbabilities(ostream& out) = 0;
@@ -181,11 +220,33 @@ class Inference
    * Prints the predicates inferred to be true to a stream.
    */
   virtual void printTruePreds(ostream& out) = 0;
+  virtual void printTruePredsH(ostream& out) = 0;
 
   /**
    * Gets the probability of a ground predicate.
    */
   virtual double getProbability(GroundPredicate* const& gndPred) = 0;
+  virtual double getProbabilityH(GroundPredicate* const& gndPred) = 0;
+
+  /**
+   * Print probabilities of the query formulas.
+   */
+  void printQFProbs(ostream& out, Domain* domain)
+  {
+    if (qfProbs_)
+    {
+      for (int i = 0; i < queryFormulas_->size(); i++)
+      {
+        Array<Predicate* >* formula = (*queryFormulas_)[i];
+        for (int j = 0; j < formula->size(); j++)
+        {
+          (*formula)[j]->printWithStrVar(out, domain);
+          if (j != formula->size() - 1) out << " ^ ";
+        }
+        out << " " << (*qfProbs_)[i] << endl;
+      }
+    }
+  }
 
   long int getSeed() { return seed_; }
   void setSeed(long int s) { seed_ = s; }
@@ -193,11 +254,17 @@ class Inference
   VariableState* getState() { return state_; }
   void setState(VariableState* s) { state_ = s; }
 
-  /* Increase or decrease the number of MCMC samples by a multiplicative
+  HVariableState* getHState() { return hstate_; }
+  void setHState(HVariableState* s) { hstate_ = s; }
+  
+  /**
+   * Increase or decrease the number of MCMC samples by a multiplicative
    * factor.  (For MaxWalkSAT, this could perhaps change the number
    * of flips or something that trades off speed and accuracy.)
    */
   virtual void scaleSamples(double factor) { /* Override this... */ }
+
+
   
   const Array<double>* getClauseTrueCnts()   { return clauseTrueCnts_; }
   const Array<double>* getClauseTrueSqCnts() { return clauseTrueSqCnts_; }
@@ -410,11 +477,15 @@ class Inference
     // State of atoms and clauses used during inference
     // Does not belong to inference (do not delete)
   VariableState* state_;
+  HVariableState* hstate_;
+  
     // Save all counts for all iterations
   bool saveAllCounts_;
     // Holds the average number of true groundings of each first-order clause
     // in the mln associated with this inference
   Array<double>* clauseTrueCnts_;
+  Array<double>* clauseTrueCntsCont_;
+  
     // Holds the average number of true groundings squared of each 
     // first-order clause in the mln associated with this inference
   Array<double>* clauseTrueSqCnts_;
@@ -428,6 +499,9 @@ class Inference
 
   Array<double>* oldClauseTrueCnts_;
   Array<Array<double> >* oldAllClauseTrueCnts_;
+  
+  Array<Array<Predicate* >* >* queryFormulas_;
+  Array<double>* qfProbs_;
 };
 
 #endif /*INFERENCE_H_*/

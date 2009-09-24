@@ -66,6 +66,7 @@
 #include "term.h"
 #include "function.h"
 #include "domain.h"
+#include <cstring>
 
 double Term::fixedSizeB_ = -1;
 

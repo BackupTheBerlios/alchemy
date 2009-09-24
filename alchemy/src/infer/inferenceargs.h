@@ -2,11 +2,11 @@
  * All of the documentation and software included in the
  * Alchemy Software is copyrighted by Stanley Kok, Parag
  * Singla, Matthew Richardson, Pedro Domingos, Marc
- * Sumner, Hoifung Poon, and Daniel Lowd.
+ * Sumner, Hoifung Poon, Daniel Lowd, and Jue Wang.
  * 
- * Copyright [2004-07] Stanley Kok, Parag Singla, Matthew
+ * Copyright [2004-09] Stanley Kok, Parag Singla, Matthew
  * Richardson, Pedro Domingos, Marc Sumner, Hoifung
- * Poon, and Daniel Lowd. All rights reserved.
+ * Poon, Daniel Lowd, and Jue Wang. All rights reserved.
  * 
  * Contact: Pedro Domingos, University of Washington
  * (pedrod@cs.washington.edu).
@@ -29,8 +29,9 @@
  * acknowledgment: "This product includes software
  * developed by Stanley Kok, Parag Singla, Matthew
  * Richardson, Pedro Domingos, Marc Sumner, Hoifung
- * Poon, and Daniel Lowd in the Department of Computer Science and
- * Engineering at the University of Washington".
+ * Poon, Daniel Lowd, and Jue Wang in the Department of
+ * Computer Science and Engineering at the University of
+ * Washington".
  * 
  * 4. Your publications acknowledge the use or
  * contribution made by the Software to your research
@@ -40,7 +41,7 @@
  * Statistical Relational AI", Technical Report,
  * Department of Computer Science and Engineering,
  * University of Washington, Seattle, WA.
- * http://www.cs.washington.edu/ai/alchemy.
+ * http://alchemy.cs.washington.edu.
  * 
  * 5. Neither the name of the University of Washington nor
  * the names of its contributors may be used to endorse or
@@ -85,6 +86,16 @@ char* ainMLNFiles     = NULL;
 char* aClosedWorldPredsStr = NULL;
   // Holds open-world evidence preds
 char* aOpenWorldPredsStr = NULL;
+  // Continuous part of each clause
+char* aContPartFile = NULL;
+  // list of segments
+char* aSegListFile = NULL;
+
+// Continuous list of each cont part mln
+char* aContListFile = NULL;
+
+
+//
 
   // MAP Inference
 bool  amapPos = false;
@@ -97,9 +108,24 @@ bool  amcsatInfer = false;
 bool  asimtpInfer = false;
   // Belief propagation
 bool  abpInfer = false;
+  // No inference, just output network
+bool  aoutputNetwork = false;
 
   // Lazy state or not?
 bool aLazy = false;
+
+  // Hybrid or not?
+bool aHybrid = false;
+
+bool aSA = false;
+
+char* aProposalStdev = "tmp.sd";
+bool bOptimum = false;
+
+char*  aContSamples = NULL;
+
+//inference with maxwalksat?
+bool aMaxOrNot = false;
   // Seed for inference algorithm
 int aSeed = -1;
   // Limit in kbytes before using lazy version
@@ -121,6 +147,7 @@ bool amwsLazyLowState = false;
 int  assSaRatio = 0;       // percent of SA steps
 int  assSaTemp  = 10;       // temperature/100: SA temperature
 bool assLateSa  = true;    // sa only at a plateur
+double aSATempDownRatio = 0.5;
 
   // MCMC params
 int amcmcNumChains    = 10;

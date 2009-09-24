@@ -84,6 +84,8 @@ struct BPParams
   int convergeRequiredItrCnt;
     // Indicates if implicit representation is to be used
   bool implicitRep;
+    // No inference is run, rather the factor graph is built
+  bool outputNetwork;
   
 };
 

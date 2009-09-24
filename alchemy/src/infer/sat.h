@@ -78,8 +78,18 @@ class SAT : public Inference
  
   SAT(VariableState* state, long int seed, const bool& trackClauseTrueCnts) : 
     Inference(state, seed, trackClauseTrueCnts) {}
+
+  SAT(HVariableState* state, long int seed, const bool& trackClauseTrueCnts) : 
+    Inference(state, seed, trackClauseTrueCnts) {}
     // Virtual destructor
   virtual ~SAT() {}
+
+  /**
+   * Prints out the network.
+   */
+  virtual void printNetwork(ostream& out)
+  {
+  } 
 
   const int getNumSolutions()
   {
@@ -161,6 +171,15 @@ class SAT : public Inference
     return truthValue;
   }
 
+  double getProbabilityH(GroundPredicate* const& gndPred)
+  {
+	  int idx = state_->getGndPredIndex(gndPred);
+	  int truthValue = 0;
+	  if (idx >= 0) truthValue = state_->getValueOfLowAtom(idx + 1);
+	  return truthValue;
+  }
+
+
   /**
    * Prints the predicates set to true in the best state to a stream.
    */
@@ -174,6 +193,18 @@ class SAT : public Inference
         out << endl;
       }
     }
+  }
+  
+  void printTruePredsH(ostream& out)
+  {
+	  for (int i = 0; i < state_->getNumAtoms(); i++)
+	  {
+		  if (state_->getValueOfLowAtom(i + 1))
+		  {
+			  state_->printGndPred(i, out);
+			  out << endl;
+		  }
+	  }
   }
   
  protected:

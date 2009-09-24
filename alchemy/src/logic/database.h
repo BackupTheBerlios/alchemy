@@ -2,11 +2,11 @@
  * All of the documentation and software included in the
  * Alchemy Software is copyrighted by Stanley Kok, Parag
  * Singla, Matthew Richardson, Pedro Domingos, Marc
- * Sumner, Hoifung Poon, and Daniel Lowd.
+ * Sumner, Hoifung Poon, Daniel Lowd, and Jue Wang.
  * 
- * Copyright [2004-07] Stanley Kok, Parag Singla, Matthew
+ * Copyright [2004-09] Stanley Kok, Parag Singla, Matthew
  * Richardson, Pedro Domingos, Marc Sumner, Hoifung
- * Poon, and Daniel Lowd. All rights reserved.
+ * Poon, Daniel Lowd, and Jue Wang. All rights reserved.
  * 
  * Contact: Pedro Domingos, University of Washington
  * (pedrod@cs.washington.edu).
@@ -29,8 +29,9 @@
  * acknowledgment: "This product includes software
  * developed by Stanley Kok, Parag Singla, Matthew
  * Richardson, Pedro Domingos, Marc Sumner, Hoifung
- * Poon, and Daniel Lowd in the Department of Computer Science and
- * Engineering at the University of Washington".
+ * Poon, Daniel Lowd, and Jue Wang in the Department of
+ * Computer Science and Engineering at the University of
+ * Washington".
  * 
  * 4. Your publications acknowledge the use or
  * contribution made by the Software to your research
@@ -40,7 +41,7 @@
  * Statistical Relational AI", Technical Report,
  * Department of Computer Science and Engineering,
  * University of Washington, Seattle, WA.
- * http://www.cs.washington.edu/ai/alchemy.
+ * http://alchemy.cs.washington.edu.
  * 
  * 5. Neither the name of the University of Washington nor
  * the names of its contributors may be used to endorse or
@@ -119,6 +120,8 @@ typedef hash_map<pair<unsigned int, unsigned int>, set<unsigned long long>,
                  IntPairHash>
     LongLongHashMap;
 
+typedef hash_map<unsigned long long, double, HashLongLong, EqualLongLong>
+    LongLongToDoubleMap;
 
 class Database
 {
@@ -862,10 +865,14 @@ class Database
     if (dbdebug >= 1)
       cout << "Calling database::addEvidenceGroundPredicate" << endl;
     setValue(pred, pred->getTruthValue());
+    if (pred->getRealValue() > numeric_limits<double>::min())
+    {
+      setRealValue(pred, pred->getRealValue());
+    }
       // Evidence status only needs to be set for open-world preds
     if (!closedWorld_[pred->getId()])
     {
-      //setEvidenceStatus(pred, true);
+      setEvidenceStatus(pred, true);
     }
     unsigned long long idx = getIdxOfGndPredValues(pred);
       // Add to evidence index
@@ -895,6 +902,33 @@ class Database
       // Occurs as neg. lit. and true evidence
     else if (!sense && tv == TRUE)
       addToInvertedIndex(pred, idx, T_INDEX);    
+  }
+
+  /**
+   * Sets the real value of a predicate in this database.
+   * 
+   * @param rv Real value to which the predicate is set
+   */
+  void setRealValue(const Predicate* const & pred, const double& rv)
+  {
+    unsigned long long idx = getIdxOfGndPredValues(pred);
+    return setRealValue(idx, rv);
+  }
+
+  /**
+   * Sets the real value of a predicate in this database.
+   * 
+   * @param rv Real value to which the predicate is set
+   */
+  void setRealValue(const unsigned long long& idx, const double& rv)
+  {
+    realValues_[idx] = rv;
+  }
+
+  double getRealValue(const Predicate* const & pred)
+  {
+    unsigned long long idx = getIdxOfGndPredValues(pred);
+    return realValues_[idx];    
   }
 
   int getNumGroundings(const int& predId) const
@@ -1644,6 +1678,7 @@ class Database
     return false;
   }
 
+
   /**
    * Sets the value of a predicate in this database.
    * 
@@ -2145,6 +2180,9 @@ class Database
 
     // Total number of groundings for each predicate
   Array<unsigned long long> numberOfGroundings_;
+  
+    // Map from pred idx to real value
+  LongLongToDoubleMap realValues_;
 };
 
 

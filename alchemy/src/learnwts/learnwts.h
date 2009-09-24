@@ -2,11 +2,11 @@
  * All of the documentation and software included in the
  * Alchemy Software is copyrighted by Stanley Kok, Parag
  * Singla, Matthew Richardson, Pedro Domingos, Marc
- * Sumner, Hoifung Poon, and Daniel Lowd.
+ * Sumner, Hoifung Poon, Daniel Lowd, and Jue Wang.
  * 
- * Copyright [2004-07] Stanley Kok, Parag Singla, Matthew
+ * Copyright [2004-09] Stanley Kok, Parag Singla, Matthew
  * Richardson, Pedro Domingos, Marc Sumner, Hoifung
- * Poon, and Daniel Lowd. All rights reserved.
+ * Poon, Daniel Lowd, and Jue Wang. All rights reserved.
  * 
  * Contact: Pedro Domingos, University of Washington
  * (pedrod@cs.washington.edu).
@@ -29,8 +29,9 @@
  * acknowledgment: "This product includes software
  * developed by Stanley Kok, Parag Singla, Matthew
  * Richardson, Pedro Domingos, Marc Sumner, Hoifung
- * Poon, and Daniel Lowd in the Department of Computer Science and
- * Engineering at the University of Washington".
+ * Poon, Daniel Lowd, and Jue Wang in the Department of
+ * Computer Science and Engineering at the University of
+ * Washington".
  * 
  * 4. Your publications acknowledge the use or
  * contribution made by the Software to your research
@@ -40,7 +41,7 @@
  * Statistical Relational AI", Technical Report,
  * Department of Computer Science and Engineering,
  * University of Washington, Seattle, WA.
- * http://www.cs.washington.edu/ai/alchemy.
+ * http://alchemy.cs.washington.edu.
  * 
  * 5. Neither the name of the University of Washington nor
  * the names of its contributors may be used to endorse or
@@ -271,9 +272,11 @@ void createDomainsAndMLNs(Array<Domain*>& domains, Array<MLN*>& mlns,
           // All mlns can use the following data structures from mln0
         ((Domain*)domains[i])->replaceTypeDualMap((
                                          DualMap*)domains[0]->getTypeDualMap());
+/*
         ((Domain*)domains[i])->replaceStrToPredTemplateMapAndPredDualMap(
                   (StrToPredTemplateMap*) domains[0]->getStrToPredTemplateMap(),
                   (DualMap*) domains[0]->getPredDualMap());
+*/
         ((Domain*)domains[i])->replaceStrToFuncTemplateMapAndFuncDualMap(
                   (StrToFuncTemplateMap*) domains[0]->getStrToFuncTemplateMap(),
                   (DualMap*) domains[0]->getFuncDualMap());
@@ -281,9 +284,10 @@ void createDomainsAndMLNs(Array<Domain*>& domains, Array<MLN*>& mlns,
                         (PredicateTemplate*)domains[0]->getEqualPredTemplate());
         ((Domain*)domains[i])->replaceFuncSet(
                                         (FunctionSet*)domains[0]->getFuncSet());
+
       }
     } // for each domain
-  
+
 	// Reorder constants in all domains
 	domains[0]->reorderConstants(mlns[0]);
     for (int i = 1; i < domains.size(); i++)
@@ -313,7 +317,7 @@ void createDomainsAndMLNs(Array<Domain*>& domains, Array<MLN*>& mlns,
           string formulaString = mlns[i]->getParentFormula(j, 0);
           bool hasExist = mlns[i]->isExistClause(j);
           if (mlns[0]->appendExternalClause(formulaString, hasExist,
-                                            new Clause(*c), domains[0]))
+                                            new Clause(*c), domains[0], false))
           {
             (*externalClausesPerMLN)[0]->append(false);
           }
@@ -412,8 +416,21 @@ void assignWtsAndOutputMLN(ostream& out, Array<MLN*>& mlns,
   {
     MLN* mln = mlns[i];
     const ClauseHashArray* clauses = mln->getClauses();
-    for (int i = 0; i < clauses->size(); i++) 
-      (*clauses)[i]->setWt(wts[i+1]);
+    for (int j = 0; j < clauses->size(); j++) 
+      (*clauses)[j]->setWt(wts[j+1]);
+  }
+
+  for (int i = 0; i < mlns.size(); i++)
+  {
+    MLN* mln = mlns[i];
+    Domain* domain = domains[i];
+    const Array<Clause*>* hclauses = mln->getHybridClauses();
+    for (int j = 0; j < hclauses->size(); j++)
+    {
+      double variance = mln->getHybridClauseVariance(j, domain);
+      double w = 1.0/(2.0*variance);
+      (*hclauses)[j]->setWt(w);
+    }
   }
 
     // output the predicate declaration
@@ -421,10 +438,14 @@ void assignWtsAndOutputMLN(ostream& out, Array<MLN*>& mlns,
   domains[0]->printPredicateTemplates(out);
   out << endl;
 
-  // output the function declarations
-  out << "//function declarations" << endl;
-  domains[0]->printFunctionTemplates(out);
-  out << endl;
+    // output the function declarations
+  if (domains[0]->getNumFunctions() > 0) 
+  {
+    // output the function declarations
+    out << "//function declarations" << endl;
+    domains[0]->printFunctionTemplates(out);
+    out << endl;
+  }
   mlns[0]->printMLN(out, domains[0]);
 }
 

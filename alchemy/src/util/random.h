@@ -2,11 +2,11 @@
  * All of the documentation and software included in the
  * Alchemy Software is copyrighted by Stanley Kok, Parag
  * Singla, Matthew Richardson, Pedro Domingos, Marc
- * Sumner, Hoifung Poon, and Daniel Lowd.
+ * Sumner and Hoifung Poon.
  * 
- * Copyright [2004-07] Stanley Kok, Parag Singla, Matthew
- * Richardson, Pedro Domingos, Marc Sumner, Hoifung
- * Poon, and Daniel Lowd. All rights reserved.
+ * Copyright [2004-06] Stanley Kok, Parag Singla, Matthew
+ * Richardson, Pedro Domingos, Marc Sumner and Hoifung
+ * Poon. All rights reserved.
  * 
  * Contact: Pedro Domingos, University of Washington
  * (pedrod@cs.washington.edu).
@@ -28,8 +28,8 @@
  * of this software must display the following
  * acknowledgment: "This product includes software
  * developed by Stanley Kok, Parag Singla, Matthew
- * Richardson, Pedro Domingos, Marc Sumner, Hoifung
- * Poon, and Daniel Lowd in the Department of Computer Science and
+ * Richardson, Pedro Domingos, Marc Sumner and Hoifung
+ * Poon in the Department of Computer Science and
  * Engineering at the University of Washington".
  * 
  * 4. Your publications acknowledge the use or
@@ -66,10 +66,17 @@
 #ifndef RANDOM_H_JUN_21_2005
 #define RANDOM_H_JUN_21_2005
 
+#include <cstdlib>
 #include <iostream>
+#include <vector>
 using namespace std;
 
-  //if you are generating more than 100,000,000 random number, use randomB 
+#define PI 3.1415926
+#define INTEGRALSTEP 1000
+#define BigValue 900000000
+#define BigValue2 50000
+#define NormalizeBase 10  
+//if you are generating more than 100,000,000 random number, use randomB 
 class Random
 {
  public:
@@ -105,7 +112,7 @@ class Random
   
 
     //0 < number returned < 1
-  float random() 
+  double random() 
   {
     return randomA(&initNum_);
     //return randomB(&initNum_);
@@ -116,11 +123,11 @@ class Random
 
 
  private:
-  float randomA(long* initNum)
+  double randomA(long* initNum)
   {
     int c;
     long d;
-    float tmp;
+    double tmp;
     
     if (*initNum <= 0 || !a_) 
     {
@@ -156,11 +163,11 @@ class Random
   }
 
 
-  float randomB(long* initNum)
+  double randomB(long* initNum)
   {
     int c;
     long d;
-    float tmp;
+    double tmp;
     
     if (*initNum <= 0) 
     {
@@ -209,6 +216,37 @@ class Random
   long a_;
   long b_[32];
 
+};
+
+class ExtRandom
+{
+public:
+
+	// Generate random numbers uniform distribution in [0,1] -U[0,1]
+	static double uniformRandom();
+
+	// Generate Gaussian Random Numbers with mean 'mu' and standard deviation 'sd'
+	static double gaussRandom(double mu, double sd);
+
+	// Generate Exponential Random Numbers with parameter of 'lambda'.
+	static double expRandom(double lambda);
+
+	// compute gaussian value at x with mu and sigma
+	static double ComputeGauss(double mu, double sigma, double x);
+
+	// compute log-gaussian value at x with mu and sigam
+	static double ComputeLnGauss(double mu, double sigma, double v1, double v2, double x);
+
+	// compute integration on [v1,v2] with mu and sigma
+	static double GaussianIntegral(double mu, double sigma, double v1, double v2);
+
+	// train gaussian parameters
+	static void GaussianParaLearning(double &mu, double &sigma, double &v1, double &v2, vector<double> Tdata);
+
+
+private:
+	static bool deviate_available;
+	static double second_deviate;
 };
 
 

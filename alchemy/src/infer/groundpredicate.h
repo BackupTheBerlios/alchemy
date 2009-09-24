@@ -198,6 +198,46 @@ class GroundPredicate
                    intArrRep_->size()*sizeof(unsigned int)) == 0);
   }
 
+  string getPredicateStr(const Domain* const& domain)
+  {
+	  const char* predName = domain->getPredicateName((*intArrRep_)[0]);
+	  string strPredName = predName;
+	  strPredName = strPredName + "(";
+	  int size = intArrRep_->size();
+	  for (int i = 1; i < size; i++)
+	  {
+		  string name = domain->getConstantName((*intArrRep_)[i]);
+		  string::size_type at = name.rfind("@");
+		  if (at != string::npos) name = name.substr(at+1, name.length()-at-1);
+		  strPredName = strPredName + name;
+		  if (i < size-1) strPredName = strPredName + ",";
+		  else strPredName = strPredName + ")";
+	  }	
+	  return strPredName;
+  }
+  string getPredName(const Domain* const& domain) 
+  {
+	  string s = string(domain->getPredicateName((*intArrRep_)[0]));
+	  return s;
+  }
+
+  string getPredString(const Domain* const & domain)
+  {
+	  string strPred = string(domain->getPredicateName((*intArrRep_)[0]));
+	  strPred = strPred + "(";
+	  int size = intArrRep_->size();
+	  for (int i = 1; i < size; i++)
+	  {
+		  string name = domain->getConstantName((*intArrRep_)[i]);
+		  string::size_type at = name.rfind("@");
+		  if (at != string::npos) name = name.substr(at+1, name.length()-at-1);
+		  strPred = strPred + name;
+		  if (i < size-1) strPred = strPred + ",";
+		  else            strPred = strPred + ")";
+	  }
+	  
+	 return strPred; 
+  }
 
   void print(ostream& out, const Domain* const & domain) const
   {

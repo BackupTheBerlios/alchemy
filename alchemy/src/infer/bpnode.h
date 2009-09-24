@@ -2,11 +2,11 @@
  * All of the documentation and software included in the
  * Alchemy Software is copyrighted by Stanley Kok, Parag
  * Singla, Matthew Richardson, Pedro Domingos, Marc
- * Sumner, Hoifung Poon, and Daniel Lowd.
+ * Sumner, Hoifung Poon, Daniel Lowd, and Jue Wang.
  * 
- * Copyright [2004-08] Stanley Kok, Parag Singla, Matthew
+ * Copyright [2004-09] Stanley Kok, Parag Singla, Matthew
  * Richardson, Pedro Domingos, Marc Sumner, Hoifung
- * Poon, and Daniel Lowd. All rights reserved.
+ * Poon, Daniel Lowd, and Jue Wang. All rights reserved.
  * 
  * Contact: Pedro Domingos, University of Washington
  * (pedrod@cs.washington.edu).
@@ -29,8 +29,9 @@
  * acknowledgment: "This product includes software
  * developed by Stanley Kok, Parag Singla, Matthew
  * Richardson, Pedro Domingos, Marc Sumner, Hoifung
- * Poon, and Daniel Lowd in the Department of Computer Science and
- * Engineering at the University of Washington".
+ * Poon, Daniel Lowd, and Jue Wang in the Department of
+ * Computer Science and Engineering at the University of
+ * Washington".
  * 
  * 4. Your publications acknowledge the use or
  * contribution made by the Software to your research
@@ -40,7 +41,7 @@
  * Statistical Relational AI", Technical Report,
  * Department of Computer Science and Engineering,
  * University of Washington, Seattle, WA.
- * http://www.cs.washington.edu/ai/alchemy.
+ * http://alchemy.cs.washington.edu.
  * 
  * 5. Neither the name of the University of Washington nor
  * the names of its contributors may be used to endorse or
@@ -94,6 +95,7 @@ class BPNode
     constants_ = constants;
     domain_ = domain;
     links_ = new Array<BPLink *>();
+    auxLinks_ = new Array<BPLink *>();
     msgsArr_ = new Array<double *>();
     nextMsgsArr_ = new Array<double *>();
     msgProds_[0] = msgProds_[1] = 0;
@@ -103,12 +105,15 @@ class BPNode
   {
     for (int i = 0; i < links_->size(); i++)
       delete (*links_)[i];
+    for (int i = 0; i < auxLinks_->size(); i++)
+      delete (*auxLinks_)[i];
     for (int i = 0; i < msgsArr_->size(); i++)
     {
       delete (*msgsArr_)[i];
       delete (*nextMsgsArr_)[i];
     }
     delete links_;
+    delete auxLinks_;
     delete msgsArr_;
     delete nextMsgsArr_;
   }
@@ -155,6 +160,15 @@ class BPNode
   }
 
  /**
+  * Adds an auxiliary link (factor along with all the relevant information about
+  * counts etc.).
+  */
+  void addAuxLink(BPLink *link)
+  {
+    auxLinks_->append(link);
+  }
+
+ /**
   * add the link (factor along with all the relevant information about
   * counts etc.).
   */
@@ -188,7 +202,7 @@ class BPNode
   void addFactors(Array<BPFactor *> * const & allFactors,
                   LinkIdToTwoWayMessageMap* const & lidToTWMsg);
 
-    //receive the message send over a link
+    //receive the message sent over a link
   void receiveMessage(double* inpMsgs, BPLink * const & link)
   {
     double *nextMsgs;
@@ -197,7 +211,7 @@ class BPNode
     nextMsgs[0] = inpMsgs[0];
     nextMsgs[1] = inpMsgs[1];
   }
-         
+
   double getExp()
   {
     double exp = msgProds_[1] - msgProds_[0];
@@ -239,11 +253,15 @@ class BPNode
     //send the messages to all the factor nodes connected to this node
   void sendMessage();
 
+    //send the messages to all the auxiliary factor nodes connected to this node
+  void sendAuxMessage();
+
     //update the stored msgs and update the msgProduct
   void moveToNextStep();
 
   ostream& print(ostream& out)
   {
+    out << predId_ << ": ";
     if (superPred_ != NULL)
       printArray(*(superPred_->getConstantTuple(0)),out);
     else
@@ -263,7 +281,9 @@ class BPNode
   Domain * domain_;
 
   Array<BPLink *> * links_;
-    //log of the actual message is stored
+    // Links to auxiliary factors
+  Array<BPLink *> * auxLinks_;
+    //log of the actual message received from factor is stored
   Array<double *> * msgsArr_; 
   Array<double *> * nextMsgsArr_;
 

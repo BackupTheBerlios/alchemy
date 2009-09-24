@@ -2,11 +2,11 @@
  * All of the documentation and software included in the
  * Alchemy Software is copyrighted by Stanley Kok, Parag
  * Singla, Matthew Richardson, Pedro Domingos, Marc
- * Sumner, Hoifung Poon, and Daniel Lowd.
+ * Sumner, Hoifung Poon, Daniel Lowd, and Jue Wang.
  * 
- * Copyright [2004-08] Stanley Kok, Parag Singla, Matthew
+ * Copyright [2004-09] Stanley Kok, Parag Singla, Matthew
  * Richardson, Pedro Domingos, Marc Sumner, Hoifung
- * Poon, and Daniel Lowd. All rights reserved.
+ * Poon, Daniel Lowd, and Jue Wang. All rights reserved.
  * 
  * Contact: Pedro Domingos, University of Washington
  * (pedrod@cs.washington.edu).
@@ -29,8 +29,9 @@
  * acknowledgment: "This product includes software
  * developed by Stanley Kok, Parag Singla, Matthew
  * Richardson, Pedro Domingos, Marc Sumner, Hoifung
- * Poon, and Daniel Lowd in the Department of Computer Science and
- * Engineering at the University of Washington".
+ * Poon, Daniel Lowd, and Jue Wang in the Department of
+ * Computer Science and Engineering at the University of
+ * Washington".
  * 
  * 4. Your publications acknowledge the use or
  * contribution made by the Software to your research
@@ -40,7 +41,7 @@
  * Statistical Relational AI", Technical Report,
  * Department of Computer Science and Engineering,
  * University of Washington, Seattle, WA.
- * http://www.cs.washington.edu/ai/alchemy.
+ * http://alchemy.cs.washington.edu.
  * 
  * 5. Neither the name of the University of Washington nor
  * the names of its contributors may be used to endorse or
@@ -78,13 +79,14 @@ using namespace std;
 using namespace __gnu_cxx;
 
 /**
- * Stores all relevant information about a node attached to a factor.
+ * Stores all relevant information about a factor.
  */
 class BPFactor
 {
  public:
   BPFactor(Clause * const & clause, SuperClause * const & superClause, 
-           Array<int> * const & constants, Domain * const & domain)
+           Array<int> * const & constants, Domain * const & domain,
+           double outputWt)
   {
     clause_ = clause;
     superClause_ = superClause;
@@ -94,7 +96,14 @@ class BPFactor
     msgsArr_ = new Array<double *>;
     nextMsgsArr_ = new Array<double *>;
     links_ = new Array<BPLink *>();
+    outputWt_ = outputWt;
     initFactorMesssages();
+  }
+  
+  BPFactor()
+  {
+    links_ = new Array<BPLink *>();
+    msgsArr_ = new Array<double *>;
   }
 		  
   ~BPFactor()
@@ -180,20 +189,11 @@ class BPFactor
     //update the stored msgs and update the msgProduct
   void moveToNextStep();
 
-  ostream& print(ostream& out)
-  {
-    if (superClause_ != NULL)
-    {
-      printArray(*(superClause_->getConstantTuple(0)), 1, out);
-    }
-    else
-    {
-      printArray(*constants_,1,out);
-    }
-    return out;
-  }
+  ostream& print(ostream& out);
 
- private:
+  ostream& printWts(ostream& out);
+
+ protected:
   Clause * clause_;
 
     //only one of the two below is used - superClause in case of lifted
@@ -202,9 +202,13 @@ class BPFactor
   Array<int> * constants_;
   Domain * domain_;
   Array<BPLink *> *links_;
+    // Incoming messages from nodes
   Array<double *> *msgsArr_;
+    // Incoming messages from nodes for next step
   Array<double *> *nextMsgsArr_;
+    // Outgoing messages
   double *factorMsgs_;
+  double outputWt_;
 };
 
 #endif

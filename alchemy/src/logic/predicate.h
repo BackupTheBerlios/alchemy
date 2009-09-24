@@ -2,11 +2,11 @@
  * All of the documentation and software included in the
  * Alchemy Software is copyrighted by Stanley Kok, Parag
  * Singla, Matthew Richardson, Pedro Domingos, Marc
- * Sumner, Hoifung Poon, and Daniel Lowd.
+ * Sumner, Hoifung Poon, Daniel Lowd, and Jue Wang.
  * 
- * Copyright [2004-07] Stanley Kok, Parag Singla, Matthew
+ * Copyright [2004-09] Stanley Kok, Parag Singla, Matthew
  * Richardson, Pedro Domingos, Marc Sumner, Hoifung
- * Poon, and Daniel Lowd. All rights reserved.
+ * Poon, Daniel Lowd, and Jue Wang. All rights reserved.
  * 
  * Contact: Pedro Domingos, University of Washington
  * (pedrod@cs.washington.edu).
@@ -29,8 +29,9 @@
  * acknowledgment: "This product includes software
  * developed by Stanley Kok, Parag Singla, Matthew
  * Richardson, Pedro Domingos, Marc Sumner, Hoifung
- * Poon, and Daniel Lowd in the Department of Computer Science and
- * Engineering at the University of Washington".
+ * Poon, Daniel Lowd, and Jue Wang in the Department of
+ * Computer Science and Engineering at the University of
+ * Washington".
  * 
  * 4. Your publications acknowledge the use or
  * contribution made by the Software to your research
@@ -40,7 +41,7 @@
  * Statistical Relational AI", Technical Report,
  * Department of Computer Science and Engineering,
  * University of Washington, Seattle, WA.
- * http://www.cs.washington.edu/ai/alchemy.
+ * http://alchemy.cs.washington.edu.
  * 
  * 5. Neither the name of the University of Washington nor
  * the names of its contributors may be used to endorse or
@@ -90,12 +91,14 @@ class Predicate
   Predicate(const PredicateTemplate* const & pt) 
     : template_(pt), terms_(new Array<Term*>), sense_(true), 
       truthValue_(UNKNOWN), allTermsAreDiffVars_(false), isGrounded_(false), 
-      intArrRep_(NULL), hashCode_(0), dirty_(true), parent_(NULL) {}
+      intArrRep_(NULL), hashCode_(0), dirty_(true), parent_(NULL),
+      realValue_(numeric_limits<double>::min()) {}
 
   Predicate(const PredicateTemplate* const & pt, Clause* const & parent)
     : template_(pt), terms_(new Array<Term*>), sense_(true), 
       truthValue_(UNKNOWN), allTermsAreDiffVars_(false), isGrounded_(false), 
-      intArrRep_(NULL), hashCode_(0), dirty_(true), parent_(parent) {}
+      intArrRep_(NULL), hashCode_(0), dirty_(true), parent_(parent),
+      realValue_(numeric_limits<double>::min()) {}
 
   Predicate(const Predicate& p)  { parent_ = NULL; copy(p); }
   Predicate(const Predicate& p,  Clause* const & par) { parent_= par; copy(p); }
@@ -207,6 +210,8 @@ class Predicate
     return "UNKNOWN"; //avoid compilation warning
   }
 
+  double getRealValue() const { return realValue_; }
+  void setRealValue(const double rv) { realValue_ = rv; }
 
   double getNumGroundingsIfAllVarDiff(const Domain* const & domain) const;
  
@@ -418,6 +423,19 @@ class Predicate
       int id = term->getId();
       assert(id < 0);
       pconstants->append((*constants)[-id]);
+    }
+    return pconstants;
+  }
+
+  Array<int> * getPredicateConstants()
+  {
+    Array<int> * pconstants = new Array<int>();
+    for (int termno = 0; termno < getNumTerms(); termno++)
+    {
+      const Term *term = getTerm(termno);
+      int id = term->getId();
+      assert(id >= 0);
+      pconstants->append(id);
     }
     return pconstants;
   }
@@ -832,6 +850,7 @@ class Predicate
   Clause* parent_; //not owned by Predicate, so no deleted in destructor
 
   static double fixedSizeB_;
+  double realValue_;
 };
 
 inline

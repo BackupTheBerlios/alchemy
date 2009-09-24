@@ -2,11 +2,11 @@
  * All of the documentation and software included in the
  * Alchemy Software is copyrighted by Stanley Kok, Parag
  * Singla, Matthew Richardson, Pedro Domingos, Marc
- * Sumner, Hoifung Poon, and Daniel Lowd.
+ * Sumner, Hoifung Poon, Daniel Lowd, and Jue Wang.
  * 
- * Copyright [2004-08] Stanley Kok, Parag Singla, Matthew
+ * Copyright [2004-09] Stanley Kok, Parag Singla, Matthew
  * Richardson, Pedro Domingos, Marc Sumner, Hoifung
- * Poon, and Daniel Lowd. All rights reserved.
+ * Poon, Daniel Lowd, and Jue Wang. All rights reserved.
  * 
  * Contact: Pedro Domingos, University of Washington
  * (pedrod@cs.washington.edu).
@@ -29,8 +29,9 @@
  * acknowledgment: "This product includes software
  * developed by Stanley Kok, Parag Singla, Matthew
  * Richardson, Pedro Domingos, Marc Sumner, Hoifung
- * Poon, and Daniel Lowd in the Department of Computer Science and
- * Engineering at the University of Washington".
+ * Poon, Daniel Lowd, and Jue Wang in the Department of
+ * Computer Science and Engineering at the University of
+ * Washington".
  * 
  * 4. Your publications acknowledge the use or
  * contribution made by the Software to your research
@@ -40,7 +41,7 @@
  * Statistical Relational AI", Technical Report,
  * Department of Computer Science and Engineering,
  * University of Washington, Seattle, WA.
- * http://www.cs.washington.edu/ai/alchemy.
+ * http://alchemy.cs.washington.edu.
  * 
  * 5. Neither the name of the University of Washington nor
  * the names of its contributors may be used to endorse or
@@ -81,17 +82,20 @@ class SuperClause
  public:
 
   SuperClause(Clause * const & clause, Array<Variable *> * const & eqVars,
-              Array<int> * const & varIdToCanonicalVarId, bool useImplicit)
+              Array<int> * const & varIdToCanonicalVarId, bool useImplicit,
+              double outputWt)
   {
     int parentSuperClauseId = -1;
+    outputWt_ = outputWt;
     init(clause, eqVars, varIdToCanonicalVarId, useImplicit,
          parentSuperClauseId);
   }
 
   SuperClause(Clause * const & clause, Array<Variable *> * const & eqVars,
               Array<int> * const & varIdToCanonicalVarId, bool useImplicit,
-              int parentSuperClauseId)
+              int parentSuperClauseId, double outputWt)
   {
+    outputWt_ = outputWt;
     init(clause, eqVars, varIdToCanonicalVarId, useImplicit,
          parentSuperClauseId);
   }
@@ -122,7 +126,7 @@ class SuperClause
   SuperClause * createSuperClauseFromTemplate()
   {
     return new SuperClause(clause_, eqVars_, varIdToCanonicalVarId_,
-                           useImplicit_,superClauseId_);
+                           useImplicit_, superClauseId_, outputWt_);
   }
 
   int getSuperClauseId() { return superClauseId_;}
@@ -401,11 +405,21 @@ class SuperClause
     return num;
   }
 
+  double getOutputWt()
+  {
+    return outputWt_;
+  }
+
+  void addOutputWt(const double& outputWt)
+  {
+    outputWt_ += outputWt;
+  }
+
     //print the tuples  
   ostream& print(ostream& out)
   {
     int beginIndex = 1;
-    for(int i=0;i<constantTuples_->size();i++)
+    for (int i = 0; i < constantTuples_->size(); i++)
     {
       printArray(*((*constantTuples_)[i]), beginIndex, out);
       out << endl;
@@ -427,6 +441,7 @@ class SuperClause
   bool useImplicit_;
   int superClauseId_;
   int parentSuperClauseId_;
+  double outputWt_;
           
   static int superClauseIndex__;
 };

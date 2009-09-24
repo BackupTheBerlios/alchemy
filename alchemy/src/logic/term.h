@@ -67,6 +67,7 @@
 #define TERM_H_JUN_26_2005
 
 #include <climits>
+#include <cstring>
 #include <stdlib.h>
 #include <ostream>
 using namespace std;

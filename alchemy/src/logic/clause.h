@@ -121,18 +121,19 @@ class Clause
  public: 
   Clause() 
     : wt_(0), predicates_(new Array<Predicate*>), intArrRep_(NULL),
-      hashCode_(0), dirty_(true), isHardClause_(false),
+      hashCode_(0), dirty_(true), isHardClause_(false), locked_(false),
       varIdToVarsGroundedType_(NULL), auxClauseData_(NULL) {}
 
   Clause(const double& wt) 
     : wt_(wt), predicates_(new Array<Predicate*>), intArrRep_(NULL),
-      hashCode_(0), dirty_(true), isHardClause_(false),
+      hashCode_(0), dirty_(true), isHardClause_(false), locked_(false),
       varIdToVarsGroundedType_(NULL), auxClauseData_(NULL) {}
 
 
   Clause(const Clause& c)
   {
     wt_ = c.wt_;
+    locked_ = c.locked_;
     predicates_ = new Array<Predicate*>;
     Array<Predicate*>* cpredicates = c.predicates_;
     for (int i = 0; i < cpredicates->size(); i++)
@@ -276,8 +277,8 @@ class Clause
   const double* getWtPtr() const { return &wt_; }
 
     // not setting dirty bit because it does not affect the clause
-  void setWt(const double& wt) { wt_ = wt; }  
-  void addWt(const double& wt) { wt_ += wt;  }
+  void setWt(const double& wt) { if (!locked_) wt_ = wt; }  
+  void addWt(const double& wt) { if (!locked_) wt_ += wt; }
  
   void setDirty() { dirty_ = true; }
   bool isDirty() const { return dirty_; }
@@ -327,6 +328,10 @@ class Clause
 
   bool isHardClause() const { return isHardClause_; }
   void setIsHardClause(const bool& b) { isHardClause_ = b; }
+
+  bool isLocked() const { return locked_; }
+  void lock()   { locked_ = true; }
+  void unlock() { locked_ = false; }
 
 
     // p is stored in MLN and the caller of this function should not delete it.
@@ -2910,6 +2915,7 @@ public:
   size_t hashCode_;
   bool dirty_;
   bool isHardClause_;
+  bool locked_;
 
     // (*varIdToVarsGroundedType_)[v] is the VarsGroundType of variable -v
     // start accessing this array from index 1

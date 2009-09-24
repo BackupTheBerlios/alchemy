@@ -73,6 +73,7 @@ using namespace __gnu_cxx;
 #include "array.h"
 #include "hash.h"
 #include <map>
+#include <cstring>
 
 using namespace std;
 

@@ -2,11 +2,11 @@
  * All of the documentation and software included in the
  * Alchemy Software is copyrighted by Stanley Kok, Parag
  * Singla, Matthew Richardson, Pedro Domingos, Marc
- * Sumner, Hoifung Poon, and Daniel Lowd.
+ * Sumner, Hoifung Poon, Daniel Lowd, and Jue Wang.
  * 
- * Copyright [2004-07] Stanley Kok, Parag Singla, Matthew
+ * Copyright [2004-09] Stanley Kok, Parag Singla, Matthew
  * Richardson, Pedro Domingos, Marc Sumner, Hoifung
- * Poon, and Daniel Lowd. All rights reserved.
+ * Poon, Daniel Lowd, and Jue Wang. All rights reserved.
  * 
  * Contact: Pedro Domingos, University of Washington
  * (pedrod@cs.washington.edu).
@@ -29,8 +29,9 @@
  * acknowledgment: "This product includes software
  * developed by Stanley Kok, Parag Singla, Matthew
  * Richardson, Pedro Domingos, Marc Sumner, Hoifung
- * Poon, and Daniel Lowd in the Department of Computer Science and
- * Engineering at the University of Washington".
+ * Poon, Daniel Lowd, and Jue Wang in the Department of
+ * Computer Science and Engineering at the University of
+ * Washington".
  * 
  * 4. Your publications acknowledge the use or
  * contribution made by the Software to your research
@@ -40,7 +41,7 @@
  * Statistical Relational AI", Technical Report,
  * Department of Computer Science and Engineering,
  * University of Washington, Seattle, WA.
- * http://www.cs.washington.edu/ai/alchemy.
+ * http://alchemy.cs.washington.edu.
  * 
  * 5. Neither the name of the University of Washington nor
  * the names of its contributors may be used to endorse or
@@ -428,6 +429,7 @@ class Domain
   }
 
 	// Returns the index of the given constant of all constants of this type
+/*
   int getConstantIndexInType(const int& constId) const
   {
   	int typeId = getConstantTypeId(constId);
@@ -437,7 +439,7 @@ class Domain
         return i;
   	return -1;
   }
-  
+*/  
   /**
    * Returns the number of constants of a certain type in this domain.
    * External constants are not included.
@@ -536,28 +538,47 @@ class Domain
            << " because its type of " << typeName << " doesn't exist" << endl;
       return typeId;
     }
-    
+
+      // If constant already exists, then add it to new type
+    int constId = getConstantId(constName);
+    if (constId >= 0)
+    {
+      bool newType = false;
+      Array<const char*>* prevTypes = getConstantTypeNames(constId);
+      for (int i = 0; i < prevTypes->size(); i++)
+      {
+        if (strcmp((*prevTypes)[i], typeName) != 0)
+        {
+            // New type
+          newType = true;
+          break;
+        }
+      }
+      
+      if (!newType)
+      {
+          // Constant already belongs to this type
+        return -1;
+      }
+    }
       // Insert constant into constDualMap_
-    int constId = constDualMap_->insert(constName, typeId);
+    constId = constDualMap_->insert(constName, typeId);
     if (constId < 0)
     {
       cout << "Warning: failed to add constant " << constName << " of type " 
            << typeName << endl;
       return constId;
     }
-    
+
+      // Insert id into by type index
     if (external)
     {
       (*externalConstantsByType_)[typeId]->append(constId);
-      //externalConstant_->append(true);
     }
     else
     {
-      //externalConstant_->append(false);
       (*constantsByType_)[typeId]->append(constId);
     }
-      // Insert id into by type index
-    //(*constantsByType_)[typeId]->append(constId);
     return constId;
   }
 
@@ -570,6 +591,7 @@ class Domain
    * 
    * @return id of constant changed, or -1 if not found.
    */
+/*
   int replaceTypeOfConstant(const char* const & constName,
   							const char* const & oldTypeName,
   							const char* const & newTypeName)
@@ -601,10 +623,12 @@ class Domain
     (*constantsByType_)[newTypeId]->append(constId);
     return constId;
   }
+*/
   
   /**
    * Returns number of (internal) constants.
    */
+/*
   int getNumConstants() const
   {
     int count = 0;
@@ -615,15 +639,17 @@ class Domain
     }
     return count;
   }
+*/
 
   /**
    * Returns number of internal and external constants.
    */
+/*
   int getNumConstantsWithExt() const
   {
     return constDualMap_->getNumInt();
   }
-
+*/
 
   /**
    * Returns the name of a constant in this domain associated with a given
@@ -653,13 +679,13 @@ class Domain
   bool isConstant(const int& id) const { return (getConstantName(id) != NULL); }
 
     // Caller should delete the constName argument if required
-  int getConstantTypeId(const char* const & constName) const 
+  Array<int>* getConstantTypeIds(const char* const & constName) const 
   { 
     return constDualMap_->getInt2(constName);
   }
 
 
-  int getConstantTypeId(const int& constId) const
+  Array<int>* getConstantTypeIds(const int& constId) const
   {
     return constDualMap_->getInt2(constId);
   }
@@ -667,10 +693,17 @@ class Domain
 
     // Caller should not delete returned const char*
     // Returns NULL if id does not exist.
-  const char* getConstantTypeName(const int& constId) const
+  Array<const char*>* getConstantTypeNames(const int& constId) const
   { 
-    int typeId = getConstantTypeId(constId);
-    return getTypeName(typeId);
+    Array<int>* typeIds = getConstantTypeIds(constId);
+    if (typeIds == NULL) return NULL;
+    else
+    {
+      Array<const char*>* typeNames = new Array<const char*>;
+      for (int i = 0; i < typeIds->size(); i++)
+        typeNames->append(getTypeName((*typeIds)[i]));
+      return typeNames;
+    }
   }
 
 

@@ -67,6 +67,7 @@
 #define MAXWALKSATPARAMS_H_MAR_21_2005
 
 #include "samplesatparams.h"
+enum heuristics {RANDOM = 0, BEST = 1, TABU = 2, SS = 3, HMWS = 4, HSA = 5};
 
 /**
  * This struct holds parameters needed to run MaxWalksat

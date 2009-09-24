@@ -2,11 +2,11 @@
  * All of the documentation and software included in the
  * Alchemy Software is copyrighted by Stanley Kok, Parag
  * Singla, Matthew Richardson, Pedro Domingos, Marc
- * Sumner, Hoifung Poon, and Daniel Lowd.
+ * Sumner, Hoifung Poon, Daniel Lowd, and Jue Wang.
  * 
- * Copyright [2004-07] Stanley Kok, Parag Singla, Matthew
+ * Copyright [2004-09] Stanley Kok, Parag Singla, Matthew
  * Richardson, Pedro Domingos, Marc Sumner, Hoifung
- * Poon, and Daniel Lowd. All rights reserved.
+ * Poon, Daniel Lowd, and Jue Wang. All rights reserved.
  * 
  * Contact: Pedro Domingos, University of Washington
  * (pedrod@cs.washington.edu).
@@ -29,8 +29,9 @@
  * acknowledgment: "This product includes software
  * developed by Stanley Kok, Parag Singla, Matthew
  * Richardson, Pedro Domingos, Marc Sumner, Hoifung
- * Poon, and Daniel Lowd in the Department of Computer Science and
- * Engineering at the University of Washington".
+ * Poon, Daniel Lowd, and Jue Wang in the Department of
+ * Computer Science and Engineering at the University of
+ * Washington".
  * 
  * 4. Your publications acknowledge the use or
  * contribution made by the Software to your research
@@ -40,7 +41,7 @@
  * Statistical Relational AI", Technical Report,
  * Department of Computer Science and Engineering,
  * University of Washington, Seattle, WA.
- * http://www.cs.washington.edu/ai/alchemy.
+ * http://alchemy.cs.washington.edu.
  * 
  * 5. Neither the name of the University of Washington nor
  * the names of its contributors may be used to endorse or
@@ -87,8 +88,8 @@ class MCMC : public Inference
    *                            GibbsParams*)
    */  
   MCMC(VariableState* state, long int seed, const bool& trackClauseTrueCnts,
-       MCMCParams* params)
-    : Inference(state, seed, trackClauseTrueCnts)
+       MCMCParams* params, Array<Array<Predicate* >* >* queryFormulas = NULL)
+    : Inference(state, seed, trackClauseTrueCnts, queryFormulas)
   {
       // User-set parameters
     numChains_ = params->numChains;
@@ -99,10 +100,341 @@ class MCMC : public Inference
     maxSeconds_ = params->maxSeconds;
   }
 
+
+  MCMC(HVariableState* state, long int seed, const bool& trackClauseTrueCnts,
+	  MCMCParams* params)
+	  : Inference(state, seed, trackClauseTrueCnts)
+  {
+	  // User-set parameters
+	  numChains_ = params->numChains;
+	  burnMinSteps_ = params->burnMinSteps;
+	  burnMaxSteps_ = params->burnMaxSteps;
+	  minSteps_ = params->minSteps;
+	  maxSteps_ = params->maxSteps;
+	  maxSeconds_ = params->maxSeconds;
+  }
+
   /**
    * Destructor.
    */
   ~MCMC() {}
+
+  /*double computeHybridClauseValue(int contClauseIdx)
+  {
+	  return hstate_->hybridClauseCost_[contClauseIdx] * HybridClauseContPartValue(contClauseIdx) * HybridClauseDisPartValue(contClauseIdx);
+  }*/
+
+  double computeHybridClauseValue(int clauseIdx, int c)
+  {
+	  double contClauseContPartValue = HybridClauseContPartValue(clauseIdx, c);
+	  double contClauseDisPartValue = HybridClauseDisPartValue(clauseIdx, c);
+	  return hstate_->hybridWts_[clauseIdx] * contClauseContPartValue * contClauseDisPartValue;
+  }
+
+  double HybridClauseContPartValue(int contClauseIdx, int c)
+  {
+	  PolyNomial& pl = hstate_->GetHybridClausePolynomial(contClauseIdx);
+
+	  assert(hstate_->hybridContClause_[contClauseIdx].size() == pl.GetVarNum());
+
+	  Array<double> arVar;
+	  for(int i = 0; i < hstate_->hybridContClause_[contClauseIdx].size(); ++i)
+	  {
+		  arVar.append(truthValuesCont_[hstate_->hybridContClause_[contClauseIdx][i] - 1][c]); // the order of the cont atom here should be the same as they are in the Pl
+	  }
+	  double v = pl.ComputePlValue(arVar);
+	  
+	  return v;
+  }
+
+  double HybridClauseDisPartValue(int contClauseIdx, int c)
+  {
+	  bool bAndOr = hstate_->hybridConjunctionDisjunction_[contClauseIdx];	  
+	  int numTrueLits = 0;
+	  int numFalseLits = 0;
+	  for(int j = 0; j < hstate_->hybridDisClause_[contClauseIdx].size(); ++j)
+	  {
+		  int atomIdx = hstate_->hybridDisClause_[contClauseIdx][j];
+		  if((atomIdx > 0) == truthValues_[abs(atomIdx)-1][c]) // true literal
+		  {
+			  numTrueLits ++;
+			  if(!bAndOr) // disjunctive clause
+			  {
+				  break;
+			  }
+		  }
+		  else // false literal
+		  {
+			  numFalseLits ++;
+			  if(bAndOr) // conjunctive clause
+			  {
+				  break;
+			  }
+		  }
+	  }
+	  if(!bAndOr) // disjunctive clause
+	  {
+		  return (numTrueLits > 0)?1.0:0.0;
+	  }
+	  else // conjunctive clause
+	  {
+		  return (numFalseLits > 0)?0.0:1.0;
+	  }
+	  return 0.0;
+  }
+
+  void updateDisPredValue(int predIdx, int chainIdx, bool updateValue)
+  {
+	  bool bBak = truthValues_[predIdx][chainIdx];
+	  Array<int>& occDisPos = hstate_->getPosOccurenceArray(predIdx + 1);
+	  Array<int>& occDisNeg = hstate_->getNegOccurenceArray(predIdx + 1);
+	  Array<int>& occCont = hstate_->getContDisOccurenceArray(predIdx + 1) ;
+
+	  if(updateValue)
+	  {
+		  if(!bBak)
+		  {
+			  // update numTrueLits of discrete clauses where it appears 
+			  for(int j = 0; j < occDisPos.size(); ++j)
+			  {
+				  int disClauseIdx = occDisPos[j];
+				  numTrueLits_[disClauseIdx][chainIdx] += 1;
+			  }
+
+			  for( int j = 0; j < occDisNeg.size(); ++j)
+			  {
+				  int disClauseIdx = occDisNeg[j];
+				  numTrueLits_[disClauseIdx][chainIdx] -= 1;
+			  }
+		  }
+	  }
+	  else
+	  {
+		  if(bBak)
+		  {
+			  for( int j = 0; j < occDisPos.size(); ++j)
+			  {
+				  int disClauseIdx = occDisPos[j];
+				  numTrueLits_[disClauseIdx][chainIdx] -= 1;
+			  }
+
+			  for( int j = 0; j < occDisNeg.size(); ++j)
+			  {
+				  int disClauseIdx = occDisNeg[j];
+				  numTrueLits_[disClauseIdx][chainIdx] += 1;
+			  }
+		  }	
+	  }
+
+	  truthValues_[predIdx][chainIdx] = updateValue;
+
+	  if(bBak != updateValue)
+	  {
+		  for( int j = 0; j < occCont.size(); ++j)
+		  {
+			  int hybridClauseIdx = occCont[j];
+			  hybridClauseDisPartValueMCMC_[hybridClauseIdx] = HybridClauseDisPartValue(hybridClauseIdx, chainIdx)==1.0?true:false;
+		  }
+	  }  
+  }
+
+  void updateProposalContValue(int contPredIdx, int chainIdx)
+  {
+	  Array<int>& occContCont = hstate_->hybridContOccurrence_[contPredIdx + 1];
+	  PolyNomial pl;
+	  for(int j = 0; j < occContCont.size(); j++)
+	  {
+		  int contClauseIdx = occContCont[j];
+		  PolyNomial pltmp = hstate_->hybridPls_[contClauseIdx];
+		  //find the in idx here
+		  int inIdx = -1;
+		  Array<double> arVars;
+		  for(int k = 0; k < hstate_->hybridContClause_[contClauseIdx].size(); k++)
+		  {
+			  arVars.append(truthValuesCont_[hstate_->hybridContClause_[contClauseIdx][k]-1][chainIdx]);
+			  if (hstate_->hybridContClause_[contClauseIdx][k] == contPredIdx+1)
+			  {
+				  //pltmp.ReduceToOneVar(,k)
+				  inIdx = k;
+			  }			  
+		  }
+		  if (inIdx == -1)
+		  {
+			  cout <<  "faint" << endl;
+		  }			  
+
+		  pltmp.ReduceToOneVar(arVars, inIdx);
+		  pl.AddPl(pltmp);
+	  }
+	  
+	  double miu = 0, stdev = 0;
+	  pl.GetGaussianPara(&miu, &stdev);
+	  truthValuesCont_[contPredIdx][chainIdx] = ExtRandom::gaussRandom(miu, stdev);
+
+	  for(int j = 0; j < occContCont.size(); j++)
+	  {
+		  int hybridClauseIdx = occContCont[j];
+		  hybridClauseContPartValueMCMC_[hybridClauseIdx][chainIdx] = HybridClauseContPartValue(hybridClauseIdx,chainIdx);
+	  }  
+  }
+
+  // Computes the probability of a ground discrete predicate in a chain, adapted to accommodate the hybrid case.
+  double getProbabilityOfPredH(const int& predIdx, const int& chainIdx, const double& invTemp)
+  {
+	  // Different for multi-chain
+	  if (numChains_ > 1)
+	  {
+		  double wtDisAsTrue = 0, wtDisAsFalse = 0;
+		  bool bBak = truthValues_[predIdx][chainIdx];
+
+		  Array<int>& occDisPos = hstate_->getPosOccurenceArray(predIdx + 1);
+		  Array<int>& occDisNeg = hstate_->getNegOccurenceArray(predIdx + 1);
+		  Array<int>& occCont = hstate_->getContDisOccurenceArray(predIdx + 1) ;
+
+		  // for clauses where the variable appears as a true literal
+		  for(int j = 0; j < occDisPos.size(); j++)
+		  {
+			  int disClauseIdx = occDisPos[j];
+			  wtDisAsTrue += hstate_->clauseCost_[disClauseIdx];
+
+			  if(numTrueLits_[disClauseIdx][chainIdx] > 1)
+			  {
+				  wtDisAsFalse += hstate_->clauseCost_[disClauseIdx];
+			  }
+			  else if(numTrueLits_[disClauseIdx][chainIdx] == 1 && !bBak) // there was only 1 true literal and the only true literal is some one else
+			  {
+				  wtDisAsFalse += hstate_->clauseCost_[disClauseIdx];
+			  }
+		  }
+
+		  // for clauses where the variable appears as a false literal
+		  for(int j = 0; j < occDisNeg.size(); j++)
+		  {
+			  int disClauseIdx = occDisNeg[j];
+			  if(numTrueLits_[disClauseIdx][chainIdx] > 1) // there were more than one true literals 
+			  {
+				  wtDisAsTrue += hstate_->clauseCost_[disClauseIdx];
+			  }
+			  else if(numTrueLits_[disClauseIdx][chainIdx] == 1 && bBak) // there was only 1 true literal and the only true literal is some one else
+			  {
+				  wtDisAsTrue += hstate_->clauseCost_[disClauseIdx];
+			  }
+			  wtDisAsFalse += hstate_->clauseCost_[disClauseIdx];
+		  }
+
+		  for (int j = 0; j < occCont.size(); j++) {
+			  int hybridClauseIdx = occCont[j];
+			  double contPart = hybridClauseContPartValueMCMC_[hybridClauseIdx][chainIdx];
+			  double wt = hstate_->hybridWts_[hybridClauseIdx];
+
+			  truthValues_[predIdx][chainIdx] = true;
+			  double disPartAsTrue = HybridClauseDisPartValue(hybridClauseIdx,chainIdx);
+			  truthValues_[predIdx][chainIdx] = false;
+			  double disPartAsFalse = HybridClauseDisPartValue(hybridClauseIdx,chainIdx);
+			  truthValues_[predIdx][chainIdx] = bBak;
+
+			  wtDisAsTrue += wt*disPartAsTrue*contPart;
+			  wtDisAsFalse += wt*disPartAsFalse*contPart;
+		  }
+
+		  // get probabilities
+		  double wtDiff = (wtDisAsFalse - wtDisAsTrue) * invTemp;
+		  double prob;
+		  if (wtDiff > 403.429)
+		  {
+			  prob = 0;
+		  }
+		  else if (wtDiff < -403.429)
+		  {
+			  prob = 1;
+		  }
+		  else
+		  {
+			  prob = 1 / ( 1 + exp(wtDiff));
+		  }
+		  return prob;
+	  }  // For chain id ends.
+	  else
+	  {
+		  GroundPredicate* gndPred = hstate_->getGndPred(predIdx);
+		  double wtDisAsTrue = 0, wtDisAsFalse = 0;
+		  bool bBak = gndPred->getTruthValue();
+
+		  Array<int>& occDisPos = hstate_->getPosOccurenceArray(predIdx + 1);
+		  Array<int>& occDisNeg = hstate_->getNegOccurenceArray(predIdx + 1);
+		  Array<int>& occCont = hstate_->getContDisOccurenceArray(predIdx + 1) ;
+
+		  gndPred->setTruthValue(true);
+		  //hstate_->setValueOfAtom(i+1, true);		  
+		  for(int j = 0; j < occDisPos.size(); j++)
+		  {
+			  int disClauseIdx = occDisPos[j];
+			  wtDisAsTrue += hstate_->clauseCost_[disClauseIdx];			  
+		  }
+
+		  for(int j = 0; j < occDisNeg.size(); j++)
+		  {
+			  int disClauseIdx = occDisNeg[j];
+			  for(int k = 0; k < hstate_->clause_[disClauseIdx].size(); k++)
+			  {
+				  int lit = hstate_->clause_[disClauseIdx][k];
+				  GroundPredicate* gndPredtmp =	 hstate_->getGndPred(abs(lit)-1);
+				  if ((lit > 0) == gndPredtmp->getTruthValue()) //true literal
+				  {
+					  wtDisAsTrue += hstate_->clauseCost_[disClauseIdx];
+					  break;
+				  }
+			  }
+		  }
+
+		  for (int j = 0; j < occCont.size(); j++)
+		  {
+			  int contClauseIdx = occCont[j];
+			  wtDisAsTrue += hstate_->HybridClauseValue(contClauseIdx);
+				  // computeHybridClauseValue(contClauseIdx);
+		  }
+
+
+		  gndPred->setTruthValue(false);
+		  for(int j = 0; j < occDisNeg.size(); j++)
+		  {
+			  int disClauseIdx = occDisNeg[j];
+			  wtDisAsFalse += hstate_->clauseCost_[disClauseIdx];
+		  }
+
+		  for(int j = 0; j < occDisPos.size(); j++)
+		  {
+			  int disClauseIdx = occDisPos[j];
+			  for(int k = 0; k < hstate_->clause_[disClauseIdx].size(); k++)
+			  {
+				  int lit = hstate_->clause_[disClauseIdx][k];
+				  GroundPredicate* gndPredtmp =	 hstate_->getGndPred(abs(lit)-1);
+				  if ((lit > 0) == gndPredtmp->getTruthValue()) //true literal
+				  {
+					  wtDisAsFalse += hstate_->clauseCost_[disClauseIdx];
+					  break;
+				  }
+			  }
+		  }
+
+		  for (int j = 0; j < occCont.size(); j++)
+		  {
+			  int contClauseIdx = occCont[j];
+			  wtDisAsFalse += hstate_->HybridClauseValue(contClauseIdx);
+		  }
+
+		  gndPred->setTruthValue(bBak);
+
+		  return 1.0 / ( 1.0 + exp((wtDisAsFalse - wtDisAsTrue) * invTemp));
+	  }
+  }
+
+  /**
+   * Prints out the network.
+   */
+  virtual void printNetwork(ostream& out)
+  {
+  } 
 
   /**
    * Prints the probabilities of each predicate to a stream.
@@ -159,6 +491,16 @@ class MCMC : public Inference
     }    
   }
 
+
+  double getProbabilityH(GroundPredicate* const& gndPred)
+  {
+	  int idx = hstate_->getGndPredIndex(gndPred);
+	  double prob = 0.0;
+	  if (idx >= 0) prob = getProbTrue(idx);
+	  // Uniform smoothing
+	  return (prob*10000 + 1/2.0)/(10000 + 1.0);
+  }
+
   /**
    * Gets the probability of a ground predicate.
    * 
@@ -188,6 +530,19 @@ class MCMC : public Inference
       if (prob >= 0.5) state_->printGndPred(i, out);
     }    
   }
+
+  void printTruePredsH(ostream& out)
+  {
+	  for (int i = 0; i < hstate_->getNumAtoms(); i++)
+	  {
+		  double prob = getProbTrue(i);
+
+		  // Uniform smoothing
+		  prob = (prob * 10000 + 1/2.0) / (10000 + 1.0);
+		  if (prob >= 0.5) hstate_->printGndPred(i, out);
+	  }    
+  }
+
 
  protected:
 
@@ -568,6 +923,147 @@ class MCMC : public Inference
    * @param gndPreds Ground predicates whose weights should be updated.
    * @param chainIdx Index of chain where updating occurs.
    */
+  void updateWtsForGndPredsH(GroundPredicateHashArray& gndPreds,
+	  Array<int>& gndPredIndices, const int& chainIdx)
+  {
+	  if (mcmcdebug) cout << "Entering updateWtsForGndPreds" << endl;
+	  // for each ground predicate whose MB has changed
+	  for (int g = 0; g < gndPreds.size(); g++)
+	  {
+		  double wtIfNoChange = 0, wtIfInverted = 0, wt;
+		  // Ground clauses in which this pred occurs
+		  Array<int>& negGndClauses =
+			  hstate_->getNegOccurenceArray(gndPredIndices[g] + 1);
+		  Array<int>& posGndClauses =
+			  hstate_->getPosOccurenceArray(gndPredIndices[g] + 1);
+
+		  int gndClauseIdx;
+		  bool sense;
+		  if (mcmcdebug)
+		  {
+			  cout << "Ground clauses in which pred " << g << " occurs neg.: "
+				  << negGndClauses.size() << endl;
+			  cout << "Ground clauses in which pred " << g << " occurs pos.: "
+				  << posGndClauses.size() << endl;
+		  }
+
+		  for (int i = 0; i < negGndClauses.size() + posGndClauses.size(); i++)
+		  {
+			  if (i < negGndClauses.size())
+			  {
+				  gndClauseIdx = negGndClauses[i];
+				  if (mcmcdebug) cout << "Neg. in clause " << gndClauseIdx << endl;
+				  sense = false;
+			  }
+			  else
+			  {
+				  gndClauseIdx = posGndClauses[i - negGndClauses.size()];
+				  if (mcmcdebug) cout << "Pos. in clause " << gndClauseIdx << endl;
+				  sense = true;
+			  }
+
+			  GroundClause* gndClause = hstate_->getGndClause(gndClauseIdx);
+			  if (gndClause->isHardClause())
+				  wt = hstate_->getClauseCost(gndClauseIdx);
+			  else
+				  wt = gndClause->getWt();
+			  // NumTrueLits are stored differently for multi-chain
+			  int numSatLiterals;
+			  if (numChains_ > 1)
+				  numSatLiterals = numTrueLits_[gndClauseIdx][chainIdx];
+			  else
+				  numSatLiterals = hstate_->getNumTrueLits(gndClauseIdx);
+			  if (numSatLiterals > 1)
+			  {
+				  // Some other literal is making it sat, so it doesn't matter
+				  // if pos. clause. If neg., nothing can be done to unsatisfy it.
+				  if (wt > 0)
+				  {
+					  wtIfNoChange += wt;
+					  wtIfInverted += wt;
+				  }
+			  }
+			  else 
+				  if (numSatLiterals == 1) 
+				  {
+					  if (wt > 0) wtIfNoChange += wt;
+					  // Truth values are stored differently for multi-chain
+					  bool truthValue;
+					  if (numChains_ > 1)
+						  truthValue = truthValues_[gndPredIndices[g]][chainIdx];
+					  else
+						  truthValue = gndPreds[g]->getTruthValue();
+					  // If the current truth value is the same as its sense in gndClause
+					  if (truthValue == sense) 
+					  {
+						  // This gndPred is the only one making this function satisfied
+						  if (wt < 0) wtIfInverted += abs(wt);
+					  }
+					  else 
+					  {
+						  // Some other literal is making it satisfied
+						  if (wt > 0) wtIfInverted += wt;
+					  }
+				  }
+				  else
+					  if (numSatLiterals == 0) 
+					  {
+						  // None satisfy, so when gndPred switch to its negative, it'll satisfy
+						  if (wt > 0) wtIfInverted += wt;
+						  else if (wt < 0) wtIfNoChange += abs(wt);
+					  }
+		  } // for each ground clause that gndPred appears in
+
+		  if (mcmcdebug)
+		  {
+			  cout << "wtIfNoChange of pred " << g << ": "
+				  << wtIfNoChange << endl;
+			  cout << "wtIfInverted of pred " << g << ": "
+				  << wtIfInverted << endl;
+		  }
+
+		  // Clause info is stored differently for multi-chain
+		  if (numChains_ > 1)
+		  {
+			  if (truthValues_[gndPredIndices[g]][chainIdx]) 
+			  {
+				  wtsWhenTrue_[gndPredIndices[g]][chainIdx] = wtIfNoChange;
+				  wtsWhenFalse_[gndPredIndices[g]][chainIdx] = wtIfInverted;
+			  }
+			  else 
+			  {
+				  wtsWhenFalse_[gndPredIndices[g]][chainIdx] = wtIfNoChange;
+				  wtsWhenTrue_[gndPredIndices[g]][chainIdx] = wtIfInverted;
+			  }
+		  }
+		  else
+		  { // Single chain
+			  if (gndPreds[g]->getTruthValue())
+			  {
+				  gndPreds[g]->setWtWhenTrue(wtIfNoChange);
+				  gndPreds[g]->setWtWhenFalse(wtIfInverted);
+			  }
+			  else
+			  {
+				  gndPreds[g]->setWtWhenFalse(wtIfNoChange);
+				  gndPreds[g]->setWtWhenTrue(wtIfInverted);            
+			  }
+		  }
+	  } // for each ground predicate whose MB has changed
+	  if (mcmcdebug) cout << "Leaving updateWtsForGndPreds" << endl;
+  }
+
+  
+
+
+  /**
+   * Updates the weights of affected ground predicates. These are the ground
+   * predicates which are in clauses of predicates which have had their truth
+   * value changed.
+   * 
+   * @param gndPreds Ground predicates whose weights should be updated.
+   * @param chainIdx Index of chain where updating occurs.
+   */
   void updateWtsForGndPreds(GroundPredicateHashArray& gndPreds,
                             Array<int>& gndPredIndices,
                             const int& chainIdx)
@@ -863,6 +1359,14 @@ class MCMC : public Inference
     minSteps_ = (int)(minSteps_ * factor);
     maxSteps_ = (int)(maxSteps_ * factor);
   }
+  
+ public: 
+  // truth value assignment for continuous variables for each chain
+  Array<Array<double> > truthValuesCont_;
+  // storing values for the discrete parts of hybrid clauses for each chain
+  Array<Array<bool> > hybridClauseDisPartValueMCMC_; 
+  // storing values for the continuous parts of hybrid clauses for each chain
+  Array<Array<double> > hybridClauseContPartValueMCMC_; 
   
  protected:
  

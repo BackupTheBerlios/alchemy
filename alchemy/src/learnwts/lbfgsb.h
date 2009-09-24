@@ -2,11 +2,11 @@
  * All of the documentation and software included in the
  * Alchemy Software is copyrighted by Stanley Kok, Parag
  * Singla, Matthew Richardson, Pedro Domingos, Marc
- * Sumner, Hoifung Poon, and Daniel Lowd.
+ * Sumner and Hoifung Poon.
  * 
- * Copyright [2004-07] Stanley Kok, Parag Singla, Matthew
- * Richardson, Pedro Domingos, Marc Sumner, Hoifung
- * Poon, and Daniel Lowd. All rights reserved.
+ * Copyright [2004-06] Stanley Kok, Parag Singla, Matthew
+ * Richardson, Pedro Domingos, Marc Sumner and Hoifung
+ * Poon. All rights reserved.
  * 
  * Contact: Pedro Domingos, University of Washington
  * (pedrod@cs.washington.edu).
@@ -28,8 +28,8 @@
  * of this software must display the following
  * acknowledgment: "This product includes software
  * developed by Stanley Kok, Parag Singla, Matthew
- * Richardson, Pedro Domingos, Marc Sumner, Hoifung
- * Poon, and Daniel Lowd in the Department of Computer Science and
+ * Richardson, Pedro Domingos, Marc Sumner and Hoifung
+ * Poon in the Department of Computer Science and
  * Engineering at the University of Washington".
  * 
  * 4. Your publications acknowledge the use or
@@ -60,7 +60,7 @@
  * ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
- * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * IF ADVISED OF THE POSS IBILITY OF SUCH DAMAGE.
  * 
  */
 #ifndef LBFGSB_H_SEP_17_2005
@@ -71,6 +71,7 @@
 #include <fstream>
 #include "timer.h"
 #include "pseudologlikelihood.h"
+#include "Polynomial.h"
 
 const int LBFGSB_PRINT = -1; //-1: no output; 1: output for every iteration
 
@@ -114,11 +115,10 @@ class LBFGSB
 
   void reInit(const int& numWts)
   {
-    if (numWts_ == numWts) return;
-    init(numWts);
+	  if (numWts_ == numWts) return;
+	  init(numWts);
   }
 
-  
   void destroy() 
   {
     if (nbd_ != NULL) delete [] nbd_;
@@ -129,6 +129,85 @@ class LBFGSB
     if (wa_  != NULL) delete [] wa_;
   }
 
+  double minimize(double* const & wts, int& iter, bool& error)
+  {
+	  error = false;
+	  int m = 5; //max number of limited memory corrections
+	  double f; // value of function to be optimized
+	  double factr = 0;
+	  double pgtol = 0;
+	  // -1: silent (-1); 1: out at every iteration
+	  ofstream* itfile = NULL;
+	  int iprint = LBFGSB_PRINT; 
+	  if (iprint >= 1) itfile = new ofstream("iterate.dat");
+	  iter = 0;
+
+	  //indicate that the elements of x[] are unbounded
+	  for (int i = 0; i <= numWts_; i++) nbd_[i] = 0;
+
+	  strcpy(task_,"START");
+	  for (int i = 5; i <= 60; i++) task_[i]=' ';
+
+	  setulb(numWts_,m,wts,l_,u_,nbd_,f,g_,factr,pgtol,wa_,iwa_,task_,
+		  iprint,csave_,lsave_,isave_,dsave_,itfile);
+
+	  double initialValue = 0, prevValue = 0, newValue;
+	  bool firstIter = true;
+
+	  //while routine returns "FG" or "NEW_X" in task, keep calling it
+	  while (strncmp(task_,"FG",2)==0 || strncmp(task_,"NEW_X",5)==0)
+	  {
+		  if (strncmp(task_,"FG",2)==0)
+		  {
+			  f = getValueAndGradient(g_, wts);
+
+			  setulb(numWts_,m,wts,l_,u_,nbd_,f,g_,factr,pgtol,wa_,iwa_,task_,
+				  iprint,csave_,lsave_,isave_,dsave_,itfile);
+
+			  if (firstIter) { firstIter = false; prevValue = f; initialValue = f; }
+		  }
+		  else
+		  {
+			  //the minimization routine has returned with a new iterate,
+			  //and we have opted to continue the iteration
+			  if (iter+1 > maxIter_) break;
+			  ++iter;
+			  newValue = f;
+
+			  if (fabs(newValue-prevValue) < ftol_*fabs(prevValue)) break;
+			  prevValue = newValue;
+
+			  setulb(numWts_,m,wts,l_,u_,nbd_,f,g_,factr,pgtol,wa_,iwa_,task_,
+				  iprint,csave_,lsave_,isave_,dsave_,itfile);
+		  }
+	  }
+
+
+	  //If task is neither FG nor NEW_X we terminate execution.
+	  //the minimization routine has returned with one of
+	  //{CONV, ABNO, ERROR}
+
+	  if (strncmp(task_,"ABNO",4) == 0)
+	  {
+		  cout << "ERROR: LBFGSB failed. Returned ABNO" << endl;
+		  error = true;
+		  return initialValue;
+	  }
+
+	  if (strncmp(task_,"ERROR",5)==0)
+	  {
+		  cout << "ERROR: LBFGSB failed. Returned ERROR" << endl;
+		  error = true;
+		  return initialValue;
+	  }
+
+	  if (strncmp(task_,"CONV",4)==0)
+	  {
+		  //cout << "LBFGSB converged!" << endl;
+	  }
+
+	  return f;    
+  }
 
   double minimize(const int& numWts, double* const & wts, int& iter,bool& error)
   {
@@ -136,90 +215,201 @@ class LBFGSB
     return minimize(wts, iter, error);
   }
 
-
-  double minimize(double* const & wts, int& iter, bool& error)
+  double startPl(double* const & wts, int& iter, bool& error, PolyNomial& pl)
   {
-    error = false;
-    int m = 5; //max number of limited memory corrections
-    double f; // value of function to be optimized
-    double factr = 0;
-    double pgtol = 0;
-     // -1: silent (-1); 1: out at every iteration
-    ofstream* itfile = NULL;
-    int iprint = LBFGSB_PRINT; 
-    if (iprint >= 1) itfile = new ofstream("iterate.dat");
+	  error = false;
+	  int m = 5; //max number of limited memory corrections
+	  double f; // value of function to be optimized
+	  double factr = 0;
+	  double pgtol = 0;
+	  // -1: silent (-1); 1: out at every iteration
+	  ofstream* itfile = NULL;
+	  int iprint = LBFGSB_PRINT; 
+	  if (iprint >= 1) itfile = new ofstream("iterate.dat");
+	  iter = 0;
+	  //indicate that the elements of x[] are unbounded
+	  //for (int i = 0; i <= numWts_; i++) nbd_[i] = 0;
+
+	  //indicate that the elements of x[] have both upper bounds and lower bounds
+	  for (int i = 0; i <= numWts_; i++) nbd_[i] = 2;
+
+	  strcpy(task_,"START");
+	  for (int i = 5; i <= 60; i++) task_[i]=' ';
+
+	  // set the initial value of pl here
+	  pl.varValue_.clear();
+	  for(int i = 0; i < numWts_; i++) pl.varValue_.append(wts[i+1]);	
+
+	  setulb(numWts_,m,wts,l_,u_,nbd_,f,g_,factr,pgtol,wa_,iwa_,task_,
+		  iprint,csave_,lsave_,isave_,dsave_,itfile);
+
+	  iter++;
+	  pl.varValue_.clear();
+	  for(int i = 0; i < numWts_; i++) pl.varValue_.append(wts[i+1]);	
+	  return f;
+  }
+  // assume the lower boudn and upper bound are set
+  double proceedOneStepPl(double* const & wts, double& initialValue, int& iter, bool& error, PolyNomial& pl)
+  {
+	  error = false;
+	  int m = 5; //max number of limited memory corrections
+	  double f = initialValue; // value of function to be optimized
+	  double factr = 0;
+	  double pgtol = 0;
+	  // -1: silent (-1); 1: out at every iteration
+	  ofstream* itfile = NULL;
+	  int iprint = LBFGSB_PRINT; 
+	  if (iprint >= 1) itfile = new ofstream("iterate.dat");
+	  //iter = 0;
+	  //while routine returns "FG" or "NEW_X" in task, keep calling it
+	  if (strncmp(task_,"FG",2)==0)
+	  {
+		  f = getValueAndGradientPl(g_, wts, pl);
+		  setulb(numWts_,m,wts,l_,u_,nbd_,f,g_,factr,pgtol,wa_,iwa_,task_,
+			  iprint,csave_,lsave_,isave_,dsave_,itfile);
+		  pl.varValue_.clear();
+		  for(int i = 0; i < numWts_; i++) pl.varValue_.append(wts[i+1]);	
+		  //pl.printVars(cout);
+	  }
+	  else
+	  {
+		  //the minimization routine has returned with a new iterate,
+		  //and we have opted to continue the iteration
+		  if (iter + 1 > maxIter_) return -BigValue;
+		  ++iter;		  
+
+		  setulb(numWts_,m,wts,l_,u_,nbd_,f,g_,factr,pgtol,wa_,iwa_,task_,
+			  iprint,csave_,lsave_,isave_,dsave_,itfile);
+
+		  pl.varValue_.clear();
+		  for(int i = 0; i < numWts_; i++) pl.varValue_.append(wts[i+1]);	
+		  //pl.printVars(cout);
+	  }
 
 
-    iter = 0;
+	  //If task is neither FG nor NEW_X we terminate execution.
+	  //the minimization routine has returned with one of
+	  //{CONV, ABNO, ERROR}
+	  return f;  
 
-      //indicate that the elements of x[] are unbounded
-    for (int i = 0; i <= numWts_; i++) nbd_[i] = 0;
-    
-    strcpy(task_,"START");
-    for (int i = 5; i <= 60; i++) task_[i]=' ';
-    
-    setulb(numWts_,m,wts,l_,u_,nbd_,f,g_,factr,pgtol,wa_,iwa_,task_,
-           iprint,csave_,lsave_,isave_,dsave_,itfile);
-
-    double initialValue = 0, prevValue = 0, newValue;
-    bool firstIter = true;
-
-      //while routine returns "FG" or "NEW_X" in task, keep calling it
-    while (strncmp(task_,"FG",2)==0 || strncmp(task_,"NEW_X",5)==0)
-    {
-      if (strncmp(task_,"FG",2)==0)
-      {
-        f = getValueAndGradient(g_, wts);
-
-        setulb(numWts_,m,wts,l_,u_,nbd_,f,g_,factr,pgtol,wa_,iwa_,task_,
-               iprint,csave_,lsave_,isave_,dsave_,itfile);
-
-        if (firstIter) { firstIter = false; prevValue = f; initialValue = f; }
-        ++iter;
-      }
-      else
-      {
-          //the minimization routine has returned with a new iterate,
-          //and we have opted to continue the iteration
-        if (iter+1 > maxIter_) break;
-        ++iter;
-        newValue = f;
-        
-        if (fabs(newValue-prevValue) < ftol_*fabs(prevValue)) break;
-        prevValue = newValue;
-        
-        setulb(numWts_,m,wts,l_,u_,nbd_,f,g_,factr,pgtol,wa_,iwa_,task_,
-               iprint,csave_,lsave_,isave_,dsave_,itfile);
-      }
-    }
-    
-
-    //If task is neither FG nor NEW_X we terminate execution.
-    //the minimization routine has returned with one of
-    //{CONV, ABNO, ERROR}
-    
-    if (strncmp(task_,"ABNO",4) == 0)
-    {
-      cout << "ERROR: LBFGSB failed. Returned ABNO" << endl;
-      error = true;
-      return initialValue;
-    }
-    
-    if (strncmp(task_,"ERROR",5)==0)
-    {
-      cout << "ERROR: LBFGSB failed. Returned ERROR" << endl;
-      error = true;
-      return initialValue;
-    }
-    
-    if (strncmp(task_,"CONV",4)==0)
-    {
-      //cout << "LBFGSB converged!" << endl;
-    }
-        
-    return f;    
   }
 
+
+  double minimizePl(double* const & wts, int& iter, bool& error, PolyNomial& pl)
+  {
+	error = false;
+	int m = 5; //max number of limited memory corrections
+	double f; // value of function to be optimized
+	double factr = 0;
+	double pgtol = 0;
+	// -1: silent (-1); 1: out at every iteration
+	ofstream* itfile = NULL;
+	int iprint = LBFGSB_PRINT; 
+	if (iprint >= 1) itfile = new ofstream("iterate.dat");
+	iter = 0;
+	//indicate that the elements of x[] are unbounded
+	//for (int i = 0; i <= numWts_; i++) nbd_[i] = 0;
+
+	//indicate that the elements of x[] have both upper bounds and lower bounds
+	for (int i = 0; i <= numWts_; i++) nbd_[i] = 2;
+
+	strcpy(task_,"START");
+	for (int i = 5; i <= 60; i++) task_[i]=' ';
+
+	// set the initial value of pl here
+	pl.varValue_.clear();
+	for(int i = 0; i < numWts_; i++) pl.varValue_.append(wts[i+1]);	
+
+	setulb(numWts_,m,wts,l_,u_,nbd_,f,g_,factr,pgtol,wa_,iwa_,task_,
+		iprint,csave_,lsave_,isave_,dsave_,itfile);
+
+	pl.varValue_.clear();
+	for(int i = 0; i < numWts_; i++) pl.varValue_.append(wts[i+1]);	
+	//pl.printVars(cout);
+
+	double initialValue = 0, prevValue = 0, newValue;
+	bool firstIter = true;
+
+	//while routine returns "FG" or "NEW_X" in task, keep calling it
+	while (strncmp(task_,"FG",2)==0 || strncmp(task_,"NEW_X",5)==0)
+	{
+		if (strncmp(task_,"FG",2)==0)
+		{
+			f = getValueAndGradientPl(g_, wts, pl);
+
+			setulb(numWts_,m,wts,l_,u_,nbd_,f,g_,factr,pgtol,wa_,iwa_,task_,
+				iprint,csave_,lsave_,isave_,dsave_,itfile);
+
+			pl.varValue_.clear();
+			for(int i = 0; i < numWts_; i++) pl.varValue_.append(wts[i+1]);	
+			//pl.printVars(cout);
+
+			if (firstIter) { firstIter = false; prevValue = f; initialValue = f; }
+		}
+		else
+		{
+			//the minimization routine has returned with a new iterate,
+			//and we have opted to continue the iteration
+			if (iter+1 > maxIter_) break;
+			++iter;
+			newValue = f;
+
+			if (fabs(newValue-prevValue) < ftol_*fabs(prevValue)) break;
+			prevValue = newValue;
+
+			setulb(numWts_,m,wts,l_,u_,nbd_,f,g_,factr,pgtol,wa_,iwa_,task_,
+				iprint,csave_,lsave_,isave_,dsave_,itfile);
+
+			pl.varValue_.clear();
+			for(int i = 0; i < numWts_; i++) pl.varValue_.append(wts[i+1]);	
+			//pl.printVars(cout);
+		}
+	}
+
+
+	//If task is neither FG nor NEW_X we terminate execution.
+	//the minimization routine has returned with one of
+	//{CONV, ABNO, ERROR}
+
+	if (strncmp(task_,"ABNO",4) == 0)
+	{
+		cout << "ERROR: LBFGSB failed. Returned ABNO" << endl;
+		error = true;
+		return initialValue;
+	}
+
+	if (strncmp(task_,"ERROR",5)==0)
+	{
+		cout << "ERROR: LBFGSB failed. Returned ERROR" << endl;
+		error = true;
+		return initialValue;
+	}
+
+	if (strncmp(task_,"CONV",4)==0)
+	{
+		//cout << "LBFGSB converged!" << endl;
+	}
+
+	return f;   
+
+  }
+  
+ 
+  void setUpperBounds(const double* u)
+  {
+	if (numWts_ > 0)
+	{
+		memcpy(u_+1, u, numWts_*sizeof(double));
+	}	
+  }
+
+  void setLowerBounds(const double* l)
+  {
+	  if(numWts_ > 0)
+	  {
+		  memcpy(l_+1, l, numWts_*sizeof(double));
+	  }
+  }
 
  private:
   int maxIter_;
@@ -242,7 +432,22 @@ class LBFGSB
   double dsave_[30];
 
 
- private:
+ private :
+// g for storing gradient, wts for storing current assignment to variables
+  double getValueAndGradientPl(double* const & g, const double* const & wts, PolyNomial& pl)
+  {
+	 g[0] = 0;
+	 //set pl var values
+	 //get Pl gradient 
+	 Array<double> gr = pl.GetGradient();
+	
+	 for(int i = 0; i < gr.size(); i++)
+	 {
+		g[i+1] = gr[i];
+	 }
+
+	 return pl.ComputePlValue();
+  }
   double getValueAndGradient(double* const & g, const double* const & wts)
   {
     return (pll_->getValueAndGradient(g+1, wts+1, numWts_));
@@ -539,7 +744,7 @@ class LBFGSB
   //
   //   m is an integer variable.
   //     On entry m is the maximum number of variable metri//
-  //        corrections allowed in the limited memory matrix.
+  //     corrections allowed in the limited memory matrix.
   //     On exit m is unchanged.
   //
   //   x is a double precision array of dimension n.
@@ -597,7 +802,7 @@ class LBFGSB
   //        wy, of dimension n x m, stores Y, the matrix of y-vectors;
   //        sy, of dimension m x m, stores S'Y;
   //        ss, of dimension m x m, stores S'S;
-  //	   yy, of dimension m x m, stores Y'Y;
+  //	    yy, of dimension m x m, stores Y'Y;
   //        wt, of dimension m x m, stores the Cholesky factorization
   //                                of (theta*S'S+LD^(-1)L'); see eq.
   //                                (2.26) in [3].
@@ -705,12 +910,12 @@ class LBFGSB
   //
   //   ************
   //function
-  void mainlb(const int& n, const int& m, double* const & x, 
-              const double* const & l, const double* const & u, 
-              const int* const & nbd, double& f,  double* const & g, 
-              const double& factr, const double& pgtol, 
-              double* const & ws, double* const & wy, double* const & sy,
-              double* const & ss, double* const & yy, double* const & wt,
+void mainlb(const int& n, const int& m, double* const & x, 
+			const double* const & l, const double* const & u, 
+			const int* const & nbd, double& f,  double* const & g, 
+			const double& factr, const double& pgtol, 
+			double* const & ws, double* const & wy, double* const & sy,
+			double* const & ss, double* const & yy, double* const & wt,
               double* const & wn, double* const & snd, double* const & z,
               double* const & r, double* const & d, double* const & t, 
               double* const & wa, double* const & sg, double* const& sgo,
@@ -802,7 +1007,6 @@ class LBFGSB
     else
     {
       //restore local variables.
-
       prjctd = lsave[1];
       cnstnd = lsave[2];
       boxed  = lsave[3];
