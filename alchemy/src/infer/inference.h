@@ -129,7 +129,8 @@ class Inference
         clauseTrueCnts_(NULL), clauseTrueCntsCont_(NULL), 
         clauseTrueSqCnts_(NULL), numSamples_(0),
         allClauseTrueCnts_(NULL), oldClauseTrueCnts_(NULL),
-        oldAllClauseTrueCnts_(NULL)
+        oldAllClauseTrueCnts_(NULL), queryFormulas_(NULL),
+        qfProbs_(NULL)
   {
         // If seed not specified, then init always to same random number
       if (seed_ == -1) seed_ = DEFAULT_SEED;

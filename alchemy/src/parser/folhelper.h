@@ -2598,7 +2598,7 @@ void zzappendUnitClausesToMLN(const Domain* const & domain, MLN* const & mln,
     ostringstream oss;
     clause->getPredicate(0)->getTemplate()->printWithStrVar(oss);
     bool app = mln->appendClause(oss.str(), false, clause, defaultWt, false,
-                                 idx, false, false);
+                                 idx, false, false, false);
     if (app)
     {
       mln->setFormulaNumPreds(oss.str(), 1);
@@ -2729,9 +2729,14 @@ void zzappendFormulaClausesToMLN(const ListObj* const & formula,
         ////// the sign because it's a real wt. This flag would have to 
         ////// be passed in via runYYParser
         double clauseWt = perClauseWt;
-        if (flippedClause && flippedClause == clauses[i] 
-            && zzflipWtsOfFlippedClause)
-          clauseWt = -clauseWt;
+        bool conjunction = false;
+        if (flippedClause && flippedClause == clauses[i])
+        {
+          if (zzflipWtsOfFlippedClause)
+            clauseWt = -clauseWt;
+          else
+            conjunction = true;
+        }
 
         int prevIdx;
         bool ok = false;
@@ -2746,7 +2751,7 @@ void zzappendFormulaClausesToMLN(const ListObj* const & formula,
         {
           ok = mln->appendClause(formStr, hasExist, clauses[i], 
                                  clauseWt, hasFullStop, prevIdx,
-                                 isIndivisible, hasWeightFullStop);
+                                 isIndivisible, hasWeightFullStop, conjunction);
         }
         
         if (!ok)

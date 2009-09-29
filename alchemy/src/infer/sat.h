@@ -173,9 +173,9 @@ class SAT : public Inference
 
   double getProbabilityH(GroundPredicate* const& gndPred)
   {
-	  int idx = state_->getGndPredIndex(gndPred);
+	  int idx = hstate_->getGndPredIndex(gndPred);
 	  int truthValue = 0;
-	  if (idx >= 0) truthValue = state_->getValueOfLowAtom(idx + 1);
+	  if (idx >= 0) truthValue = hstate_->getValueOfLowAtom(idx + 1);
 	  return truthValue;
   }
 
@@ -197,11 +197,11 @@ class SAT : public Inference
   
   void printTruePredsH(ostream& out)
   {
-	  for (int i = 0; i < state_->getNumAtoms(); i++)
+	  for (int i = 0; i < hstate_->getNumAtoms(); i++)
 	  {
-		  if (state_->getValueOfLowAtom(i + 1))
+		  if (hstate_->getValueOfLowAtom(i + 1))
 		  {
-			  state_->printGndPred(i, out);
+			  hstate_->printGndPred(i, out);
 			  out << endl;
 		  }
 	  }

@@ -144,9 +144,6 @@ ARGS ARGS::Args[] =
        "[-1] Maximum limit in kbytes which should be used for inference. "
        "-1 means main memory available on system is used."),
 
-  ARGS("GndPredIdxMapFile", ARGS::Opt, aGndPredIdxMapFile,
-       "File containing the mapping from ground predicates (dis & num) to their idx"),
-  
   ARGS("PrintSamplePerIteration", ARGS::Opt, aPrintSamplePerIteration,
        "Whether to print out variable values at each HMCS sample round."),
 	
@@ -154,36 +151,10 @@ ARGS ARGS::Args[] =
 
   ARGS("MaxSeconds", ARGS::Opt, aMaxSeconds, "Max seconds for HMWS and SA."),
 
-  ARGS("StartPt", ARGS::Opt, aStartPt,
-       "Starting from a fixed point, load from testcont and testdis."),    
-
-  ARGS("GenRandom", ARGS::Opt, aGenRandom,
-       "Generate random assignment as starting point, saving in testcont and testdis."),
-
-  ARGS("SATempDownRation", ARGS::Opt, aSATempDownRatio, "simulated annealing temperature degrade ratio."),
+  ARGS("SATempDownRatio", ARGS::Opt, aSATempDownRatio, "Simulated annealing "
+       "temperature degrade ratio."),
 
   ARGS("SA", ARGS::Opt, aSA, "simulated annealing inference."),
-
-  ARGS("MWSRST", ARGS::Opt, aMWSrst, "Result file for MaxwalkSAT inference."),
-
-  ARGS("noisynum", ARGS::Opt, anumerator, 
-       "numerator value for noisy pick in HMWS."),    
-
-  ARGS("noisyden", ARGS::Opt, adenominator, 
-       "denominator value for noisy pick in HMWS."),    
-
-  ARGS("hmwsDis", ARGS::Opt, aHMWSDis, 
-       "dis inference result file for hybrid maxwalksat."),    
-
-  ARGS("testcont", ARGS::Opt, atestcont, 
-       "file path containing assignment to cont variables."),    
-
-  ARGS("testdis", ARGS::Opt, atestdis, 
-       "file path containing assignment to dis variables."),    
-
-  ARGS("mwsMax", ARGS::Opt, aMaxOrNot, 
-       "[false] (MaxWalkSat) If false,MC-SAT uses WalkSAT, if true, MC-SAT "
-       "uses max-WalkSAT. "),  
 
   ARGS("hybrid", ARGS::Opt, aHybrid, 
 	   "Flag for HMLN inference."),
@@ -621,7 +592,7 @@ int main(int argc, char* argv[])
     else
     {
       inference->infer();
-      if (aHybrid && !amapPos)
+      if (aHybrid)
 	  { 
 	    printResults(queryFile, queryPredsStr, domain, resultsOut, &queries,
                      inference, inference->getHState());	

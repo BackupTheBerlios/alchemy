@@ -201,4 +201,410 @@ depend:
 	@mv $(MF).new $(MF)
 
 ############ Everything below here is subject to SUDDEN DEATH #####
+#
+# dependencies generated on:  Thu Sep 24 09:39:35 PDT 2009
+#
+../bin/obj/arguments.o: ../src/util/arguments.cpp ../src/util/arguments.h
+
+../bin/obj/powerset.o: ../src/util/powerset.cpp ../src/util/powerset.h \
+  ../src/util/array.h ../src/util/random.h
+
+../bin/obj/random.o: ../src/util/random.cpp ../src/util/random.h
+
+../bin/obj/fol.o: ../src/parser/fol.cpp ../src/parser/fol.h ../src/logic/mln.h \
+  ../src/logic/clause.h ../src/logic/domain.h ../src/util/equalstr.h \
+  ../src/util/dualmap.h ../src/util/array.h ../src/util/random.h \
+  ../src/util/equalstr.h ../src/util/constdualmap.h ../src/util/strint.h \
+  ../src/logic/predicatetemplate.h ../src/util/array.h \
+  ../src/logic/functiontemplate.h ../src/logic/predicate.h \
+  ../src/logic/term.h ../src/util/hash.h ../src/util/hasharray.h \
+  ../src/logic/function.h ../src/util/hashstring.h \
+  ../src/util/hasharray.h ../src/util/hashlist.h \
+  ../src/util/arraysaccessor.h ../src/util/powerset.h \
+  ../src/util/multdarray.h ../src/util/hashint.h ../src/logic/database.h \
+  ../src/logic/groundpreds.h ../src/infer/groundpredicate.h \
+  ../src/logic/domain.h ../src/logic/predicate.h \
+  ../src/infer/groundclause.h ../src/util/hasharray.h ../src/util/array.h \
+  ../src/util/hash.h ../src/logic/clausesampler.h \
+  ../src/logic/truefalsegroundingsstore.h ../src/util/random.h \
+  ../src/logic/clausehelper.h ../src/logic/mlnhelper.h \
+  ../src/logic/domain.h ../src/logic/database.h ../src/parser/follex.cpp \
+  ../src/parser/folhelper.h ../src/parser/strfifolist.h \
+  ../src/logic/predicate.h ../src/logic/function.h ../src/logic/clause.h \
+  ../src/logic/clausefactory.h ../src/util/hashstring.h \
+  ../src/parser/listobj.h ../src/util/array.h \
+  ../src/util/arraysaccessor.h ../src/util/timer.h \
+  ../src/parser/internals.h
+
+../bin/obj/listobj.o: ../src/parser/listobj.cpp ../src/parser/listobj.h \
+  ../src/util/array.h ../src/util/random.h ../src/util/hashstring.h \
+  ../src/util/hasharray.h ../src/logic/domain.h ../src/util/equalstr.h \
+  ../src/util/dualmap.h ../src/util/array.h ../src/util/equalstr.h \
+  ../src/util/constdualmap.h ../src/util/strint.h \
+  ../src/logic/predicatetemplate.h ../src/util/array.h \
+  ../src/logic/functiontemplate.h ../src/logic/predicate.h \
+  ../src/logic/term.h ../src/util/hash.h ../src/util/hasharray.h \
+  ../src/logic/function.h ../src/util/arraysaccessor.h
+
+../bin/obj/predicatetemplate.o: ../src/logic/predicatetemplate.cpp \
+  ../src/logic/predicatetemplate.h ../src/util/array.h \
+  ../src/util/random.h ../src/logic/domain.h ../src/util/equalstr.h \
+  ../src/util/dualmap.h ../src/util/array.h ../src/util/equalstr.h \
+  ../src/util/constdualmap.h ../src/util/strint.h \
+  ../src/logic/functiontemplate.h ../src/logic/predicate.h \
+  ../src/logic/term.h ../src/util/hash.h ../src/util/hasharray.h \
+  ../src/logic/function.h
+
+../bin/obj/functiontemplate.o: ../src/logic/functiontemplate.cpp \
+  ../src/logic/functiontemplate.h ../src/logic/predicatetemplate.h \
+  ../src/util/array.h ../src/util/random.h ../src/logic/domain.h \
+  ../src/util/equalstr.h ../src/util/dualmap.h ../src/util/array.h \
+  ../src/util/equalstr.h ../src/util/constdualmap.h ../src/util/strint.h \
+  ../src/logic/predicate.h ../src/logic/term.h ../src/util/hash.h \
+  ../src/util/hasharray.h ../src/logic/function.h
+
+../bin/obj/function.o: ../src/logic/function.cpp ../src/logic/function.h \
+  ../src/logic/functiontemplate.h ../src/logic/predicatetemplate.h \
+  ../src/util/array.h ../src/util/random.h ../src/util/hash.h \
+  ../src/util/array.h ../src/logic/term.h ../src/logic/domain.h \
+  ../src/util/equalstr.h ../src/util/dualmap.h ../src/util/equalstr.h \
+  ../src/util/constdualmap.h ../src/util/strint.h \
+  ../src/logic/predicate.h ../src/util/hasharray.h
+
+../bin/obj/predicate.o: ../src/logic/predicate.cpp ../src/logic/predicate.h \
+  ../src/logic/predicatetemplate.h ../src/util/array.h \
+  ../src/util/random.h ../src/logic/term.h ../src/util/hash.h \
+  ../src/util/array.h ../src/util/hasharray.h ../src/logic/function.h \
+  ../src/logic/functiontemplate.h ../src/logic/clause.h \
+  ../src/logic/domain.h ../src/util/equalstr.h ../src/util/dualmap.h \
+  ../src/util/equalstr.h ../src/util/constdualmap.h ../src/util/strint.h \
+  ../src/util/hashstring.h ../src/util/hasharray.h ../src/util/hashlist.h \
+  ../src/util/arraysaccessor.h ../src/util/powerset.h \
+  ../src/util/multdarray.h ../src/util/hashint.h ../src/logic/database.h \
+  ../src/logic/groundpreds.h ../src/infer/groundpredicate.h \
+  ../src/logic/domain.h ../src/logic/predicate.h \
+  ../src/infer/groundclause.h ../src/util/hasharray.h ../src/util/array.h \
+  ../src/util/hash.h ../src/logic/clausesampler.h \
+  ../src/logic/truefalsegroundingsstore.h ../src/util/random.h \
+  ../src/logic/clausehelper.h
+
+../bin/obj/term.o: ../src/logic/term.cpp ../src/logic/term.h ../src/util/array.h \
+  ../src/util/random.h ../src/logic/function.h \
+  ../src/logic/functiontemplate.h ../src/logic/predicatetemplate.h \
+  ../src/util/hash.h ../src/util/array.h ../src/logic/domain.h \
+  ../src/util/equalstr.h ../src/util/dualmap.h ../src/util/equalstr.h \
+  ../src/util/constdualmap.h ../src/util/strint.h \
+  ../src/logic/predicate.h ../src/util/hasharray.h
+
+../bin/obj/domain.o: ../src/logic/domain.cpp ../src/logic/clause.h \
+  ../src/logic/domain.h ../src/util/equalstr.h ../src/util/dualmap.h \
+  ../src/util/array.h ../src/util/random.h ../src/util/equalstr.h \
+  ../src/util/constdualmap.h ../src/util/strint.h \
+  ../src/logic/predicatetemplate.h ../src/util/array.h \
+  ../src/logic/functiontemplate.h ../src/logic/predicate.h \
+  ../src/logic/term.h ../src/util/hash.h ../src/util/hasharray.h \
+  ../src/logic/function.h ../src/util/hashstring.h \
+  ../src/util/hasharray.h ../src/util/hashlist.h \
+  ../src/util/arraysaccessor.h ../src/util/powerset.h \
+  ../src/util/multdarray.h ../src/util/hashint.h ../src/logic/database.h \
+  ../src/logic/groundpreds.h ../src/infer/groundpredicate.h \
+  ../src/logic/domain.h ../src/logic/predicate.h \
+  ../src/infer/groundclause.h ../src/util/hasharray.h ../src/util/array.h \
+  ../src/util/hash.h ../src/logic/clausesampler.h \
+  ../src/logic/truefalsegroundingsstore.h ../src/util/random.h \
+  ../src/logic/clausehelper.h ../src/logic/mln.h ../src/logic/mlnhelper.h
+
+../bin/obj/clause.o: ../src/logic/clause.cpp ../src/logic/clause.h \
+  ../src/logic/domain.h ../src/util/equalstr.h ../src/util/dualmap.h \
+  ../src/util/array.h ../src/util/random.h ../src/util/equalstr.h \
+  ../src/util/constdualmap.h ../src/util/strint.h \
+  ../src/logic/predicatetemplate.h ../src/util/array.h \
+  ../src/logic/functiontemplate.h ../src/logic/predicate.h \
+  ../src/logic/term.h ../src/util/hash.h ../src/util/hasharray.h \
+  ../src/logic/function.h ../src/util/hashstring.h \
+  ../src/util/hasharray.h ../src/util/hashlist.h \
+  ../src/util/arraysaccessor.h ../src/util/powerset.h \
+  ../src/util/multdarray.h ../src/util/hashint.h ../src/logic/database.h \
+  ../src/logic/groundpreds.h ../src/infer/groundpredicate.h \
+  ../src/logic/domain.h ../src/logic/predicate.h \
+  ../src/infer/groundclause.h ../src/util/hasharray.h ../src/util/array.h \
+  ../src/util/hash.h ../src/logic/clausesampler.h \
+  ../src/logic/truefalsegroundingsstore.h ../src/util/random.h \
+  ../src/logic/clausehelper.h ../src/infer/mrf.h ../src/util/timer.h \
+  ../src/logic/mln.h ../src/logic/mlnhelper.h \
+  ../src/infer/groundpredicate.h ../src/infer/variable.h \
+  ../src/util/util.h ../src/infer/superclause.h ../src/infer/mrf.h \
+  ../src/util/hashint.h ../src/infer/variable.h
+
+../bin/obj/clausesampler.o: ../src/logic/clausesampler.cpp \
+  ../src/logic/clausesampler.h ../src/logic/database.h ../src/util/hash.h \
+  ../src/util/array.h ../src/util/random.h ../src/logic/groundpreds.h \
+  ../src/logic/predicate.h ../src/logic/predicatetemplate.h \
+  ../src/util/array.h ../src/logic/term.h ../src/util/hasharray.h \
+  ../src/logic/function.h ../src/logic/functiontemplate.h \
+  ../src/logic/domain.h ../src/util/equalstr.h ../src/util/dualmap.h \
+  ../src/util/equalstr.h ../src/util/constdualmap.h ../src/util/strint.h \
+  ../src/util/arraysaccessor.h ../src/infer/groundpredicate.h \
+  ../src/logic/domain.h ../src/logic/predicate.h \
+  ../src/infer/groundclause.h ../src/util/hasharray.h ../src/util/array.h \
+  ../src/util/hash.h ../src/logic/truefalsegroundingsstore.h \
+  ../src/util/random.h ../src/logic/clause.h ../src/util/hashstring.h \
+  ../src/util/hasharray.h ../src/util/hashlist.h ../src/util/powerset.h \
+  ../src/util/multdarray.h ../src/util/hashint.h \
+  ../src/logic/clausehelper.h
+
+../bin/obj/groundclause.o: ../src/infer/groundclause.cpp ../src/infer/groundclause.h \
+  ../src/util/hasharray.h ../src/util/random.h ../src/util/array.h \
+  ../src/util/hash.h ../src/util/array.h ../src/infer/groundpredicate.h \
+  ../src/logic/domain.h ../src/util/equalstr.h ../src/util/dualmap.h \
+  ../src/util/equalstr.h ../src/util/constdualmap.h ../src/util/strint.h \
+  ../src/logic/predicatetemplate.h ../src/util/array.h \
+  ../src/logic/functiontemplate.h ../src/logic/predicate.h \
+  ../src/logic/term.h ../src/util/hash.h ../src/util/hasharray.h \
+  ../src/logic/function.h ../src/logic/predicate.h ../src/logic/clause.h \
+  ../src/logic/domain.h ../src/util/hashstring.h ../src/util/hasharray.h \
+  ../src/util/hashlist.h ../src/util/arraysaccessor.h \
+  ../src/util/powerset.h ../src/util/multdarray.h ../src/util/hashint.h \
+  ../src/logic/database.h ../src/logic/groundpreds.h \
+  ../src/infer/groundpredicate.h ../src/logic/clausesampler.h \
+  ../src/logic/truefalsegroundingsstore.h ../src/util/random.h \
+  ../src/logic/clausehelper.h ../src/logic/mln.h ../src/logic/clause.h \
+  ../src/logic/mlnhelper.h
+
+../bin/obj/learnwts.o: ../src/learnwts/learnwts.cpp ../src/util/arguments.h \
+  ../src/infer/inferenceargs.h ../src/learnwts/lbfgsb.h \
+  ../src/util/timer.h ../src/learnwts/pseudologlikelihood.h \
+  ../src/util/array.h ../src/util/random.h ../src/util/random.h \
+  ../src/logic/domain.h ../src/util/equalstr.h ../src/util/dualmap.h \
+  ../src/util/array.h ../src/util/equalstr.h ../src/util/constdualmap.h \
+  ../src/util/strint.h ../src/logic/predicatetemplate.h \
+  ../src/util/array.h ../src/logic/functiontemplate.h \
+  ../src/logic/predicate.h ../src/logic/term.h ../src/util/hash.h \
+  ../src/util/hasharray.h ../src/logic/function.h ../src/logic/clause.h \
+  ../src/logic/domain.h ../src/util/hashstring.h ../src/util/hasharray.h \
+  ../src/util/hashlist.h ../src/util/arraysaccessor.h \
+  ../src/util/powerset.h ../src/util/multdarray.h ../src/util/hashint.h \
+  ../src/logic/database.h ../src/logic/groundpreds.h \
+  ../src/infer/groundpredicate.h ../src/logic/domain.h \
+  ../src/logic/predicate.h ../src/infer/groundclause.h \
+  ../src/util/hasharray.h ../src/util/array.h ../src/util/hash.h \
+  ../src/logic/clausesampler.h ../src/logic/truefalsegroundingsstore.h \
+  ../src/util/random.h ../src/logic/clausehelper.h ../src/logic/mln.h \
+  ../src/logic/clause.h ../src/logic/mlnhelper.h \
+  ../src/learnwts/indextranslator.h ../src/logic/Polynomial.h \
+  ../src/learnwts/discriminativelearner.h ../src/infer/infer.h \
+  ../src/util/util.h ../src/parser/fol.h ../src/logic/mln.h \
+  ../src/logic/domain.h ../src/logic/database.h ../src/infer/mrf.h \
+  ../src/util/timer.h ../src/logic/mln.h ../src/infer/groundpredicate.h \
+  ../src/learnwts/learnwts.h ../src/util/util.h ../src/parser/fol.h \
+  ../src/infer/inferenceargs.h ../src/infer/maxwalksat.h \
+  ../src/infer/sat.h ../src/infer/inference.h \
+  ../src/logic/variablestate.h ../src/infer/mrf.h ../src/util/timer.h \
+  ../src/logic/hvariablestate.h ../src/logic/Polynomial.h \
+  ../src/learnwts/lbfgsp.h ../src/logic/logsigmoid.h \
+  ../src/logic/logichelper.h ../src/infer/maxwalksatparams.h \
+  ../src/infer/samplesatparams.h ../src/infer/mcsat.h ../src/infer/mcmc.h \
+  ../src/infer/mcmcparams.h ../src/infer/mcsatparams.h \
+  ../src/infer/unitpropagation.h ../src/infer/gibbssampler.h \
+  ../src/infer/gibbsparams.h ../src/infer/convergencetest.h \
+  ../src/util/meanvariance.h ../src/infer/gelmanconvergencetest.h \
+  ../src/infer/simulatedtempering.h \
+  ../src/infer/simulatedtemperingparams.h ../src/infer/bp.h \
+  ../src/infer/bpparams.h ../src/infer/twowaymessage.h \
+  ../src/infer/superclause.h ../src/util/hashint.h \
+  ../src/infer/variable.h ../src/infer/auxfactor.h ../src/infer/factor.h \
+  ../src/infer/link.h ../src/infer/node.h ../src/infer/superpred.h \
+  ../src/infer/factorgraph.h ../src/infer/hmcsat.h \
+  ../src/infer/hmaxwalksat.h ../src/logic/logichelper.h \
+  ../src/learnwts/lbfgsp.h ../src/infer/maxwalksat.h \
+  ../src/learnwts/learnwts.h ../src/infer/mcsat.h \
+  ../src/infer/gibbssampler.h ../src/infer/simulatedtempering.h
+
+../bin/obj/infer.o: ../src/infer/infer.cpp ../src/parser/fol.h ../src/logic/mln.h \
+  ../src/logic/clause.h ../src/logic/domain.h ../src/util/equalstr.h \
+  ../src/util/dualmap.h ../src/util/array.h ../src/util/random.h \
+  ../src/util/equalstr.h ../src/util/constdualmap.h ../src/util/strint.h \
+  ../src/logic/predicatetemplate.h ../src/util/array.h \
+  ../src/logic/functiontemplate.h ../src/logic/predicate.h \
+  ../src/logic/term.h ../src/util/hash.h ../src/util/hasharray.h \
+  ../src/logic/function.h ../src/util/hashstring.h \
+  ../src/util/hasharray.h ../src/util/hashlist.h \
+  ../src/util/arraysaccessor.h ../src/util/powerset.h \
+  ../src/util/multdarray.h ../src/util/hashint.h ../src/logic/database.h \
+  ../src/logic/groundpreds.h ../src/infer/groundpredicate.h \
+  ../src/logic/domain.h ../src/logic/predicate.h \
+  ../src/infer/groundclause.h ../src/util/hasharray.h ../src/util/array.h \
+  ../src/util/hash.h ../src/logic/clausesampler.h \
+  ../src/logic/truefalsegroundingsstore.h ../src/util/random.h \
+  ../src/logic/clausehelper.h ../src/logic/mlnhelper.h \
+  ../src/logic/domain.h ../src/logic/database.h ../src/util/arguments.h \
+  ../src/util/util.h ../src/infer/infer.h ../src/infer/mrf.h \
+  ../src/util/timer.h ../src/logic/mln.h ../src/infer/groundpredicate.h \
+  ../src/learnwts/learnwts.h ../src/util/util.h ../src/util/timer.h \
+  ../src/parser/fol.h ../src/logic/mln.h \
+  ../src/learnwts/indextranslator.h ../src/infer/inferenceargs.h \
+  ../src/infer/maxwalksat.h ../src/infer/sat.h ../src/infer/inference.h \
+  ../src/logic/variablestate.h ../src/infer/mrf.h ../src/util/timer.h \
+  ../src/logic/hvariablestate.h ../src/logic/Polynomial.h \
+  ../src/learnwts/lbfgsp.h ../src/logic/Polynomial.h \
+  ../src/logic/logsigmoid.h ../src/logic/logichelper.h \
+  ../src/infer/maxwalksatparams.h ../src/infer/samplesatparams.h \
+  ../src/infer/mcsat.h ../src/infer/mcmc.h ../src/infer/mcmcparams.h \
+  ../src/infer/mcsatparams.h ../src/infer/unitpropagation.h \
+  ../src/infer/gibbssampler.h ../src/infer/gibbsparams.h \
+  ../src/infer/convergencetest.h ../src/util/meanvariance.h \
+  ../src/infer/gelmanconvergencetest.h ../src/infer/simulatedtempering.h \
+  ../src/infer/simulatedtemperingparams.h ../src/infer/bp.h \
+  ../src/infer/bpparams.h ../src/infer/twowaymessage.h \
+  ../src/infer/superclause.h ../src/util/hashint.h \
+  ../src/infer/variable.h ../src/infer/auxfactor.h ../src/infer/factor.h \
+  ../src/infer/link.h ../src/infer/node.h ../src/infer/superpred.h \
+  ../src/infer/factorgraph.h ../src/infer/hmcsat.h \
+  ../src/infer/hmaxwalksat.h ../src/logic/logichelper.h \
+  ../src/learnwts/lbfgsp.h
+
+../bin/obj/learnstruct.o: ../src/learnstruct/learnstruct.cpp ../src/util/arguments.h \
+  ../src/parser/fol.h ../src/logic/mln.h ../src/logic/clause.h \
+  ../src/logic/domain.h ../src/util/equalstr.h ../src/util/dualmap.h \
+  ../src/util/array.h ../src/util/random.h ../src/util/equalstr.h \
+  ../src/util/constdualmap.h ../src/util/strint.h \
+  ../src/logic/predicatetemplate.h ../src/util/array.h \
+  ../src/logic/functiontemplate.h ../src/logic/predicate.h \
+  ../src/logic/term.h ../src/util/hash.h ../src/util/hasharray.h \
+  ../src/logic/function.h ../src/util/hashstring.h \
+  ../src/util/hasharray.h ../src/util/hashlist.h \
+  ../src/util/arraysaccessor.h ../src/util/powerset.h \
+  ../src/util/multdarray.h ../src/util/hashint.h ../src/logic/database.h \
+  ../src/logic/groundpreds.h ../src/infer/groundpredicate.h \
+  ../src/logic/domain.h ../src/logic/predicate.h \
+  ../src/infer/groundclause.h ../src/util/hasharray.h ../src/util/array.h \
+  ../src/util/hash.h ../src/logic/clausesampler.h \
+  ../src/logic/truefalsegroundingsstore.h ../src/util/random.h \
+  ../src/logic/clausehelper.h ../src/logic/mlnhelper.h \
+  ../src/logic/domain.h ../src/logic/database.h \
+  ../src/learnwts/learnwts.h ../src/util/util.h ../src/util/timer.h \
+  ../src/parser/fol.h ../src/logic/mln.h \
+  ../src/learnwts/indextranslator.h ../src/learnstruct/structlearn.h \
+  ../src/logic/clausefactory.h ../src/logic/mln.h \
+  ../src/learnwts/lbfgsb.h ../src/learnwts/pseudologlikelihood.h \
+  ../src/util/array.h ../src/util/random.h ../src/logic/domain.h \
+  ../src/logic/clause.h ../src/logic/Polynomial.h \
+  ../src/learnwts/discriminativelearner.h ../src/infer/infer.h \
+  ../src/util/util.h ../src/parser/fol.h ../src/infer/mrf.h \
+  ../src/util/timer.h ../src/logic/mln.h ../src/infer/groundpredicate.h \
+  ../src/learnwts/learnwts.h ../src/infer/inferenceargs.h \
+  ../src/infer/maxwalksat.h ../src/infer/sat.h ../src/infer/inference.h \
+  ../src/logic/variablestate.h ../src/infer/mrf.h ../src/util/timer.h \
+  ../src/logic/hvariablestate.h ../src/logic/Polynomial.h \
+  ../src/learnwts/lbfgsp.h ../src/logic/logsigmoid.h \
+  ../src/logic/logichelper.h ../src/infer/maxwalksatparams.h \
+  ../src/infer/samplesatparams.h ../src/infer/mcsat.h ../src/infer/mcmc.h \
+  ../src/infer/mcmcparams.h ../src/infer/mcsatparams.h \
+  ../src/infer/unitpropagation.h ../src/infer/gibbssampler.h \
+  ../src/infer/gibbsparams.h ../src/infer/convergencetest.h \
+  ../src/util/meanvariance.h ../src/infer/gelmanconvergencetest.h \
+  ../src/infer/simulatedtempering.h \
+  ../src/infer/simulatedtemperingparams.h ../src/infer/bp.h \
+  ../src/infer/bpparams.h ../src/infer/twowaymessage.h \
+  ../src/infer/superclause.h ../src/util/hashint.h \
+  ../src/infer/variable.h ../src/infer/auxfactor.h ../src/infer/factor.h \
+  ../src/infer/link.h ../src/infer/node.h ../src/infer/superpred.h \
+  ../src/infer/factorgraph.h ../src/infer/hmcsat.h \
+  ../src/infer/hmaxwalksat.h ../src/logic/logichelper.h \
+  ../src/learnwts/lbfgsp.h ../src/infer/maxwalksat.h
+
+../bin/obj/Polynomial.o: ../src/logic/Polynomial.cpp ../src/logic/Polynomial.h \
+  ../src/util/array.h ../src/util/random.h ../src/util/complex.h \
+  ../src/util/array.h
+
+../bin/obj/logichelper.o: ../src/logic/logichelper.cpp ../src/logic/logichelper.h \
+  ../src/util/array.h ../src/util/random.h
+
+../bin/obj/superpred.o: ../src/infer/superpred.cpp ../src/util/util.h \
+  ../src/infer/mrf.h ../src/util/timer.h ../src/logic/mln.h \
+  ../src/logic/clause.h ../src/logic/domain.h ../src/util/equalstr.h \
+  ../src/util/dualmap.h ../src/util/array.h ../src/util/random.h \
+  ../src/util/equalstr.h ../src/util/constdualmap.h ../src/util/strint.h \
+  ../src/logic/predicatetemplate.h ../src/util/array.h \
+  ../src/logic/functiontemplate.h ../src/logic/predicate.h \
+  ../src/logic/term.h ../src/util/hash.h ../src/util/hasharray.h \
+  ../src/logic/function.h ../src/util/hashstring.h \
+  ../src/util/hasharray.h ../src/util/hashlist.h \
+  ../src/util/arraysaccessor.h ../src/util/powerset.h \
+  ../src/util/multdarray.h ../src/util/hashint.h ../src/logic/database.h \
+  ../src/logic/groundpreds.h ../src/infer/groundpredicate.h \
+  ../src/logic/domain.h ../src/logic/predicate.h \
+  ../src/infer/groundclause.h ../src/util/hasharray.h ../src/util/array.h \
+  ../src/util/hash.h ../src/logic/clausesampler.h \
+  ../src/logic/truefalsegroundingsstore.h ../src/util/random.h \
+  ../src/logic/clausehelper.h ../src/logic/mlnhelper.h \
+  ../src/infer/groundpredicate.h ../src/infer/superclause.h \
+  ../src/util/hashint.h ../src/infer/variable.h ../src/infer/superpred.h
+
+../bin/obj/superclause.o: ../src/infer/superclause.cpp ../src/util/util.h \
+  ../src/infer/mrf.h ../src/util/timer.h ../src/logic/mln.h \
+  ../src/logic/clause.h ../src/logic/domain.h ../src/util/equalstr.h \
+  ../src/util/dualmap.h ../src/util/array.h ../src/util/random.h \
+  ../src/util/equalstr.h ../src/util/constdualmap.h ../src/util/strint.h \
+  ../src/logic/predicatetemplate.h ../src/util/array.h \
+  ../src/logic/functiontemplate.h ../src/logic/predicate.h \
+  ../src/logic/term.h ../src/util/hash.h ../src/util/hasharray.h \
+  ../src/logic/function.h ../src/util/hashstring.h \
+  ../src/util/hasharray.h ../src/util/hashlist.h \
+  ../src/util/arraysaccessor.h ../src/util/powerset.h \
+  ../src/util/multdarray.h ../src/util/hashint.h ../src/logic/database.h \
+  ../src/logic/groundpreds.h ../src/infer/groundpredicate.h \
+  ../src/logic/domain.h ../src/logic/predicate.h \
+  ../src/infer/groundclause.h ../src/util/hasharray.h ../src/util/array.h \
+  ../src/util/hash.h ../src/logic/clausesampler.h \
+  ../src/logic/truefalsegroundingsstore.h ../src/util/random.h \
+  ../src/logic/clausehelper.h ../src/logic/mlnhelper.h \
+  ../src/infer/groundpredicate.h ../src/infer/superclause.h \
+  ../src/util/hashint.h ../src/infer/variable.h ../src/infer/superpred.h
+
+../bin/obj/node.o: ../src/infer/node.cpp ../src/infer/node.h ../src/util/util.h \
+  ../src/infer/mrf.h ../src/util/timer.h ../src/logic/mln.h \
+  ../src/logic/clause.h ../src/logic/domain.h ../src/util/equalstr.h \
+  ../src/util/dualmap.h ../src/util/array.h ../src/util/random.h \
+  ../src/util/equalstr.h ../src/util/constdualmap.h ../src/util/strint.h \
+  ../src/logic/predicatetemplate.h ../src/util/array.h \
+  ../src/logic/functiontemplate.h ../src/logic/predicate.h \
+  ../src/logic/term.h ../src/util/hash.h ../src/util/hasharray.h \
+  ../src/logic/function.h ../src/util/hashstring.h \
+  ../src/util/hasharray.h ../src/util/hashlist.h \
+  ../src/util/arraysaccessor.h ../src/util/powerset.h \
+  ../src/util/multdarray.h ../src/util/hashint.h ../src/logic/database.h \
+  ../src/logic/groundpreds.h ../src/infer/groundpredicate.h \
+  ../src/logic/domain.h ../src/logic/predicate.h \
+  ../src/infer/groundclause.h ../src/util/hasharray.h ../src/util/array.h \
+  ../src/util/hash.h ../src/logic/clausesampler.h \
+  ../src/logic/truefalsegroundingsstore.h ../src/util/random.h \
+  ../src/logic/clausehelper.h ../src/logic/mlnhelper.h \
+  ../src/infer/groundpredicate.h ../src/infer/link.h \
+  ../src/infer/superpred.h ../src/infer/superclause.h \
+  ../src/util/hashint.h ../src/infer/variable.h \
+  ../src/infer/twowaymessage.h ../src/infer/factor.h
+
+../bin/obj/factor.o: ../src/infer/factor.cpp ../src/infer/factor.h \
+  ../src/util/util.h ../src/infer/mrf.h ../src/util/timer.h \
+  ../src/logic/mln.h ../src/logic/clause.h ../src/logic/domain.h \
+  ../src/util/equalstr.h ../src/util/dualmap.h ../src/util/array.h \
+  ../src/util/random.h ../src/util/equalstr.h ../src/util/constdualmap.h \
+  ../src/util/strint.h ../src/logic/predicatetemplate.h \
+  ../src/util/array.h ../src/logic/functiontemplate.h \
+  ../src/logic/predicate.h ../src/logic/term.h ../src/util/hash.h \
+  ../src/util/hasharray.h ../src/logic/function.h \
+  ../src/util/hashstring.h ../src/util/hasharray.h ../src/util/hashlist.h \
+  ../src/util/arraysaccessor.h ../src/util/powerset.h \
+  ../src/util/multdarray.h ../src/util/hashint.h ../src/logic/database.h \
+  ../src/logic/groundpreds.h ../src/infer/groundpredicate.h \
+  ../src/logic/domain.h ../src/logic/predicate.h \
+  ../src/infer/groundclause.h ../src/util/hasharray.h ../src/util/array.h \
+  ../src/util/hash.h ../src/logic/clausesampler.h \
+  ../src/logic/truefalsegroundingsstore.h ../src/util/random.h \
+  ../src/logic/clausehelper.h ../src/logic/mlnhelper.h \
+  ../src/infer/groundpredicate.h ../src/infer/link.h ../src/infer/node.h \
+  ../src/infer/superpred.h ../src/infer/superclause.h \
+  ../src/util/hashint.h ../src/infer/variable.h \
+  ../src/infer/twowaymessage.h
 

@@ -719,14 +719,19 @@ int main(int argc, char* argv[])
          << " formulas will be tied" << endl;
 
   Array<double> priorMeans, priorStdDevs;
+  Array<bool> lockedWts;
   if (!noPrior)
   {
     if (indexTrans)
     {
       indexTrans->setPriorMeans(priorMeans);
       priorStdDevs.growToSize(priorMeans.size());
+      lockedWts.growToSize(priorMeans.size());
       for (int i = 0; i < priorMeans.size(); i++)
+      {
         priorStdDevs[i] = priorStdDev;
+        lockedWts[i] = false;
+      }
     }
     else
     {
@@ -736,15 +741,16 @@ int main(int argc, char* argv[])
       {
         priorMeans.append((*clauses)[i]->getWt());
         priorStdDevs.append(priorStdDev);
+        lockedWts.append((*clauses)[i]->isStaticWt());
       }
     }
   }
 
   int numClausesFormulas;
   if (indexTrans)
-      numClausesFormulas = indexTrans->getNumClausesAndExistFormulas();
+    numClausesFormulas = indexTrans->getNumClausesAndExistFormulas();
   else
-      numClausesFormulas = mlns[0]->getClauses()->size();
+    numClausesFormulas = mlns[0]->getClauses()->size();
 
 
   //////////////////////  discriminative/generative learning /////////////////
@@ -1122,6 +1128,8 @@ int main(int argc, char* argv[])
                           priorStdDevs.getItems());
     else          
       pll.setMeansStdDevs(-1, NULL, NULL);
+      
+    pll.setLockedWts(lockedWts.getItems());
     
     ////////////// compute the counts for the clauses
 
@@ -1129,6 +1137,7 @@ int main(int argc, char* argv[])
     for (int m = 0; m < mlns.size(); m++)
     {
       cout << "Computing counts for clauses in domain " << m << "..." << endl;
+/*
       const ClauseHashArray* clauses = mlns[m]->getClauses();
       for (int i = 0; i < clauses->size(); i++)
       {
@@ -1142,7 +1151,43 @@ int main(int argc, char* argv[])
         pll.computeCountsForNewAppendedClause((*clauses)[i], &(ci->index), m, 
                                               NULL, false, NULL);
       }
+*/
+      const ClauseHashArray* clauses = mlns[m]->getClauses();
+      const Array<MLNClauseInfo*>* clauseInfos = mlns[m]->getMLNClauseInfos();
+      const FormulaAndClausesArray* facs = mlns[m]->getFormulaAndClausesArray();
+      for (int i = 0; i < clauseInfos->size(); i++)
+      {
+        MLNClauseInfo* ci = (*clauseInfos)[i];
+        if (PRINT_CLAUSE_DURING_COUNT)
+        {
+          cout << "clause " << i << ": ";
+          (*clauses)[i]->printWithoutWt(cout, domains[m]);
+          cout << endl; cout.flush();
+        }
+        
+        Array<FormulaClauseIndexes*>& fciArr = ci->formulaClauseIndexes;
+        int fidx = *(fciArr[0]->formulaIndex);
+        //int remIdx = *(fciArr[0]->clauseIndex);
+        FormulaAndClauses* fac = (*facs)[fidx];
+
+          // If clauses are tied together, compute counts for the conjunction
+          // of clauses
+        if (fac->tiedClauses)
+        {
+          Array<Clause*>* tiedClauses = new Array<Clause*>;
+          pll.computeCountsForNewAppendedClause((*clauses)[i], &(ci->index), m, 
+                                                NULL, false, NULL, tiedClauses);
+          delete tiedClauses;
+        }
+        else
+        {
+          pll.computeCountsForNewAppendedClause((*clauses)[i], &(ci->index), m, 
+                                                NULL, false, NULL, NULL);
+        }
+      }
     }
+    
+    
     pll.compress();
     cout <<"Computing counts took ";
     Timer::printTime(cout, timer.time() - begSec); cout << endl;
@@ -1151,8 +1196,11 @@ int main(int argc, char* argv[])
 
       // initialize the clause weights
     wts.growToSize(numClausesFormulas + 1);
-    for (int i = 0; i < numClausesFormulas; i++) wts[i+1] = 0;
-    //wts[i+1] = priorMeans[i];
+    for (int i = 0; i < numClausesFormulas; i++)
+    {
+      if (lockedWts[i]) wts[i+1] = priorMeans[i];
+      else wts[i+1] = 0;
+    }
 
       // optimize the clause weights
     cout << "L-BFGS-B is finding optimal weights......" << endl;

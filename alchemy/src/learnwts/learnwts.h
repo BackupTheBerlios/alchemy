@@ -318,7 +318,7 @@ void createDomainsAndMLNs(Array<Domain*>& domains, Array<MLN*>& mlns,
           bool hasExist = mlns[i]->isExistClause(j);
           if (mlns[0]->appendExternalClause(formulaString, hasExist,
                                             new Clause(*c), domains[0], false,
-                                            false))
+                                            false, false))
           {
             (*externalClausesPerMLN)[0]->append(false);
           }

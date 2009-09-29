@@ -149,10 +149,12 @@ struct MLNClauseInfo
 struct FormulaAndClauses 
 { 
   FormulaAndClauses(const string& fformula, const int& iindex, 
-                    const bool& hhasExist, const bool& ttiedClauses)
+                    const bool& hhasExist, const bool& ttiedClauses,
+                    const bool& iisConjunction)
     : formula(fformula), indexClauses(new IndexClauseHashArray), index(iindex), 
-      hasExist(hhasExist), tiedClauses(ttiedClauses), numPreds(-1),
-      isHard(false), priorMean(0), wt(0), isExistUnique(false) {}
+      hasExist(hhasExist), tiedClauses(ttiedClauses),
+      isConjunction(iisConjunction), numPreds(-1), isHard(false), priorMean(0),
+      wt(0), isExistUnique(false) {}
   ~FormulaAndClauses() { indexClauses->deleteItemsAndClear();
                          delete indexClauses; }
   string formula; 
@@ -160,6 +162,7 @@ struct FormulaAndClauses
   int index; 
   bool hasExist;
   bool tiedClauses;
+  bool isConjunction;
   int numPreds;
   bool isHard;
   double priorMean;

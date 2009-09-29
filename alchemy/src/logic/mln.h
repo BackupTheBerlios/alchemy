@@ -162,12 +162,13 @@ class MLN
   bool appendExternalClause(const string& formulaString, const bool& hasExist,
                             Clause* const& c, const Domain* const & domain,
                             const bool& tiedClauses,
-                            const bool& hasWeightFullStop)
+                            const bool& hasWeightFullStop,
+                            const bool& isConjunction)
   {
     int idx;
     bool app = appendClause(formulaString, hasExist, c, c->getWt(),
                             c->isHardClause(), idx, tiedClauses,
-                            hasWeightFullStop);
+                            hasWeightFullStop, isConjunction);
     if (app)
     {
       setFormulaNumPreds(formulaString, c->getNumPredicates());
@@ -188,7 +189,8 @@ class MLN
   bool appendClause(const string& formulaString, const bool& hasExist, 
                     Clause* const& c, const double& wt,
                     const bool& isHardClause, int& retClauseIdx,
-                    const bool& tiedClauses, const bool& hasWeightFullStop)
+                    const bool& tiedClauses, const bool& hasWeightFullStop,
+                    const bool& conjunction)
   {
     assert(c);
     c->canonicalize();
@@ -216,7 +218,8 @@ class MLN
  
     FormulaAndClauses* fac = new FormulaAndClauses(formulaString, 
                                                    formAndClausesArray_->size(),
-                                                   hasExist, tiedClauses);
+                                                   hasExist, tiedClauses,
+                                                   conjunction);
     int fidx;
       // if this is the first time we see the formulaString
     if ( (fidx = formAndClausesArray_->find(fac)) < 0 )
@@ -741,7 +744,7 @@ class MLN
   const IndexClauseHashArray* 
   getClausesOfFormula(const string& formulaStr) const
   {
-    FormulaAndClauses tmp(formulaStr, 0, false, false);    
+    FormulaAndClauses tmp(formulaStr, 0, false, false, false);    
     int i = formAndClausesArray_->find(&tmp);
     if (i < 0) return NULL;
     FormulaAndClauses* fnc = (*formAndClausesArray_)[i];
@@ -753,7 +756,7 @@ class MLN
     //returns false.
   bool setFormulaNumPreds(const string& formulaStr, const int& numPreds)
   {
-    FormulaAndClauses tmp(formulaStr, 0, false, false);    
+    FormulaAndClauses tmp(formulaStr, 0, false, false, false);    
     int i = formAndClausesArray_->find(&tmp);
     if (i < 0) return false;
     FormulaAndClauses* fnc = (*formAndClausesArray_)[i];
@@ -766,7 +769,7 @@ class MLN
     //returns false.
   bool setFormulaIsHard(const string& formulaStr, const bool& isHard)
   {
-    FormulaAndClauses tmp(formulaStr, 0, false, false);    
+    FormulaAndClauses tmp(formulaStr, 0, false, false, false);    
     int i = formAndClausesArray_->find(&tmp);
     if (i < 0) return false;
     FormulaAndClauses* fnc = (*formAndClausesArray_)[i];
@@ -779,7 +782,7 @@ class MLN
     //returns false.
   bool setFormulaPriorMean(const string& formulaStr, const double& priorMean)
   {
-    FormulaAndClauses tmp(formulaStr, 0, false, false);    
+    FormulaAndClauses tmp(formulaStr, 0, false, false, false);
     int i = formAndClausesArray_->find(&tmp);
     if (i < 0) return false;
     FormulaAndClauses* fnc = (*formAndClausesArray_)[i];
@@ -791,7 +794,7 @@ class MLN
     //returns false.
   bool setFormulaWt(const string& formulaStr, const double& wt)
   {
-    FormulaAndClauses tmp(formulaStr, 0, false, false);    
+    FormulaAndClauses tmp(formulaStr, 0, false, false, false);    
     int i = formAndClausesArray_->find(&tmp);
     if (i < 0) return false;
     FormulaAndClauses* fnc = (*formAndClausesArray_)[i];
@@ -805,7 +808,7 @@ class MLN
   bool setFormulaIsExistUnique(const string& formulaStr, 
                                const bool& isExistUnique)
   {
-    FormulaAndClauses tmp(formulaStr, 0, false, false);    
+    FormulaAndClauses tmp(formulaStr, 0, false, false, false);
     int i = formAndClausesArray_->find(&tmp);
     if (i < 0) return false;
     FormulaAndClauses* fnc = (*formAndClausesArray_)[i];
@@ -817,7 +820,7 @@ class MLN
     //formulaStr must be in MLN
   double getFormulaWt(const string& formulaStr)
   {
-    FormulaAndClauses tmp(formulaStr, 0, false, false);    
+    FormulaAndClauses tmp(formulaStr, 0, false, false, false);    
     int i = formAndClausesArray_->find(&tmp);
     FormulaAndClauses* fnc = (*formAndClausesArray_)[i];
     return fnc->wt;
@@ -915,7 +918,10 @@ class MLN
       if ((*fncArr)[i]->isHard) 
         out << (*fncArr)[i]->formula << endl;
       else
+      {
+        if ((*fncArr)[i]->isConjunction) totalWt = -totalWt;
         out << totalWt << "  " << (*fncArr)[i]->formula << endl;
+      }
       
       if ((*fncArr)[i]->hasExist || (*fncArr)[i]->isExistUnique)
       {
@@ -1006,11 +1012,13 @@ class MLN
       }
         // output the original formula and its weight
       out.width(0); out << "// "; out.width(outprec); 
-      if (!(*fncArr)[i]->isHard) 
-        out << totalWt << "  ";
-      out << (*fncArr)[i]->formula;
-      out << endl;
-      
+      if ((*fncArr)[i]->isHard) 
+        out << (*fncArr)[i]->formula << endl;
+      else
+      {
+        if ((*fncArr)[i]->isConjunction) totalWt = -totalWt;
+        out << totalWt << "  " << (*fncArr)[i]->formula << endl;
+      }
 
       if ((*fncArr)[i]->tiedClauses)
       {

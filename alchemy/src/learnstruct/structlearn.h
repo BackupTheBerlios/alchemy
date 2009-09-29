@@ -1021,7 +1021,8 @@ class StructLearn
         int* clauseIdxInMLN = clauseIdxInMLNs[i];
         pll_->computeCountsForNewAppendedClause(c, clauseIdxInMLN, i,
                                                 undoInfos, sampleClauses_, 
-                                                c->getAuxClauseData()->cache);
+                                                c->getAuxClauseData()->cache,
+                                                NULL);
       }
     }
     else
@@ -1033,7 +1034,8 @@ class StructLearn
         int* clauseIdxInMLN = clauseIdxInMLNs[i];
         pll_->computeCountsForNewAppendedClause(c, clauseIdxInMLN, i,
                                                 undoInfos, sampleClauses_, 
-                                                c->getAuxClauseData()->cache);
+                                                c->getAuxClauseData()->cache,
+                                                NULL);
       }
       if (i > 1) c->translateConstants((*domains_)[i-1], (*domains_)[0]);
     }
@@ -1093,8 +1095,8 @@ class StructLearn
         cout << "Clause " << j << ": ";
         c->printWithoutWtWithStrVar(cout, (*domains_)[i]); cout << endl;
         int* clauseIdxInMLN = mln->getMLNClauseInfoIndexPtr(j);
-        pll_->computeCountsForNewAppendedClause(c, clauseIdxInMLN, i,
-                                            NULL, sampleClauses_, NULL);
+        pll_->computeCountsForNewAppendedClause(c, clauseIdxInMLN, i, NULL,
+                                                sampleClauses_, NULL, NULL);
       }
     }
   }
@@ -1124,7 +1126,7 @@ class StructLearn
       {
         Clause* c = (j == 0) ? unitClauses[i] : new Clause(*unitClauses[i]);
         (*mlns_)[j]->appendClause(oss.str(), false, c, priorMean_, false, idx,
-                                  false, false);
+                                  false, false, false);
         ((MLNClauseInfo*)(*mlns_)[j]->getMLNClauseInfo(idx))->priorMean 
           = priorMean_;
       }
@@ -1258,7 +1260,7 @@ class StructLearn
     c->printWithoutWtWithStrVar(oss, (*domains_)[domainIdx]);
     MLN* mln = (*mlns_)[domainIdx];
     bool ok = mln->appendClause(oss.str(), false, c, c->getWt(), false, idx,
-                                false, false);
+                                false, false, false);
     if (!ok) { cout << "ERROR: failed to insert " << oss.str() <<" into MLN"
                     << endl; exit(-1); }
     ((MLNClauseInfo*)mln->getMLNClauseInfo(idx))->priorMean = priorMean_;
@@ -2015,7 +2017,7 @@ class StructLearn
     for (int i = 0; i < existFormulas.size(); i++)
     {
       string formula = existFormulas[i]->formula;      
-      FormulaAndClauses tmp(formula, 0, false, false);
+      FormulaAndClauses tmp(formula, 0, false, false, false);
       const FormulaAndClausesArray* fnca
         = (*mlns_)[0]->getFormulaAndClausesArray();
       int a = fnca->find(&tmp);            
@@ -2104,7 +2106,8 @@ class StructLearn
       //we do not have the counts
     pll_->computeCountsForNewAppendedClause(cnfClause,clauseIdxInMln,domainIdx,
                                             undoInfos, sampleClauses_, 
-                                            cnfClause->getAuxClauseData()->cache);
+                                            cnfClause->getAuxClauseData()->cache,
+                                            NULL);
 
     if (cnfClause->getAuxClauseData()->cache)
     {
@@ -2370,7 +2373,7 @@ class StructLearn
           //if cnfClauses[i] is already in MLN, its weights will be correctly set
           //in updateWts() later
         mln->appendClause(ef->formula, true, new Clause(*cnfClauses[i]),
-                          wt, false, idx, false, false);
+                          wt, false, idx, false, false, false);
         mln->setFormulaPriorMean(ef->formula, priorMean_);
         ((MLNClauseInfo*)mln->getMLNClauseInfo(idx))->priorMean 
           += priorMean_/cnfClauses.size();

@@ -73,12 +73,11 @@
 #include "hvariablestate.h"
 
 const int hmsdebug = false;
-const int wjhmsdebug = false;
 
 /**
 * HMC-SAT is an MCMC inference algorithm designed to deal efficiently with
 * probabilistic and deterministic dependencies (See Poon and Domingos, 2006).
-* It wraps a procedure around SampleSat, thus enabling it to sample_ nearly
+* It wraps a procedure around SampleSat, thus enabling it to sample nearly
 * uniform.
 */
 class HMCSAT : public MCMC
@@ -89,13 +88,23 @@ class HMCSAT : public MCMC
   */  
   HMCSAT(HVariableState* state, long int seed, const bool& trackClauseTrueCnts,
          MCSatParams* mcsatParams) 
-       : MCMC(state, seed, trackClauseTrueCnts, mcsatParams)
+    : MCMC(state, seed, trackClauseTrueCnts, mcsatParams)
   {
+	Timer timer1;
+
       // We don't need to track clause true counts in up and ss
     mws_ = new HMaxWalkSat(hstate_, seed, false, mcsatParams->mwsParams);
     bMaxWalkSat_ = false;
     contSamples_.growToSize(hstate_->contAtomNum_);
     print_vars_per_sample_ = false;
+    
+    if (hmsdebug)
+    {
+      cout << "[MCSAT] ";
+      Timer::printTime(cout, timer1.time());
+      cout << endl;
+      timer1.reset();
+    }
   }
 
  /**
@@ -117,13 +126,19 @@ class HMCSAT : public MCMC
   */
   void init()
   {
+    Timer timer1;
     assert(numChains_ == 1);
+
+    cout << "Initializing MC-SAT with MaxWalksat on hard clauses..." << endl;
+    
     initNumTrueTotal();
     hstate_->eliminateSoftClauses();
+    hstate_->setInferenceMode(hstate_->MODE_HARD);
       // Set num. of solutions temporarily to 1
     int numSolutions = mws_->getNumSolutions();
     mws_->setNumSolutions(1);
       // Initialize with MWS
+/*    
     if (!bMaxWalkSat_)
     {
       hstate_->makeUnitCosts();
@@ -132,6 +147,7 @@ class HMCSAT : public MCMC
       // get the initialization by satisfying only hard clauses
       // Since the hybrid constraints' threshold are intialized to very large negative values, they are all satisfied and wound't be involved in inference here.
     mws_->setHeuristic(TABU);
+*/
     mws_->init();
     mws_->infer();
 
@@ -150,6 +166,17 @@ class HMCSAT : public MCMC
     mws_->setTargetCost(0.0);
     hstate_->resetDeadClauses();
     sample_ = 0;
+
+	// state_->makeUnitCosts();
+    hstate_->setInferenceMode(hstate_->MODE_SAMPLESAT);	
+
+    if (hmsdebug)
+    {
+      cout << "[MCSAT.init] ";
+      Timer::printTime(cout, timer1.time());
+      cout << endl;
+      timer1.reset();
+    }
   }
 
 	void printContSamples()
@@ -169,24 +196,15 @@ class HMCSAT : public MCMC
 	*/
 	void infer()
 	{
-		Timer timer;
+  	Timer timer1;
 		// Burn-in only if burnMaxSteps positive
 		bool burningIn = (burnMaxSteps_ > 0) ? true : false;
 		double secondsElapsed = 0;
-		upSecondsElapsed_ = 0;
+    //upSecondsElapsed_ = 0;
 		ssSecondsElapsed_ = 0;
-		double startTimeSec = timer.time();
+		double startTimeSec = timer1.time();
 		double currentTimeSec;
 		int samplesPerOutput = 100;
-
-		// If keeping track of true clause groundings, then init to zero
-		if (trackClauseTrueCnts_)
-		{
-			for (int clauseno = 0; clauseno < clauseTrueCnts_->size(); clauseno++)
-				(*clauseTrueCnts_)[clauseno] = 0;
-			for (int clauseno = 0; clauseno < clauseTrueCntsCont_->size(); clauseno++)
-				(*clauseTrueCntsCont_)[clauseno] = 0;
-		}
 
 		// Holds the ground preds which have currently been affected
 		GroundPredicateHashArray affectedGndPreds;
@@ -194,16 +212,23 @@ class HMCSAT : public MCMC
 		
 		// Update the weights for Gibbs step
 		int numAtoms = hstate_->getNumAtoms();
-
 		for (int i = 0; i < numAtoms; i++)
 		{
 			affectedGndPreds.append(hstate_->getGndPred(i), numAtoms);
 			affectedGndPredIndices.append(i);
 		}
-
 		updateWtsForGndPredsH(affectedGndPreds, affectedGndPredIndices, 0);
 		affectedGndPreds.clear();
 		affectedGndPredIndices.clear();
+
+    if (hmsdebug)
+    {	
+      cout << "[MCSAT.infer.prep] "; 
+      Timer::printTime(cout, timer1.time());
+      cout << endl;
+      timer1.reset();
+    }
+
 		cout << "Running MC-SAT sampling..." << endl;
 		// Sampling loop
 		int numSamplesPerPred = 0;
@@ -213,10 +238,13 @@ class HMCSAT : public MCMC
 			++sample_;
 			if (sample_ % samplesPerOutput == 0)
 			{ 
-				currentTimeSec = timer.time();
+				currentTimeSec = timer1.time();
 				secondsElapsed = currentTimeSec - startTimeSec;
-				cout << "sample_ (per pred) " << sample_ << ", time elapsed = ";
-				Timer::printTime(cout, secondsElapsed); cout << endl;
+        cout << "Sample (per pred) " << sample_ << ", time elapsed = ";
+        Timer::printTime(cout, secondsElapsed);
+        cout << ", num. preds = " << hstate_->getNumAtoms();
+		cout << ", num. clauses = " << hstate_->getNumClauses();
+		cout << endl;		
 			}
 
           performMCSatStep(burningIn);
@@ -246,10 +274,10 @@ class HMCSAT : public MCMC
 		} // while (!done)
 
 		cout<< "Time taken for MC-SAT sampling = "; 
-		Timer::printTime(cout, timer.time() - startTimeSec); cout << endl;
+		Timer::printTime(cout, timer1.time() - startTimeSec); cout << endl;
 
-		cout<< "Time taken for unit propagation = "; 
-		Timer::printTime(cout, upSecondsElapsed_); cout << endl;
+    //cout<< "Time taken for unit propagation = "; 
+    //Timer::printTime(cout, upSecondsElapsed_); cout << endl;
 
 		cout<< "Time taken for SampleSat = "; 
 		Timer::printTime(cout, ssSecondsElapsed_); cout << endl;
@@ -259,7 +287,7 @@ class HMCSAT : public MCMC
 		{
 			setProbTrue(i, numTrue_[i] / numSamplesPerPred);
 		}
-
+/*
 		// If keeping track of true clause groundings
 		if (trackClauseTrueCnts_)
 		{
@@ -269,6 +297,7 @@ class HMCSAT : public MCMC
 			for (int i = 0; i < clauseTrueCntsCont_->size(); i++)
 				(*clauseTrueCntsCont_)[i] = (*clauseTrueCntsCont_)[i] / numSamplesPerPred;
 		}
+*/		
 	}
 
 
@@ -301,19 +330,23 @@ private:
 		if (hmsdebug)
 		{
 			cout << "Num of clauses " << hstate_->getNumClauses() << endl;
+            cout << "Num of false clauses " << hstate_->getNumFalseClauses() << endl;
 			cout << "Num of dead clauses " << hstate_->getNumDeadClauses() << endl;
 		}
 		Timer timer;
 		double startTime;
 		if (hmsdebug) cout << "Entering MC-SAT step" << endl;
-		// Clause selection
-		hstate_->setUseThreshold(true);
-		int start = 0;		
-		
-		//at this point, 
-		//the dis and conti atom states needs to be set according to last round solution
-		hstate_->killClauses(start); //update the set of constraints of discrete variables
-		
+
+      // Clause selection
+    hstate_->setUseThreshold(true);
+    hstate_->updatePrevSatisfied();
+
+    int start = 0;
+    
+    hstate_->resetMakeBreakCostWatch();
+
+    hstate_->killClauses(start);
+
 		// SampleSat on the clauses
 		startTime = timer.time();
 		mws_->init();
@@ -332,11 +365,11 @@ private:
 		    }
 		    cout << endl;
 		}
-		if (wjhmsdebug && hstate_->costOfTotalFalseConstraints_ < mws_->getTargetCost() + SMALLVALUE)
+		if (hmsdebug && hstate_->costOfTotalFalseConstraints_ < mws_->getTargetCost() + SMALLVALUE)
 		{
 			hstate_->printLowStateAll(cout);
 		}
-		if (wjhmsdebug && hstate_->costOfTotalFalseConstraints_ > mws_->getTargetCost() + SMALLVALUE)
+		if (hmsdebug && hstate_->costOfTotalFalseConstraints_ > mws_->getTargetCost() + SMALLVALUE)
 		{
 			cout << "not all satisfied, at sample " << sample_ << ". " << endl;
 			cout << "Error at sample: " << sample_ << ", " << hstate_->costOfTotalFalseConstraints_ << endl;
@@ -436,7 +469,7 @@ private:
 	HMaxWalkSat* mws_;
 
 	// Time spent on UnitPropagation
-	double upSecondsElapsed_;
+  //double upSecondsElapsed_;
 	// Time spent on SampleSat
 	double ssSecondsElapsed_;
 };

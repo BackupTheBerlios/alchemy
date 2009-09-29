@@ -461,7 +461,8 @@ class IndexTranslator
     const FormulaAndClausesArray* fnca = mln0->getFormulaAndClausesArray();
     for (int i = 0; i < existFormulaOrdering_->size(); i++)
     {
-      FormulaAndClauses tmp((*existFormulaOrdering_)[i], 0, false, false);
+      FormulaAndClauses tmp((*existFormulaOrdering_)[i], 0, false, false,
+                            false);
       int a = fnca->find(&tmp);
       assert(a >= 0);
       priorMeans[m++] = (*fnca)[a]->priorMean;

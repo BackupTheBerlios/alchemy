@@ -93,25 +93,14 @@ char* aresultsFile    = NULL;
 char* aqueryPredsStr  = NULL;
 char* aqueryFile      = NULL;
 
-char* atestcont = "tmp.cont";
-char* atestdis = "tmp.dis";
-char* aHMWSDis = NULL;
-char* aMWSrst = NULL;
-
 int anumerator = 50;
 int adenominator = 100;
 
 char* aMaxSeconds = NULL;
-bool aGenRandom = true;
-bool aStartPt = false;
-
-int aLineNum = -1;
-char* aLinePara = NULL;
-char* aLineName = NULL;
+bool aStartPt = true;
 
 int saInterval = 100;
 
-char* aGndPredIdxMapFile = NULL;
 bool aPrintSamplePerIteration = false;
 
 string queryPredsStr, queryFile;
@@ -1281,7 +1270,7 @@ int buildInference(Inference*& inference, Domain*& domain,
       hstate->LoadContMLN();
 
 	  //hstate->WriteGndPredIdxMap(aGndPredIdxMapFile);
-	  hstate->bMaxOnly_ = amapPos;
+	  hstate->bMaxOnly_ = (amapPos || amapAll);
     }
     else
     {
@@ -1293,29 +1282,17 @@ int buildInference(Inference*& inference, Domain*& domain,
                                 trackParentClauseWts,
                                 mln, domain, aLazy);
     }
-    
-    if (aGenRandom && aHybrid)
-    {
-	  hstate->setProposalStdev(aProposalStdev);
-	  hstate->initRandom();
-	  //hstate->printContAtoms()
-	  hstate->saveLowStateAll();
-	  ofstream oscont(atestcont), osdis(atestdis);
-	  hstate->printLowStateCont(oscont);
-	  hstate->printLowState(osdis);
-	  //return 0;
-    }
 
     if (aStartPt && aHybrid)
     {
-	  hstate->LoadDisEviValuesFromRst(atestdis);
-	  hstate->LoadContEviValues(atestcont);
+      //hstate->LoadDisEviValuesFromRst(atestdis);
+      hstate->loadDisEviValues();
+      for (int i = 0; i < evidenceFilesArr.size(); i++)
+        hstate->LoadContEviValues(evidenceFilesArr[i]);
+      //hstate->loadContEviValues();
+      hstate->setInitFromEvi(true);
     }
-    if (aStartPt && !aHybrid)
-    {
-	  state->LoadDisEviValuesFromRst(atestdis);
-    }
-    
+
       // MAP inference, MC-SAT, Gibbs or Sim. Temp.
     if (amapPos || amapAll || amcsatInfer || agibbsInfer || asimtpInfer ||
         aHybrid || aSA)
@@ -1327,29 +1304,29 @@ int buildInference(Inference*& inference, Domain*& domain,
         mwsparams->numSolutions = 1;
         inference = new MaxWalkSat(state, aSeed, trackClauseTrueCnts, mwsparams);
       }
-      else if (amapPos && aHybrid && !amcsatInfer && !aSA)
+      else if ((amapPos || amapAll) && aHybrid && !amcsatInfer && !aSA)
 	  {
-	    hstate->setProposalStdev(aProposalStdev);
-		  // maximizing all the numeric terms individually by l-bfgs, 
-		  // and cache the optimal solution for each term
-		hstate->optimizeIndividualNumTerm();
-		mwsparams->numSolutions = 1;
-		mwsparams->heuristic = HMWS;
-		inference = new HMaxWalkSat(hstate, aSeed, trackClauseTrueCnts,
+        hstate->setProposalStdev(aProposalStdev);
+          // maximizing all the numeric terms individually by l-bfgs, 
+          // and cache the optimal solution for each term
+        hstate->optimizeIndividualNumTerm();
+        mwsparams->numSolutions = 1;
+        mwsparams->heuristic = HMWS;
+        inference = new HMaxWalkSat(hstate, aSeed, trackClauseTrueCnts,
                                     mwsparams);		
-		HMaxWalkSat* p = (HMaxWalkSat*)inference;
-		p->SetNoisePra(anumerator, adenominator);
-		if (aMaxSeconds)
-		{
-		  p->SetMaxSeconds(atof(aMaxSeconds));
-		}
-		
-		if (aStartPt)
-		{
+        HMaxWalkSat* p = (HMaxWalkSat*)inference;
+        p->SetNoisePra(anumerator, adenominator);
+        if (aMaxSeconds)
+        {
+          p->SetMaxSeconds(atof(aMaxSeconds));
+        }
+
+        if (aStartPt)
+        {
 		  hstate->setInitFromEvi(true);
-		}	
+		}
 	  }
-	  else if (amapPos && aHybrid && !amcsatInfer && aSA)
+	  else if ((amapPos || amapAll) && aHybrid && !amcsatInfer && aSA)
 	  {
 		hstate->setProposalStdev(aProposalStdev);
 		mwsparams->numSolutions = 1;

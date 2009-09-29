@@ -86,16 +86,6 @@ char* ainMLNFiles     = NULL;
 char* aClosedWorldPredsStr = NULL;
   // Holds open-world evidence preds
 char* aOpenWorldPredsStr = NULL;
-  // Continuous part of each clause
-char* aContPartFile = NULL;
-  // list of segments
-char* aSegListFile = NULL;
-
-// Continuous list of each cont part mln
-char* aContListFile = NULL;
-
-
-//
 
   // MAP Inference
 bool  amapPos = false;
@@ -119,7 +109,7 @@ bool aHybrid = false;
 
 bool aSA = false;
 
-char* aProposalStdev = "tmp.sd";
+char* aProposalStdev = (char*)"tmp.sd";
 bool bOptimum = false;
 
 char*  aContSamples = NULL;
@@ -144,10 +134,10 @@ int  amwsTabuLength   = 10;
 bool amwsLazyLowState = false;
 
   // SampleSat params
-int  assSaRatio = 0;       // percent of SA steps
-int  assSaTemp  = 10;       // temperature/100: SA temperature
+int  assSaRatio = 50;       // percent of SA steps
+int  assSaTemp  = 80;       // temperature/100: SA temperature
 bool assLateSa  = true;    // sa only at a plateur
-double aSATempDownRatio = 0.5;
+double aSATempDownRatio = 0.9;
 
   // MCMC params
 int amcmcNumChains    = 10;

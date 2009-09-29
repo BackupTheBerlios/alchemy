@@ -2,11 +2,11 @@
  * All of the documentation and software included in the
  * Alchemy Software is copyrighted by Stanley Kok, Parag
  * Singla, Matthew Richardson, Pedro Domingos, Marc
- * Sumner, Hoifung Poon, and Daniel Lowd.
+ * Sumner, Hoifung Poon, Daniel Lowd, and Jue Wang.
  * 
- * Copyright [2004-07] Stanley Kok, Parag Singla, Matthew
+ * Copyright [2004-09] Stanley Kok, Parag Singla, Matthew
  * Richardson, Pedro Domingos, Marc Sumner, Hoifung
- * Poon, and Daniel Lowd. All rights reserved.
+ * Poon, Daniel Lowd, and Jue Wang. All rights reserved.
  * 
  * Contact: Pedro Domingos, University of Washington
  * (pedrod@cs.washington.edu).
@@ -29,8 +29,9 @@
  * acknowledgment: "This product includes software
  * developed by Stanley Kok, Parag Singla, Matthew
  * Richardson, Pedro Domingos, Marc Sumner, Hoifung
- * Poon, and Daniel Lowd in the Department of Computer Science and
- * Engineering at the University of Washington".
+ * Poon, Daniel Lowd, and Jue Wang in the Department of
+ * Computer Science and Engineering at the University of
+ * Washington".
  * 
  * 4. Your publications acknowledge the use or
  * contribution made by the Software to your research
@@ -40,7 +41,7 @@
  * Statistical Relational AI", Technical Report,
  * Department of Computer Science and Engineering,
  * University of Washington, Seattle, WA.
- * http://www.cs.washington.edu/ai/alchemy.
+ * http://alchemy.cs.washington.edu.
  * 
  * 5. Neither the name of the University of Washington nor
  * the names of its contributors may be used to endorse or
@@ -324,6 +325,7 @@ class VariableState
   /**
    * State is re-initialized with all new clauses and atoms.
    */
+/*
   void reinit()
   {
     clause_.clearAndCompress();
@@ -353,7 +355,7 @@ class VariableState
     baseNumAtoms_ = gndPredHashArray_.size();
     init();    
   }
-  
+*/  
   /**
    * Makes a random truth assigment to all (active) atoms. Blocks are
    * taken into account: exactly one atom in the block is set to true
@@ -1262,7 +1264,7 @@ class VariableState
   {
     prevSatisfiedClause_.clearAndCompress();
     prevSatisfiedClause_.growToSize(clause_.size(),false);
-    for (int i=0; i<clause_.size(); i++)
+    for (int i = 0; i < clause_.size(); i++)
 	{
       long double cost = clauseCost_[i];
       bool isTrue = false;
@@ -2647,52 +2649,7 @@ class VariableState
 
 	if (atLeastOneDead) initMakeBreakCostWatch();
   }
-  
-  void LoadDisEviValuesFromRst(const char* szDisEvi)
-  {
-	  for(int i = 1; i < atomEvi_.size(); i++)
-	  {
-		  atomEvi_[i] = false;
-	  }
-	  map<string, int> gndPredCont;
-	  for(int i = 0; i < gndPreds_->size(); i++)
-	  {
-		  string str = (*gndPreds_)[i]->getPredicateStr(domain_);
-		  gndPredCont.insert(map<string, int>::value_type(str, i+1));
-	  }
-	  ifstream is(szDisEvi);
-	  string strLine;
-	  while (getline(is, strLine))
-	  {
-		  stringstream ss(strLine);
-		  string strtmp;
-		  getline(ss,strtmp, ' ');
-		  //strLine = "Hastype(Wall,L0_1)";
- 
-		  map<string, int>::const_iterator citer;
-		  citer = gndPredCont.find(strtmp);
-		  if (citer == gndPredCont.end())
-		  {
-			  cout << "dis evi file error, non-existent query gndings" << endl;
-			  cout  << strLine << endl;
-			  exit(1);
-		  }
-		  int atomIdx = citer->second;
-		  //atomEvi_[atomIdx] = true;
 
-		  getline(ss, strtmp);
-		  int b = atoi(strtmp.c_str());
-		  if (b==1)
-		  {
-			  atomEvi_[atomIdx] = true;
-		  }
-		  else
-		  {
-			  atomEvi_[atomIdx] = false;
-		  }
-	  }
-  }
-  
   /**
    * Marks clauses as dead which were not good in the previous iteration of
    * inference or are not picked according to a weighted coin flip. 
@@ -3382,7 +3339,7 @@ class VariableState
 
     // Current assigment of atoms
   Array<bool> atom_;
-  Array<bool> atomEvi_;
+  //Array<bool> atomEvi_;
     // Cost of clauses which would become satisfied by flipping each atom
   Array<long double> makeCost_;
     // Cost of clauses which would become unsatisfied by flipping each atom

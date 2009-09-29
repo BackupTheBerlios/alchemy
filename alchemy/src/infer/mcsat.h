@@ -301,6 +301,7 @@ class MCSAT : public MCMC
     if (msdebug)
     {
       cout << "Num of clauses " << state_->getNumClauses() << endl;
+      cout << "Num of false clauses " << state_->getNumFalseClauses() << endl;
       cout << "Num of dead clauses " << state_->getNumDeadClauses() << endl;
     }
     

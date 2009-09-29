@@ -2,11 +2,11 @@
  * All of the documentation and software included in the
  * Alchemy Software is copyrighted by Stanley Kok, Parag
  * Singla, Matthew Richardson, Pedro Domingos, Marc
- * Sumner, Hoifung Poon, and Daniel Lowd.
+ * Sumner, Hoifung Poon, Daniel Lowd, and Jue Wang.
  * 
- * Copyright [2004-07] Stanley Kok, Parag Singla, Matthew
+ * Copyright [2004-09] Stanley Kok, Parag Singla, Matthew
  * Richardson, Pedro Domingos, Marc Sumner, Hoifung
- * Poon, and Daniel Lowd. All rights reserved.
+ * Poon, Daniel Lowd, and Jue Wang. All rights reserved.
  * 
  * Contact: Pedro Domingos, University of Washington
  * (pedrod@cs.washington.edu).
@@ -29,8 +29,9 @@
  * acknowledgment: "This product includes software
  * developed by Stanley Kok, Parag Singla, Matthew
  * Richardson, Pedro Domingos, Marc Sumner, Hoifung
- * Poon, and Daniel Lowd in the Department of Computer Science and
- * Engineering at the University of Washington".
+ * Poon, Daniel Lowd, and Jue Wang in the Department of
+ * Computer Science and Engineering at the University of
+ * Washington".
  * 
  * 4. Your publications acknowledge the use or
  * contribution made by the Software to your research
@@ -40,7 +41,7 @@
  * Statistical Relational AI", Technical Report,
  * Department of Computer Science and Engineering,
  * University of Washington, Seattle, WA.
- * http://www.cs.washington.edu/ai/alchemy.
+ * http://alchemy.cs.washington.edu.
  * 
  * 5. Neither the name of the University of Washington nor
  * the names of its contributors may be used to endorse or
@@ -131,8 +132,8 @@ class PseudoLogLikelihood
                       const double& fraction, const int& minGndPredSamples, 
                       const int& maxGndPredSamples) 
     : domains_(new Array<Domain*>) , numMeans_(-1), 
-      priorMeans_(NULL), priorStdDevs_(NULL), wtFOPred_(wtFOPred),
-      sampleGndPreds_(sampleGndPreds), idxTrans_(NULL)
+      priorMeans_(NULL), priorStdDevs_(NULL), lockedWts_(NULL),
+      wtFOPred_(wtFOPred), sampleGndPreds_(sampleGndPreds), idxTrans_(NULL)
   {
 
     if (areNonEvidPreds)
@@ -332,10 +333,12 @@ class PseudoLogLikelihood
                                          const int& domainIdx,
                                          Array<UndoInfo*>* const & undoInfos,
                                          const bool& sampleClauses,
-                              Array<Array<Array<CacheCount*>*>*>* const & cache)
+                              Array<Array<Array<CacheCount*>*>*>* const & cache,
+                                         Array<Clause*>* const & tiedClauses)
   {
     computeCountsRemoveCountsHelper(true, c, clauseIdxInMLN, domainIdx, 
-                                    undoInfos, sampleClauses, cache);
+                                    undoInfos, sampleClauses, cache,
+                                    tiedClauses);
   }
 
 
@@ -344,7 +347,7 @@ class PseudoLogLikelihood
                              Array<UndoInfo*>* const & undoInfos)
   {
     computeCountsRemoveCountsHelper(false, c, clauseIdxInMLN, domainIdx, 
-                                    undoInfos, false, NULL);
+                                    undoInfos, false, NULL, NULL);
   }
 
 
@@ -476,6 +479,10 @@ class PseudoLogLikelihood
     priorStdDevs_ = priorStdDevs;
   }
 
+  void setLockedWts(const bool* const & lockedWts)
+  {
+    lockedWts_ = lockedWts;
+  }
 
   void setSampleGndPreds(const bool& sgp) 
   { 
@@ -656,7 +663,8 @@ class PseudoLogLikelihood
                                        const int& domainIdx,
                                        Array<UndoInfo*>* const & undoInfos,
                                        const bool& sampleClauses,
-                              Array<Array<Array<CacheCount*>*>*>* const & cache)
+                              Array<Array<Array<CacheCount*>*>*>* const & cache,
+                                       Array<Clause*>* const & tiedClauses)
   {
     //cout << "before: c = " << *c << endl;
     const Domain* domain = (*domains_)[domainIdx];
@@ -676,7 +684,7 @@ class PseudoLogLikelihood
       //used to store canonicalized predicates (before they are grounded)
     PredicateHashArray seenPreds;
 
-        //for each pred that clause contains
+      //for each pred that clause contains
     for (int p = 0; p < c->getNumPredicates(); p++)
     {
       Predicate* pred = c->getPredicate(p);
@@ -717,7 +725,8 @@ class PseudoLogLikelihood
           if (computeCounts)
           {
             computeAndSetCounts(c, clauseIdxInMLN, predId, gndPred, g, db,
-                                domainIdx, undoInfos, sampleClauses, cache);
+                                domainIdx, undoInfos, sampleClauses, cache,
+                                tiedClauses);
           }
           else
             removeCounts(clauseIdxInMLN, predId, g, domainIdx, undoInfos);
@@ -775,7 +784,8 @@ class PseudoLogLikelihood
 
             if (computeCounts)
               computeAndSetCounts(c, clauseIdxInMLN, predId, gndPred, g, db, 
-                                  domainIdx, undoInfos, sampleClauses, cache);
+                                  domainIdx, undoInfos, sampleClauses, cache,
+                                  tiedClauses);
             else
               removeCounts(clauseIdxInMLN, predId, g, domainIdx, undoInfos);
           }
@@ -791,7 +801,8 @@ class PseudoLogLikelihood
           {
             if (computeCounts)
               computeAndSetCounts(c, clauseIdxInMLN, predId, gndPred, g, db, 
-                                  domainIdx, undoInfos, sampleClauses, cache);
+                                  domainIdx, undoInfos, sampleClauses, cache,
+                                  tiedClauses);
             else
               removeCounts(clauseIdxInMLN, predId, g, domainIdx, undoInfos);
           }
@@ -1049,7 +1060,8 @@ class PseudoLogLikelihood
                            const int& domainIdx,
                            Array<UndoInfo*>* const & undoInfos,
                            const bool& sampleClauses,
-                           Array<Array<Array<CacheCount*>*>*>* const & cache)
+                           Array<Array<Array<CacheCount*>*>*>* const & cache,
+                           Array<Clause*>* const & tiedClauses)
   {
     Array<Array<Array<Array<IndexAndCount*>*>*>*>* gndPredClauseIndexesAndCounts
       = (*gndPredClauseIndexesAndCountsArr_)[domainIdx];
@@ -1089,7 +1101,8 @@ class PseudoLogLikelihood
       double cnt =
         ((Clause*)clause)->countDiffNumTrueGroundings(&gndPred, domain, db,
                                                       DB_HAS_UNKNOWN_PREDS,
-                                                      sampleClauses, c);
+                                                      sampleClauses, c,
+                                                      tiedClauses);
 //cout << "Count " << cnt << endl;
         //ignore clauses if the difference in counts is zero
       if (cnt != 0)
@@ -1403,6 +1416,7 @@ class PseudoLogLikelihood
   int numMeans_; // size priorMeans_ and priorStdDevs_ arrays
   const double* priorMeans_; //not owned by PseudoLogLikelihood, so don't delete
   const double* priorStdDevs_;//not owned by PseudoLogLikelihood,so don't delete
+  const bool* lockedWts_;//not owned by PseudoLogLikelihood,so don't delete
 
   bool wtFOPred_;  
   Array<Array<double>*>* numGndings_;

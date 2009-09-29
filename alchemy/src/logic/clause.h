@@ -2,11 +2,11 @@
  * All of the documentation and software included in the
  * Alchemy Software is copyrighted by Stanley Kok, Parag
  * Singla, Matthew Richardson, Pedro Domingos, Marc
- * Sumner, Hoifung Poon, and Daniel Lowd.
+ * Sumner, Hoifung Poon, Daniel Lowd, and Jue Wang.
  * 
- * Copyright [2004-07] Stanley Kok, Parag Singla, Matthew
+ * Copyright [2004-09] Stanley Kok, Parag Singla, Matthew
  * Richardson, Pedro Domingos, Marc Sumner, Hoifung
- * Poon, and Daniel Lowd. All rights reserved.
+ * Poon, Daniel Lowd, and Jue Wang. All rights reserved.
  * 
  * Contact: Pedro Domingos, University of Washington
  * (pedrod@cs.washington.edu).
@@ -29,19 +29,19 @@
  * acknowledgment: "This product includes software
  * developed by Stanley Kok, Parag Singla, Matthew
  * Richardson, Pedro Domingos, Marc Sumner, Hoifung
- * Poon, and Daniel Lowd in the Department of Computer Science and
- * Engineering at the University of Washington".
+ * Poon, Daniel Lowd, and Jue Wang in the Department of
+ * Computer Science and Engineering at the University of
+ * Washington".
  * 
  * 4. Your publications acknowledge the use or
  * contribution made by the Software to your research
  * using the following citation(s): 
- * Stanley Kok, Marc Sumner, Matthew Richardson,
- * Parag Singla, Hoifung Poon, Daniel Lowd, and
- * Pedro Domingos (2008). "The Alchemy System for
+ * Stanley Kok, Parag Singla, Matthew Richardson and
+ * Pedro Domingos (2005). "The Alchemy System for
  * Statistical Relational AI", Technical Report,
  * Department of Computer Science and Engineering,
  * University of Washington, Seattle, WA.
- * http://alchemy.cs.washington.edu/.
+ * http://alchemy.cs.washington.edu.
  * 
  * 5. Neither the name of the University of Washington nor
  * the names of its contributors may be used to endorse or
@@ -1045,7 +1045,8 @@ class Clause
                                     Database* const & db,
                                     const bool& hasUnknownPreds,
                                     const bool& sampleClauses,
-                                    const int& combo)
+                                    const int& combo,
+                                    Array<Clause*>* const & tiedClauses)
   {
     assert(gndPred->isGrounded());
 
@@ -1068,7 +1069,8 @@ class Clause
       //count # true groundings when gndPred is held to its actual value
     double numTrueGndActual = 
       countNumTrueGroundingsForAllComb(gndPredIndexes, gndPred, actual, flipped,
-                                       domain, hasUnknownPreds, sampleClauses);
+                                       domain, hasUnknownPreds, sampleClauses,
+                                       tiedClauses);
     //cout << "numTrueGndActual = " << numTrueGndActual << endl;
     
       //count # true groundings when gndPred is held to opposite value
@@ -1109,16 +1111,17 @@ class Clause
       numTrueGndOpp +=
         countNumTrueGroundingsForAllComb(gndPredIndexes, gndPred, newTV, 
                                          newTV != actual, domain,
-                                         hasUnknownPreds, sampleClauses);
+                                         hasUnknownPreds, sampleClauses,
+                                         tiedClauses);
 
       //numTrueGndOpp +=
       //  countNumTrueGroundingsForAllComb(gndPredIndexes, (*block)[oldTrueOne],
       //                                   opp, flipped, domain, hasUnknownPreds,
-      //                                   sampleClauses);
+      //                                   sampleClauses, tiedClauses);
       //numTrueGndOpp +=
       //  countNumTrueGroundingsForAllComb(gndPredIndexes, (*block)[newTrueOne],
       //                                   opp, flipped, domain, hasUnknownPreds,
-      //                                   sampleClauses);
+      //                                   sampleClauses, tiedClauses);
       
       if (oldTruePred) db->setValue(oldTruePred, TRUE);
       db->setValue(newTruePred, FALSE);
@@ -1135,7 +1138,8 @@ class Clause
 
       numTrueGndOpp +=
         countNumTrueGroundingsForAllComb(gndPredIndexes, gndPred, opp, flipped,
-                                        domain, hasUnknownPreds, sampleClauses);
+                                        domain, hasUnknownPreds, sampleClauses,
+                                        tiedClauses);
 
       db->setValue(gndPred, actual);
     }
@@ -2232,7 +2236,8 @@ class Clause
                                           const bool& gndPredFlipped,
                                           const Domain* const & domain,
                                           const bool& hasUnknownPreds,
-                                          const bool& sampleClauses)
+                                          const bool& sampleClauses,
+                                          Array<Clause*>* const & tiedClauses)
   {
     assert(varIdToVarsGroundedType_);
     const Database* db = domain->getDB();
@@ -2279,6 +2284,15 @@ class Clause
       
         //count number of true groundings
       double cnt, numGndings = countNumGroundings();
+      if (tiedClauses)
+      {
+        for (int i = 0; i < tiedClauses->size(); i++)
+        {
+          double gndings = (*tiedClauses)[i]->getNumGroundings(domain);
+          cnt += gndings;
+          numGndings += gndings;
+        }
+      }
 
         //if any of the grounded predicates has the same truth value and sense
       if (sameTruthValueAndSense)

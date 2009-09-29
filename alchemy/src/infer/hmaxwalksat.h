@@ -82,7 +82,6 @@
 
 
 const bool hmwsdebug = false;
-const bool wjhmwsdebug = false;
 #define BIGSTEP 100
 /**
 * The HMaxWalkSat algorithm. This code is based on the HMaxWalkSat
@@ -113,6 +112,8 @@ public:
 		maxTries_ = params->maxTries;
 		targetCost_ = params->targetCost;
 		hard_ = params->hard;
+      // Set this in the state
+    hstate_->setBreakHardClauses(hard_);
 		numSolutions_ = params->numSolutions;
 		heuristic_ = params->heuristic;									   
 
@@ -125,9 +126,8 @@ public:
 		lateSa_ = params->ssParams->lateSa;
 
 		// Info from SAT class
-		if (heuristic_ == TABU || heuristic_ == SS || heuristic_ == HMWS) {
+		if (heuristic_ == TABU || heuristic_ == SS || heuristic_ == HMWS)
 			changed_.growToSize(numAtoms + 1);
-		}
 		numFlips_ = 0;
 
 		// Info from HMaxWalkSat
@@ -279,7 +279,7 @@ public:
 				numFlips_++;
 				int atomIdx = (this->*(pickcode[heuristic_]))();
 
-				if (wjhmwsdebug)
+				if (hmwsdebug)
 				{
 					cout << "HMWS picked atom: " << atomIdx << "." << endl;
 				}
@@ -303,24 +303,24 @@ public:
 						hstate_->UpdateHybridClauseWeightSumByContAtom(atomIdx, pickedContValue_);
 					}  // For HMWS ends
 				}  // Continuous variable ends
-				else if (atomIdx >0 && atomIdx != NOVALUE)  // Discrete variables
+				else if (atomIdx > 0 && atomIdx != NOVALUE)  // Discrete variables
 				{
 					if (!hstate_->bMaxOnly_)  // HMCS
 					{
-						if (wjhmwsdebug)
+						if (hmwsdebug)
 						{
 							cout << "flipping dis atom: " << atomIdx << " before flip:"; hstate_->printDisAtom(atomIdx, cout); cout << endl;
 						}
 
 						flipAtom(atomIdx);
-						if (wjhmwsdebug)
+						if (hmwsdebug)
 						{
 							cout << "after flip in dis: ";hstate_->printDisAtom(atomIdx, cout); cout<< endl;
 						}
 
 						bool atomValue = hstate_->getValueOfAtom(atomIdx);
 						hstate_->UpdateHybridClauseInfoByDisAtom(atomIdx, atomValue);
-						if (wjhmwsdebug)
+						if (hmwsdebug)
 						{
 							cout << "after flip in cont: ";hstate_->printDisAtom(atomIdx, cout); cout<< endl;
 						}
@@ -431,8 +431,10 @@ public:
 				{
 					numhardfalse++;
 				}
-			}			
-			cout << "after HMWS, false dis clause#: " << hstate_->getNumFalseClauses() << " false hard clause#: " << numhardfalse<< endl;
+			}
+			cout << "after HMWS, false dis clause#: " 
+                 << hstate_->getNumFalseClauses() << " false hard clause#: "
+                 << numhardfalse << endl;
 			hstate_->saveLowToCurrentAll();
 			if (trackClauseTrueCnts_)
 			{
@@ -471,25 +473,6 @@ public:
 			hstate_->getContClauseGndings(clauseTrueCntsCont_);
 		}
 		return clauseTrueCntsCont_; 
-	}
-
-	//////////////////////////////////////////////////////////////////////////
-	/////////Customized functions for mobile robot mapping 
-	//////////////////////////////////////////////////////////////////////////
-
-	//math:
-	// k = (y2 - y1) / (x2 - x1);
-	// b = y1 - (y2 - y1)*x1 / (x2 - x1);
-	// dist = (k*x - y + b) / (sqrt(1+k^2));
-	// logsigmoid
-	// for the inequality/DoubleRange constraints of depth property, 
-	// we assume we know which side the segments should belong to, 
-	// and we use the absolute depth values in our constraints for tooshallow and too deep
-	
-	//collapsely solving the depth constraints
-	double collapseDepthConstraint(double th)
-	{
-		return 0;
 	}
 
 protected:
@@ -562,7 +545,7 @@ protected:
 	*/
 	int pickHMCS()
 	{
-		if (wjhmwsdebug)
+		if (hmwsdebug)
 		{
 			cout << "HMCS" << endl;
 		}
@@ -582,7 +565,7 @@ protected:
 		else if (toFix > 0) //discrete clause, clause idx = toFix - 1;
 		{
 			toFix --;
-			if (wjhmwsdebug)
+			if (hmwsdebug)
 			{
 				cout << "Pick false dis clause: " << toFix << ", "; hstate_->printDisClause(toFix, cout); cout << "Cost: " << hstate_->clauseCost_[toFix] << endl;
 			}
@@ -651,7 +634,7 @@ protected:
 
 			if (numbest == 0) 
 			{
-				if (wjhmwsdebug) cout << "Leaving MaxWalkSat::pickHMCS (NOVALUE)" << endl;
+				if (hmwsdebug) cout << "Leaving MaxWalkSat::pickHMCS (NOVALUE)" << endl;
 				return NOVALUE;
 			}
 			int toFlip = NOVALUE;
@@ -663,7 +646,7 @@ protected:
 				toFlip = best[random()% best.size()];
 			}
 
-			if (wjhmwsdebug) 
+			if (hmwsdebug) 
 			{
 				cout << "Improvement:" << bestvalue << endl;
 			}
@@ -676,7 +659,7 @@ protected:
 			// If the weight of the hybrid constraint is 0, then we skip the current pick.
 			if (hstate_->hybridWts_[contClauseIdx] == 0) return NOVALUE;
 
-			if (wjhmwsdebug) {
+			if (hmwsdebug) {
 				cout << "Pick false hybrid clause: " << contClauseIdx << ", constraint:"; hstate_->printHybridConstraint(contClauseIdx, cout);
 			}
 			int contVarNum = hstate_->hybridContClause_[contClauseIdx].size();
@@ -765,8 +748,9 @@ protected:
 					}
 				}
 
-				for (int i = 0; i < disVarNum; ++i) {
-					int disAtomIdx = hstate_->hybridDisClause_[contClauseIdx][i];
+				for (int i = 0; i < disVarNum; ++i)
+                {
+					int disAtomIdx = abs(hstate_->hybridDisClause_[contClauseIdx][i]);
 					double improvement = calculateImprovementDisHMCS(disAtomIdx);
 
 					if (improvement >= bestvalue)
@@ -820,7 +804,7 @@ protected:
 
 	int pickHMWS()
 	{
-		if (wjhmwsdebug)
+		if (hmwsdebug)
 		{
 			cout << "HMWSSTEP" << endl;
 		}
@@ -840,7 +824,7 @@ protected:
 			return NOVALUE;
 		} else if (toFix > 0) {  // Discrete clause, clause idx = toFix - 1;
 			toFix--;
-			if (wjhmwsdebug)
+			if (hmwsdebug)
 			{
 				cout << "Pick false dis clause: " << toFix << ", "; hstate_->printDisClause(toFix, cout);
 			}
@@ -909,7 +893,7 @@ protected:
 
 			if (numbest == 0)
 			{
-				if (wjhmwsdebug) cout << "Leaving HMaxWalkSat::pickHMWS (NOVALUE)" << endl;
+				if (hmwsdebug) cout << "Leaving HMaxWalkSat::pickHMWS (NOVALUE)" << endl;
 				return NOVALUE;
 			}
 
@@ -921,7 +905,7 @@ protected:
 				// Choose one of the best at random
 				toFlip = best[random()%numbest];
 
-			if (wjhmwsdebug) 
+			if (hmwsdebug) 
 			{
 				cout << "Picked dis atom to flip: " << toFlip << ",";hstate_->printDisAtom(toFlip, cout);
 				cout << ". Improvement:" <<bestvalue <<endl;
@@ -934,7 +918,7 @@ protected:
 			toFix++;
 			int contClauseIdx = -toFix;
 			if (hstate_->hybridWts_[contClauseIdx] == 0) return NOVALUE;
-			if (wjhmwsdebug) {
+			if (hmwsdebug) {
 				cout << "Pick hybrid clause: " << contClauseIdx << ", constraint:";
 				hstate_->printHybridConstraint(contClauseIdx, cout);
 			}
@@ -1036,7 +1020,7 @@ protected:
 	int pickSA()
 	{
 		//	if (hmwsdebug) cout << "Entering HMaxWalkSat::pickSA" << endl;
-		if (wjhmwsdebug)
+		if (hmwsdebug)
 		{
 			cout << "SA" << endl;
 
@@ -1046,13 +1030,13 @@ protected:
 		int toFlip = hstate_->getIndexOfRandomAtom(); //change to hybrid, pos, discrete, neg, continuous
 		if (toFlip > 0)//discrete atom
 		{
-			if (wjhmwsdebug)
+			if (hmwsdebug)
 			{
 				cout << "Choose to flip dis atom " << toFlip << ":";hstate_->printDisAtom(toFlip, cout);
 			}
 			long double improvement = hstate_->getImprovementInWeightSumByFlipping(toFlip);
 			
-			if (wjhmwsdebug)
+			if (hmwsdebug)
 			{
 				cout << "By flipping, improvement is " << improvement << endl;
 			}
@@ -1084,11 +1068,11 @@ protected:
 
 			long double improvement = hstate_->getImprovementRandomMoveCont(contAtomIdx, vContAtomFlipped); // change to hybrid
 
-			if (wjhmwsdebug)
+			if (hmwsdebug)
 			{
 				cout << "Choose to flip cont atom " << contAtomIdx << ":";hstate_->printContAtom(contAtomIdx, cout);
 			}
-			if (wjhmwsdebug)
+			if (hmwsdebug)
 			{
 				cout << "By flipping to " << vContAtomFlipped << ", improvement is " << improvement << endl;
 			}
@@ -1120,7 +1104,7 @@ protected:
 		// then perform SA
 		if (costOfFalseClauses <= targetCost_ + SMALLVALUE || (random() % 100 < saRatio_ && !lateSa_))
 		{
-			if (wjhmwsdebug)
+			if (hmwsdebug)
 			{
 				cout << "SASTEP" << endl;
 			}
@@ -1128,16 +1112,18 @@ protected:
 			int toFlip = hstate_->getIndexOfRandomAtom(); //change to hybrid, pos, discrete, neg, continuous
 			if (toFlip > 0)  // Discrete atom.
 			{
-				if (wjhmwsdebug)
+				if (hmwsdebug)
 				{
-					cout << "Choose to flip dis atom " << toFlip << ":";hstate_->printDisAtom(toFlip, cout);
+					cout << "Choose to flip dis atom " << toFlip << ":";
+                    hstate_->printDisAtom(toFlip, cout);
+                    cout << endl;
 				}
 				long double improvement = calculateImprovementDisHMCS(toFlip); 
 
-				if (wjhmwsdebug)
-				{
-					cout << "By flipping, improvement is " << improvement << endl;
-				}
+        if (hmwsdebug)
+        {
+          cout << "By flipping, improvement is " << improvement << endl;
+        }
 
 				// If pos. or no improvement, then the atom will be flipped
 				// Or neg. improvement: According to temp. flip atom anyway
@@ -1157,7 +1143,7 @@ protected:
 				double vContAtomFlipped;				
 				long double improvement = hstate_->GetImprovementByMovingContVar(contAtomIdx, vContAtomFlipped); 
 				
-				if (wjhmwsdebug)
+				if (hmwsdebug)
 				{
 					cout << "Choose to move cont atom " << contAtomIdx << ":";hstate_->printContAtom(contAtomIdx, cout);
 					cout << " To " << vContAtomFlipped << ", improvement is " << improvement << endl;
